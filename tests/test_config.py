@@ -27,3 +27,10 @@ def test_secrets_masques(monkeypatch):
 
 def test_yaml_de_configuration_present():
     assert charger_yaml("etats_sudoc")["correspondance"]["printed_original"] == "originale imprimée"
+
+
+def test_seuils_vides_none(monkeypatch):
+    monkeypatch.setenv("DEWEY_SEUIL", "")
+    monkeypatch.setenv("SUDOC_SEUIL_CORRESPONDANCE", "0.78")
+    r = Reglages(_env_file=None)
+    assert r.dewey_seuil is None and r.sudoc_seuil_correspondance == 0.78

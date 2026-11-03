@@ -16,11 +16,11 @@ idref-linker /align/person,accepted,PPN retenu,auto,
 idref-linker /align/person,ambiguous,Plusieurs candidats proches,décision,
 idref-linker /align/person,low_confidence,Candidat sous le seuil,décision,
 idref-linker /align/person,not_found,Aucune autorité,décision,701 sans PPN ou création d'autorité
-idref-linker /align/person,error,Erreur de service,incident,
+idref-linker /align/person,error,Erreur de service,incident,Pas un statut de l'API : réponse HTTP 4xx/5xx ou service injoignable
 idref-linker /align/thesis-organizations,accepted,Établissement / ED aligné,auto,
 idref-linker /align/thesis-organizations,ambiguous,Versions temporelles concurrentes,décision,
 idref-linker /align/thesis-organizations,low_confidence,Alignement incertain,décision,
 idref-linker /align/thesis-organizations,not_found,Aucun alignement,décision,
-dewey-classifier,au_dessus_seuil,Première classe au-dessus du seuil,auto,Seuil à fixer
-dewey-classifier,sous_seuil,Première classe sous le seuil,décision,
-dewey-classifier,error,Erreur de service,incident,
+dewey-classifier,au_dessus_seuil,Première classe au-dessus du seuil,auto,"Seuil à fixer ; statut calculé par le démonstrateur (DEWEY_SEUIL), pas par l'API"
+dewey-classifier,sous_seuil,Première classe sous le seuil,décision,"statut calculé par le démonstrateur (DEWEY_SEUIL), pas par l'API"
+dewey-classifier,error,Erreur de service,incident,Pas un statut de l'API : réponse HTTP 4xx/5xx ou service injoignable

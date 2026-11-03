@@ -36,3 +36,14 @@ alertes_statut:
     not_found: proto-notice d'autorité à créer
   idref-linker /align/thesis-organizations:
     not_found: proto-notice d'autorité à créer
+
+# Valeur d'etat_sudoc quand sudoc-checker n'est pas appelé (notice trouvée
+# dans Alma : arrêt, S01 correspond par son joker).
+etat_sudoc_non_verifie: non vérifié
+
+# Motifs d'arrêt du workflow (SPEC §3.1, §6).
+motifs:
+  provenance: provenance à confirmer
+  sudoc_indetermine: nature de la notice Sudoc non qualifiable
+  document_invalide: document invalide
+  seuil_sudoc: SUDOC_SEUIL_CORRESPONDANCE non configuré

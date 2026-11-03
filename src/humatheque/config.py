@@ -54,12 +54,32 @@ class Reglages(BaseSettings):
     idref_qualinka_api_key: SecretStr = SecretStr("")
     dewey_classification_api_url: str = ""
     classification_api_key: SecretStr = SecretStr("")
+    # idref-linker /align/person peut dépasser une minute (relevé : 65 s)
+    idref_timeout: float = 180.0
+    # Seuil de la première classe Dewey (au_dessus_seuil / sous_seuil) ;
+    # vide = seuil non fixé (Statuts_services : « Seuil à fixer »)
+    dewey_seuil: float | None = None
+
+    # VLM : fournisseurs OpenAI-compatibles (repris du POC)
+    vlm_fournisseur: str = "vlm"
+    vlm_image_max_size: int = 768
+    vlm_image_jpeg_quality: int = 85
+    openai_api_url: str = "https://api.openai.com/v1/chat/completions"
+    openai_model: str = "gpt-4o"
+    openai_api_key: SecretStr = SecretStr("")
+    hf_api_url: str = "https://router.huggingface.co/v1/chat/completions"
+    hf_model: str = "google/gemma-4-26B-A4B-it"
+    hf_token: SecretStr = SecretStr("")
+    albert_api_url: str = "https://albert.api.etalab.gouv.fr/v1/chat/completions"
+    albert_model: str = "mistralai/Ministral-3-8B-Instruct-2512"
+    albert_api_key: SecretStr = SecretStr("")
 
     # Exécution
     code_etab: str = "EPHE"
     max_workers: int = 2
     http_timeout: float = 30.0
     relances_auto: int = 2
+    relance_delai: float = 2.0  # secondes, multiplié par le numéro de tentative
     provenance_confirmation_llm: bool = False
 
     # Ingestion MinIO
@@ -70,6 +90,11 @@ class Reglages(BaseSettings):
     minio_secret_key: SecretStr = SecretStr("")
     ingestion_auto: bool = False
     planification_cron: str = ""
+
+    @field_validator("dewey_seuil", "sudoc_seuil_correspondance", mode="before")
+    @classmethod
+    def _vide_none(cls, v: Any) -> Any:
+        return None if isinstance(v, str) and not v.strip() else v
 
     @field_validator("regles_statuts_exclus", mode="before")
     @classmethod

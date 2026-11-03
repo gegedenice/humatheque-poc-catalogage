@@ -1,0 +1,340 @@
+{
+    "source": "sudoc_sru_thesis_check",
+    "profile": {
+        "name": "thesis",
+        "description": "Doctoral thesis records identified by Sudoc TDO=y.",
+        "sru_type_filter": "tdo=y",
+        "note_required_substrings": []
+    },
+    "query": {
+        "title": "La question de l'hygiène aux Indes-Néerlandaises",
+        "subtitle": "Les enjeux médicaux, culturels et sociaux",
+        "author": "Gani Achmad JAE LANI",
+        "degree_type": "Thèse de doctorat",
+        "discipline": "Histoire et civilisations",
+        "granting_institution": "École des Hautes Études en Sciences Sociales",
+        "doctoral_school": "École doctorale de l'EHESS",
+        "defense_year": 2017,
+        "language": "fre"
+    },
+    "sru": {
+        "endpoint": "https://www.sudoc.abes.fr/cbs/sru/",
+        "indexes": [
+            "MTI",
+            "AUT",
+            "NTH",
+            "TDO"
+        ],
+        "doc_type_filter": "tdo=y",
+        "queries": [
+            {
+                "query": "mti=hygiene indes neerlandaises enjeux medicaux culturels sociaux and aut=gani lani and tdo=y",
+                "url": "https://www.sudoc.abes.fr/cbs/sru/?operation=searchRetrieve&version=1.1&query=mti%3Dhygiene+indes+neerlandaises+enjeux+medicaux+culturels+sociaux+and+aut%3Dgani+lani+and+tdo%3Dy&startRecord=1&maximumRecords=10&recordSchema=unimarc",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "mti=hygiene indes neerlandaises and aut=gani lani and tdo=y",
+                "url": "https://www.sudoc.abes.fr/cbs/sru/?operation=searchRetrieve&version=1.1&query=mti%3Dhygiene+indes+neerlandaises+and+aut%3Dgani+lani+and+tdo%3Dy&startRecord=1&maximumRecords=10&recordSchema=unimarc",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "mti=hygiene indes neerlandaises enjeux medicaux culturels sociaux and nth=histoire civilisations ecole hautes etudes sciences and tdo=y",
+                "url": "https://www.sudoc.abes.fr/cbs/sru/?operation=searchRetrieve&version=1.1&query=mti%3Dhygiene+indes+neerlandaises+enjeux+medicaux+culturels+sociaux+and+nth%3Dhistoire+civilisations+ecole+hautes+etudes+sciences+and+tdo%3Dy&startRecord=1&maximumRecords=10&recordSchema=unimarc",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "mti=hygiene indes neerlandaises and tdo=y",
+                "url": "https://www.sudoc.abes.fr/cbs/sru/?operation=searchRetrieve&version=1.1&query=mti%3Dhygiene+indes+neerlandaises+and+tdo%3Dy&startRecord=1&maximumRecords=10&recordSchema=unimarc",
+                "total_found": 1,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "aut=gani lani and nth=histoire civilisations ecole hautes etudes sciences and tdo=y",
+                "url": "https://www.sudoc.abes.fr/cbs/sru/?operation=searchRetrieve&version=1.1&query=aut%3Dgani+lani+and+nth%3Dhistoire+civilisations+ecole+hautes+etudes+sciences+and+tdo%3Dy&startRecord=1&maximumRecords=10&recordSchema=unimarc",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "nth=histoire civilisations ecole hautes etudes sciences and tdo=y",
+                "url": "https://www.sudoc.abes.fr/cbs/sru/?operation=searchRetrieve&version=1.1&query=nth%3Dhistoire+civilisations+ecole+hautes+etudes+sciences+and+tdo%3Dy&startRecord=1&maximumRecords=10&recordSchema=unimarc",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            }
+        ],
+        "excluded_by_profile_filter": 0
+    },
+    "score_weights": {
+        "title": 0.42,
+        "author": 0.22,
+        "thesis_note": 0.16,
+        "year": 0.1,
+        "language": 0.05,
+        "context_or_advisor": 0.05
+    },
+    "status": "electronic_only",
+    "duplicate_score": 0.0,
+    "best_print_candidate": null,
+    "best_electronic_candidate": {
+        "source": "sudoc",
+        "ppn": "229969437",
+        "url": "https://www.sudoc.fr/229969437",
+        "title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+        "authors": [
+            "Gani Jaelani"
+        ],
+        "contributors": [
+            {
+                "name": "Gérard Jorland",
+                "role": "727"
+            },
+            {
+                "name": "Patrice Bourdelais",
+                "role": "956"
+            },
+            {
+                "name": "Romain Bertrand",
+                "role": "555"
+            },
+            {
+                "name": "Charles Illouz",
+                "role": "555"
+            },
+            {
+                "name": "Annick Opinel",
+                "role": "555"
+            },
+            {
+                "name": "Patrick Zylberman",
+                "role": "555"
+            }
+        ],
+        "institutions": [
+            "École des hautes études en sciences sociales",
+            "École doctorale de l'École des hautes études en sciences sociales"
+        ],
+        "year": "2017",
+        "language": "fre",
+        "nnt": "2017EHES0033",
+        "thesis": {
+            "type": "Thèse de doctorat",
+            "discipline": "Histoire et civilisations",
+            "institution": "Paris, EHESS",
+            "year": "2017",
+            "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+        },
+        "carrier": "electronic",
+        "counts_as_print_duplicate": false,
+        "thesis_state": "electronic",
+        "urls": [
+            "http://www.theses.fr/2017EHES0033/document",
+            "http://www.theses.fr/2017EHES0033/abes"
+        ],
+        "identifiers": [
+            "10.70675/e9536598z8b3cz4519z80d7z9452ab6ffe0b",
+            "DOI",
+            "FR",
+            "2017EHES0033",
+            "(OCoLC)1582502304",
+            "STAR89372"
+        ],
+        "score": {
+            "final": 0.7837,
+            "title": 1.0,
+            "author": 0.7857,
+            "thesis_note": 0.1682,
+            "year": 1.0,
+            "language": 1.0,
+            "context": 0.279,
+            "advisor": 0.2748
+        },
+        "evidence": {
+            "record_title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+            "authors": [
+                "Gani Jaelani"
+            ],
+            "contributors": [
+                {
+                    "name": "Gérard Jorland",
+                    "role": "727"
+                },
+                {
+                    "name": "Patrice Bourdelais",
+                    "role": "956"
+                },
+                {
+                    "name": "Romain Bertrand",
+                    "role": "555"
+                },
+                {
+                    "name": "Charles Illouz",
+                    "role": "555"
+                },
+                {
+                    "name": "Annick Opinel",
+                    "role": "555"
+                },
+                {
+                    "name": "Patrick Zylberman",
+                    "role": "555"
+                }
+            ],
+            "institutions": [
+                "École des hautes études en sciences sociales",
+                "École doctorale de l'École des hautes études en sciences sociales"
+            ],
+            "thesis": {
+                "type": "Thèse de doctorat",
+                "discipline": "Histoire et civilisations",
+                "institution": "Paris, EHESS",
+                "year": "2017",
+                "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+            },
+            "carrier_evidence": [
+                "856 URL present",
+                "135 electronic-resource field present",
+                "035 STAR source identifier",
+                "RDA media/carrier indicates online computer resource"
+            ],
+            "matched_queries": [
+                "mti=hygiene indes neerlandaises and tdo=y"
+            ]
+        }
+    },
+    "candidates": [
+        {
+            "source": "sudoc",
+            "ppn": "229969437",
+            "url": "https://www.sudoc.fr/229969437",
+            "title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+            "authors": [
+                "Gani Jaelani"
+            ],
+            "contributors": [
+                {
+                    "name": "Gérard Jorland",
+                    "role": "727"
+                },
+                {
+                    "name": "Patrice Bourdelais",
+                    "role": "956"
+                },
+                {
+                    "name": "Romain Bertrand",
+                    "role": "555"
+                },
+                {
+                    "name": "Charles Illouz",
+                    "role": "555"
+                },
+                {
+                    "name": "Annick Opinel",
+                    "role": "555"
+                },
+                {
+                    "name": "Patrick Zylberman",
+                    "role": "555"
+                }
+            ],
+            "institutions": [
+                "École des hautes études en sciences sociales",
+                "École doctorale de l'École des hautes études en sciences sociales"
+            ],
+            "year": "2017",
+            "language": "fre",
+            "nnt": "2017EHES0033",
+            "thesis": {
+                "type": "Thèse de doctorat",
+                "discipline": "Histoire et civilisations",
+                "institution": "Paris, EHESS",
+                "year": "2017",
+                "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+            },
+            "carrier": "electronic",
+            "counts_as_print_duplicate": false,
+            "thesis_state": "electronic",
+            "urls": [
+                "http://www.theses.fr/2017EHES0033/document",
+                "http://www.theses.fr/2017EHES0033/abes"
+            ],
+            "identifiers": [
+                "10.70675/e9536598z8b3cz4519z80d7z9452ab6ffe0b",
+                "DOI",
+                "FR",
+                "2017EHES0033",
+                "(OCoLC)1582502304",
+                "STAR89372"
+            ],
+            "score": {
+                "final": 0.7837,
+                "title": 1.0,
+                "author": 0.7857,
+                "thesis_note": 0.1682,
+                "year": 1.0,
+                "language": 1.0,
+                "context": 0.279,
+                "advisor": 0.2748
+            },
+            "evidence": {
+                "record_title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+                "authors": [
+                    "Gani Jaelani"
+                ],
+                "contributors": [
+                    {
+                        "name": "Gérard Jorland",
+                        "role": "727"
+                    },
+                    {
+                        "name": "Patrice Bourdelais",
+                        "role": "956"
+                    },
+                    {
+                        "name": "Romain Bertrand",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Charles Illouz",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Annick Opinel",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Patrick Zylberman",
+                        "role": "555"
+                    }
+                ],
+                "institutions": [
+                    "École des hautes études en sciences sociales",
+                    "École doctorale de l'École des hautes études en sciences sociales"
+                ],
+                "thesis": {
+                    "type": "Thèse de doctorat",
+                    "discipline": "Histoire et civilisations",
+                    "institution": "Paris, EHESS",
+                    "year": "2017",
+                    "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+                },
+                "carrier_evidence": [
+                    "856 URL present",
+                    "135 electronic-resource field present",
+                    "035 STAR source identifier",
+                    "RDA media/carrier indicates online computer resource"
+                ],
+                "matched_queries": [
+                    "mti=hygiene indes neerlandaises and tdo=y"
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,89 @@
+{
+    "source": "idref_qualinka_alignment",
+    "similarity": {
+        "type": "lexical",
+        "model": null
+    },
+    "query": {
+        "name": "Gérard JORLAND",
+        "title": "La question de l hygiène aux Indes-Néerlandaises",
+        "subtitle": "",
+        "discipline": "Histoire et civilisations",
+        "institution": "École des Hautes Études en Sciences Sociales",
+        "doctoral_school": "",
+        "degree_type": "Thèse de doctorat",
+        "year": "2017"
+    },
+    "candidate_search": {
+        "full_name": "Gérard JORLAND",
+        "first_name": "Gérard",
+        "last_name": "JORLAND",
+        "parsed_first_name": "Gérard",
+        "parsed_last_name": "JORLAND",
+        "url": "https://qualinka.idref.fr/data/find-ra-idref/api/v2/debug/req?lastName=JORLAND&firstName=G%C3%A9rard",
+        "error": null
+    },
+    "score_weights": {
+        "name": 0.4,
+        "attrra_source": 0.25,
+        "attrra_note": 0.15,
+        "references": 0.15,
+        "institution_year": 0.05
+    },
+    "status": "low_confidence",
+    "best_ppn": null,
+    "best_candidate": {
+        "ppn": "026940345",
+        "first_name": "Gérard",
+        "last_name": "Jorland",
+        "url": "https://www.idref.fr/026940345",
+        "score": {
+            "final": 0.4355,
+            "name": 1.0,
+            "attrra_source": 0.1421,
+            "attrra_note": 0.0,
+            "references": 0.0,
+            "institution_year": 0.0
+        },
+        "evidence": {
+            "preferred_forms": [
+                "Jorland, Gérard (1946-2018 ; philosophe)",
+                "Gérard Jorland"
+            ],
+            "best_attrra_source": "La Science dans la philosophie, les recherches épistémologiques d'Alexandre Koyré / Gérard Jorland, 1981",
+            "best_attrra_note": "Philosophe. Ingénieur de recherche CNRS",
+            "best_references": []
+        },
+        "errors": [
+            "references: The read operation timed out"
+        ]
+    },
+    "candidates": [
+        {
+            "ppn": "026940345",
+            "first_name": "Gérard",
+            "last_name": "Jorland",
+            "url": "https://www.idref.fr/026940345",
+            "score": {
+                "final": 0.4355,
+                "name": 1.0,
+                "attrra_source": 0.1421,
+                "attrra_note": 0.0,
+                "references": 0.0,
+                "institution_year": 0.0
+            },
+            "evidence": {
+                "preferred_forms": [
+                    "Jorland, Gérard (1946-2018 ; philosophe)",
+                    "Gérard Jorland"
+                ],
+                "best_attrra_source": "La Science dans la philosophie, les recherches épistémologiques d'Alexandre Koyré / Gérard Jorland, 1981",
+                "best_attrra_note": "Philosophe. Ingénieur de recherche CNRS",
+                "best_references": []
+            },
+            "errors": [
+                "references: The read operation timed out"
+            ]
+        }
+    ]
+}

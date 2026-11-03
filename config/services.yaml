@@ -1,0 +1,21 @@
+# Paramètres d'appel des services externes (SPEC §6). Les URL, clés et délais
+# viennent de .env ; ici, les routes et les paramètres de requête.
+
+alma:
+  routes: {these: /check/thesis, memoire: /check/dissertation}
+sudoc:
+  routes: {these: /check/thesis, memoire: /check/dissertation}
+  # Notice UNIMARC d'un PPN (lecture de la notice source d'une conversion)
+  notice_xml: "https://www.sudoc.fr/{ppn}.xml"
+  lien_notice: "https://www.sudoc.fr/{ppn}"
+idref:
+  route_personne: /align/person
+  route_organisations: /align/thesis-organizations
+  # Paramètres de l'API laissés à leurs valeurs par défaut côté service.
+dewey:
+  route: /classify
+  requete:
+    classification_type: multi-label
+    top_k: 5
+    threshold: 0.0
+    method: local
