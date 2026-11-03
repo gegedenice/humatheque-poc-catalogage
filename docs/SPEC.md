@@ -330,8 +330,9 @@ dans le dossier :
      l'état reste `originale imprimée` ;
    - aucun candidat retenu : `ambigu` si le statut du service est
      `ambiguous_print_candidate`, sinon `rien` ;
-   - statut `error`, ou `thesis_state` absent de la réponse (version du service
-     antérieure) : routage `incident`, sans repli.
+   - erreur du service (réponse HTTP 4xx/5xx ou service injoignable ; le
+     service n'a pas de statut `error`), ou `thesis_state` absent de la
+     réponse (version du service antérieure) : routage `incident`, sans repli.
 
    Le dossier affiche le tableau de tous les candidats (PPN, score, `carrier`,
    `thesis_state`, retenu oui/non) et l'état agrégé avec sa justification.
@@ -410,10 +411,12 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 - **Statuts de service** : `Statuts_services.csv` associe `(service, statut)` à
   un routage `auto | décision | sortie | incident`. **Pour alma-checker et
   sudoc-checker**, le routage ne vient pas de cette table mais des
-  correspondances du §6 (états) et de `Situations`. Seul leur statut `error`
-  y est lu (`incident`). Les lignes actuelles de ces deux services dans Grist
-  (`present_avec_ppn`, `reproduction_found`…) ne correspondent pas aux statuts
-  réels des API : elles sont à remplacer par les statuts du §6. Pour IdRef et Dewey, un
+  correspondances du §6 (états) et de `Situations`. Seule leur ligne `error`
+  y est lue (`incident`) : ce n'est pas un statut des API, elle désigne une
+  réponse HTTP 4xx/5xx ou un service injoignable (`service_indisponible`).
+  Les autres lignes de ces deux services documentent les statuts réels des
+  API (README dans `docs/services/`) ; les anciennes lignes fictives
+  (`present`, `absent`, `reproduction_found`) ont été retirées. Pour IdRef et Dewey, un
   statut `décision` **n'arrête pas** la génération : on utilise le repli
   (`$a{nom}$b{prenom}` ou zone omise) et une exception est créée. `not_found`
   côté IdRef ajoute l'alerte « proto-notice d'autorité à créer ».
