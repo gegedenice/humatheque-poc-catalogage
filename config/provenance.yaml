@@ -1,0 +1,4 @@
+# Provenance (SPEC §6, étape 2). Les règles de déduction sont ajoutées à
+# l'étape 2 ; à ce stade, seules les valeurs admises dans Situations.provenance
+# (en plus du joker `*`) sont déclarées.
+valeurs_situation: [EPHE, hors EPHE, mémoire]

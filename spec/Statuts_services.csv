@@ -2,13 +2,12 @@ service,statut,signification,routage,remarque
 extraction-vlm,json_valide,Extraction parsée,auto,
 extraction-vlm,json_invalide,Sortie non parseable,incident,
 extraction-vlm,confiance_basse,Score de confiance sous le seuil,décision,Seuil à fixer
-alma-checker,present,"Document déjà dans Alma, lié ou non au Sudoc",sortie,
-alma-checker,absent,Non trouvé,auto,
-sudoc-checker,duplicate_found,Originale imprimée trouvée,sortie,
-sudoc-checker,ambiguous_print_candidate,Candidat imprimé incertain,décision,
-sudoc-checker,electronic_only,Seule une version électronique existe,auto,
-sudoc-checker,no_print_duplicate_found,Rien trouvé,auto,
-sudoc-checker,reproduction_found,Notice de reproduction trouvée,selon Situations,Statut à distinguer côté service (imprimée / microfiche)
+alma-checker,academic_record_found,Notice de thèse ou mémoire trouvée,sortie,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,ambiguous_academic_candidate,Candidat incertain,sortie,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,off_profile_match_only,"Notice proche, pas de type TU",sortie,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,no_academic_record_found,Aucune notice trouvée,auto,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,error,Erreur de service,incident,
+sudoc-checker,ambiguous_print_candidate,Candidat imprimé incertain,décision,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations (état « ambigu » si aucun candidat retenu)"
 sudoc-checker,error,SRU injoignable ou erreur,incident,
 idref-linker /align/person,accepted,PPN retenu,auto,
 idref-linker /align/person,ambiguous,Plusieurs candidats proches,décision,

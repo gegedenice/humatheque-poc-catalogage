@@ -1,0 +1,32 @@
+[project]
+name = "humatheque"
+version = "0.1.0"
+description = "Démonstrateur du workflow de catalogage assisté (thèses et mémoires → UNIMARC)"
+readme = "CLAUDE.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.7",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+humatheque = "humatheque.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "respx>=0.21",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/humatheque"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
