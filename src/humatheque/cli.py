@@ -1,6 +1,7 @@
 """Ligne de commande `humatheque`.
 
-Sous-commandes disponibles à ce stade : `check-spec`. Les autres
+Sous-commandes disponibles à ce stade : `check-spec`, `cache-reaccentue`
+(construit le cache du dictionnaire, appelé au build Docker). Les autres
 (`serve`, `run-url`, `run-batch`, `scan-minio`, `spec-export`) arrivent avec
 les étapes suivantes (SPEC §11).
 """
@@ -40,6 +41,15 @@ def check_spec(args: argparse.Namespace) -> int:
     return 1 if rapport.bloquant else 0
 
 
+def cache_reaccentue(args: argparse.Namespace) -> int:
+    from humatheque.texte_unimarc.ressources import NOM_CACHE, dictionnaire
+
+    d = dictionnaire()
+    print(f"Cache {reglages().dossier_data / NOM_CACHE} : {len(d.formes)} formes, "
+          f"{len(d.bigrammes)} bigrammes, {len(d.noms_propres)} noms propres")
+    return 0
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
@@ -50,6 +60,9 @@ def construire_parseur() -> argparse.ArgumentParser:
     c.add_argument("--dossier", type=Path, default=None, help="dossier des CSV (défaut : spec/)")
     c.add_argument("--json", action="store_true", help="rapport au format JSON")
     c.set_defaults(fonction=check_spec)
+
+    c = sous.add_parser("cache-reaccentue", help="construit le cache du dictionnaire reaccentue dans data/")
+    c.set_defaults(fonction=cache_reaccentue)
     return p
 
 

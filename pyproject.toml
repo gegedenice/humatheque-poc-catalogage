@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.7",
     "pyyaml>=6.0",
+    "unidecode>=1.4.0",
 ]
 
 [project.scripts]
