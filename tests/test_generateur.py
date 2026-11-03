@@ -120,12 +120,17 @@ def test_non_genere_liste_comme_non_couverte(originale):
 
 
 def test_regle_prioritaire_omise_alerte(spec):
-    ctx = copy.deepcopy(THESE_ORIGINALE_EPHE) | {"titre_classement": None, "dewey_code": None}
+    ctx = copy.deepcopy(THESE_ORIGINALE_EPHE) | {"titre_classement": None, "dewey_code": None, "author": []}
     n = generer(spec, ctx, ORIG)
-    assert {"regle_prioritaire_omise:R022", "regle_prioritaire_omise:R043"} <= set(n.alertes)
-    assert not n.zones_de("686")
+    assert set(n.alertes) == {"regle_prioritaire_omise:R022", "regle_prioritaire_omise:R025",
+                              "regle_prioritaire_omise:R044"}
+    assert not n.zones_de("686")  # R043 en priorité 2 (décision du 03/11) : pas d'alerte
     # 200 ouverte par le premier fragment, avec les indicateurs déclarés pour la zone
     assert n.zones_de("200")[0].texte().startswith("200 1#$ele cas du Sénégal")
+
+
+def test_sans_sous_titre_pas_d_alerte(reproduction):
+    assert reproduction.alertes == []  # R024 en priorité 2 (décision du 03/11)
 
 
 def test_repli_de_zone(spec):

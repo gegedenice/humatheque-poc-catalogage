@@ -1,7 +1,7 @@
 id,zone,profils,priorite,mode_production,sources,gabarit,condition,repli,statut,vigilance
 R001,008,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Valeur fixe,,008 $aAax3,,,seed,
 R002,029$a,these_originale_imprimee,1,Valeur fixe,,029 ##$aFR,Thèses originales uniquement (source EPHE),,seed,
-R003,029$b,these_originale_imprimee,1,Calcul,"defense_year, code_etab, numero_nnt",$b{defense_year}{code_etab}{numero_nnt},Thèses originales uniquement (source EPHE),,à discuter,Code établissement : constante EPHE ou sortie idref-org (recommandé) ? Source des numéros incrémentaux non définie.
+R003,029$b,these_originale_imprimee,2,Calcul,"defense_year, code_etab, numero_nnt",$b{defense_year}{code_etab}{numero_nnt},Thèses originales uniquement (source EPHE),,à discuter,Code établissement : constante EPHE ou sortie idref-org (recommandé) ? Source des numéros incrémentaux non définie.
 R004,100$a,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Extraction,defense_year,100 0#$a{defense_year},,100 0#$a19XX,à discuter,"Repli incohérent : 19XX en 100, 19.. en 214$d et 328$d."
 R005,101$a,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Extraction,language,101 0#$a{language},,,seed,
 R006,101$d,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",3,Non généré,abstract_lang,101 0#$d{abstract_lang},Si résumé présent,,à discuter,Gabarit absent du wiki (proposé ici). Source absente du schéma d'extraction.
@@ -22,7 +22,7 @@ R020,182,"these_originale_imprimee, these_reproduction_imprimee, memoire_origina
 R021,183,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Valeur fixe,,183 ##$P01$anga,,,seed,
 R022,200$a,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Extraction + calcul,"title, titre_classement",200 1#$a{titre_classement},,,à discuter,"Règle d'insertion du @ (articles, mots vides) à écrire."
 R023,200$d,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Non généré,"parallel_title, parallel_title_lang",$d= {parallel_title}$z{parallel_title_lang},Si titre parallèle,,à discuter,Sources absentes du schéma d'extraction. Doublée par la 510.
-R024,200$e,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Extraction,subtitle,$e{subtitle},Si sous-titre ; répétable ; pas de majuscule initiale,,seed,
+R024,200$e,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",2,Extraction,subtitle,$e{subtitle},Si sous-titre ; répétable ; pas de majuscule initiale,,seed,
 R025,200$f,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Extraction,author,$f{author},"Forme de la page de titre, non normalisée",,seed,
 R026,200$g,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",2,Extraction,advisor,$gsous la direction de {advisor},Si directeur présent,,à discuter,"Directeurs multiples : un seul $g, noms séparés par « , » (décision du 03/11)."
 R027,214$d,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Extraction,defense_year,214 #1$d{defense_year},,214 #1$d19..,à discuter,"Le wiki cite {defense_date}, variable inexistante : remplacée par defense_year."
@@ -41,7 +41,7 @@ R039,541$a,"these_originale_imprimee, these_reproduction_imprimee, memoire_origi
 R040,600->607,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Non généré,,,,,à discuter,Priorité 1 mais non traité : décision de périmètre nécessaire.
 R041,608,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Valeur fixe,,608 ##$3027253139$aThèses et écrits académiques$2rameau,,,seed,
 R042,610$a,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",2,Non généré,,,,,seed,
-R043,686$a,"these_originale_imprimee, these_reproduction_imprimee",1,Service,dewey_code,686 ##$a{dewey_code}$2TEF,Thèses de doctorat et reproductions conformes,,à discuter,Gabarit absent du wiki (proposé ici). Mémoires concernés ? Granularité (centaines ou 3 chiffres TEF) ?
+R043,686$a,"these_originale_imprimee, these_reproduction_imprimee",2,Service,dewey_code,686 ##$a{dewey_code}$2TEF,Thèses de doctorat et reproductions conformes,,à discuter,Gabarit absent du wiki (proposé ici). Mémoires concernés ? Granularité (centaines ou 3 chiffres TEF) ?
 R044,700,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",1,Service + règle métier,"author, ppn_personne, nom_prenom",700 #1$3{ppn}$4070,,700 #1$a{nom}$b{prenom}$4070,à discuter,Règle de découpage nom/prénom non spécifiée.
 R045,701,"these_originale_imprimee, these_reproduction_imprimee",2,Service + règle métier,"advisor, ppn_personne, nom_prenom",701 #1$3{ppn}$4727,Directeur de thèse,701 #1$a{nom}$b{prenom}$4727,à discuter,Directeur absent de certaines pages de titre.
 R046,701,memoire_original_imprime,2,Service + règle métier,"advisor, ppn_personne, nom_prenom",701 #1$3{ppn}$4003,Directeur de mémoire,701 #1$a{nom}$b{prenom}$4003,seed,
