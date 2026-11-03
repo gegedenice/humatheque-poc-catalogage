@@ -6,7 +6,7 @@ Signale, sans rien corriger :
 - les sources de cardinalité inconnue ;
 - les profils inconnus (Regles, Situations) ;
 - les valeurs non admises dans `Situations` (etat_sudoc, etat_alma, provenance,
-  routage) ;
+  routage, action, profil cible d'une création ou d'une conversion) ;
 - les lignes alma-checker et sudoc-checker de `Statuts_services` autres que
   `error` (avertissement : elles sont ignorées) ;
 - les sources calculées utilisées par aucune règle (avertissement).
@@ -157,6 +157,17 @@ def verifier(spec: Spec, vocab: Vocabulaires | None = None, statuts_exclus: list
         for p in decouper(s.profil_cible, vocab.sep_liste):
             if p not in profils:
                 signaler("erreur", "profil_inconnu", "Situations", s.id, f"profil cible « {p} » inconnu")
+
+    # --- Situations : actions (config/decision.yaml)
+    actions = charger_yaml("decision")["actions"]
+    for s in spec.situations:
+        nb_profils = len(decouper(s.profil_cible, vocab.sep_liste))
+        if s.action in actions["creer"] or s.action.startswith(actions["prefixe_conversion"]):
+            if nb_profils != 1:
+                signaler("erreur", "profil_cible_invalide", "Situations", s.id,
+                         f"action « {s.action} » : un profil cible et un seul attendu ({nb_profils})")
+        elif s.action not in actions["arreter"]:
+            signaler("erreur", "action_inconnue", "Situations", s.id, f"action « {s.action} » inconnue")
 
     # --- Statuts_services
     ignores: dict[str, list[str]] = {}

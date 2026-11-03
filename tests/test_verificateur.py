@@ -128,3 +128,15 @@ def test_source_calculee_inutilisee(spec_fabriquee):
 ])
 def test_etiquettes_zone(zone, attendu):
     assert etiquettes_zone(zone, "->") == attendu
+
+
+def test_action_inconnue(spec_fabriquee):
+    spec_fabriquee.modifier("Situations", "id", "S08", action="Fabriquer")
+    assert ("action_inconnue", "S08") in _codes(_rapport(spec_fabriquee))
+
+
+@pytest.mark.parametrize("situation, profils", [
+    ("S08", ""), ("S06", "these_originale_imprimee, these_reproduction_imprimee")])
+def test_creation_ou_conversion_sans_profil_unique(spec_fabriquee, situation, profils):
+    spec_fabriquee.modifier("Situations", "id", situation, profil_cible=profils)
+    assert ("profil_cible_invalide", situation) in _codes(_rapport(spec_fabriquee))
