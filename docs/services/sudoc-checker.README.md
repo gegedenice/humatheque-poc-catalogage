@@ -1,0 +1,231 @@
+# Humatheque Sudoc Checker API
+
+FastAPI service for checking whether VLM-extracted academic-document metadata
+already has a Sudoc bibliographic record.
+
+The API targets a printed-record cataloguing pipeline. It runs several
+recall-oriented SRU queries, returns both printed/physical and electronic
+candidates, but only printed/physical candidates count toward the duplicate
+decision. Electronic Sudoc/STAR records are kept as evidence because they may
+describe the same intellectual work without blocking creation of a printed
+bibliographic record.
+
+The document-kind specifics (which SRU type predicate to apply, what to require
+in the thesis note) are bundled into reusable `DocumentProfile` strategies, so
+the same pipeline can serve theses, mémoires, and future document profiles
+without per-document forks.
+
+## Sudoc SRU Strategy
+
+The service uses the public Sudoc SRU endpoint:
+
+```text
+https://www.sudoc.abes.fr/cbs/sru/
+```
+
+It relies on the ABES SRU guide indexes [https://abes.fr/wp-content/uploads/2023/05/guide-utilisation-service-sru-catalogue-sudoc.pdf](https://abes.fr/wp-content/uploads/2023/05/guide-utilisation-service-sru-catalogue-sudoc.pdf):
+
+| Index | Purpose |
+|---|---|
+| `MTI` | title words |
+| `AUT` | author words |
+| `NTH` | thesis note, including degree, discipline, institution, year |
+| `TDO` | document-type limitation |
+
+Whether the `TDO` predicate is added depends on the active profile (see below).
+
+## Document profiles
+
+A `DocumentProfile` carries two pieces of state:
+
+- `sru_type_filter` — a CQL fragment appended to every query (or `None` to
+  leave the search space wide open).
+- `note_required_substrings` — substrings that must all appear in the
+  normalized concatenation of UNIMARC 328 (`NTH`) and the other parsed notes
+  of each candidate. Records that do not match are dropped before scoring.
+  Matching is done after NFKD diacritic stripping, so substrings must be
+  lowercase and unaccented (`"memoire"`, not `"Mémoire"`).
+
+Built-in profiles:
+
+| Profile | `sru_type_filter` | `note_required_substrings` | Use case |
+|---|---|---|---|
+| `thesis` | `tdo=y` | _none_ | Doctoral theses flagged TDO=y in Sudoc (default, backward compatible). |
+| `dissertation` | _none_ | `memoire` | Master's mémoires and other dissertations not flagged TDO=y; the NTH content filter keeps the recall noise out. |
+
+The active profile is selected by either the route (`/check/thesis`,
+`/check/dissertation`) or the `profile` field in the request body. Routes
+override the body so clients cannot accidentally mix them.
+
+`GET /profiles` returns the registry, so new profiles can be added in code and
+discovered by clients.
+
+## Duplicate Logic
+
+`POST /check/thesis` runs several recall-oriented SRU queries, merges records by
+PPN, parses UNIMARC XML, and scores candidates with deterministic lexical
+components:
+
+```text
+final =
+  0.42 * title
++ 0.22 * author
++ 0.16 * thesis_note
++ 0.10 * year
++ 0.05 * language
++ 0.05 * context_or_advisor
+```
+
+Candidate `carrier` is classified as:
+
+| Carrier | Meaning |
+|---|---|
+| `electronic` | `856`, `135`, STAR source, or online RDA carrier evidence present |
+| `printed_or_physical` | physical thesis evidence detected and no electronic marker |
+| `unknown` | no decisive carrier marker |
+
+Only candidates whose carrier is not `electronic` are counted as printed
+duplicates.
+
+Each candidate also carries a `thesis_state` (informative only, it does not
+change `status` or `counts_as_print_duplicate`). First matching rule wins:
+
+| `thesis_state` | Rule |
+|---|---|
+| `electronic` | `carrier` is `electronic` (135 / 856 / STAR / online RDA) |
+| `microfiche_reproduction` | 105$b contains `v` AND microform marker: 215 mentions microfiche/microfilm/microforme, 106$a `t`, or 183$a starting with `h` |
+| `printed_reproduction` | 105$b contains `v`, or 328 starts with "Reproduction de" |
+| `printed_original` | 105$b contains `m`, or NNT present (029$b) |
+| `unknown` | none of the above |
+
+Statuses:
+
+| Status | Meaning |
+|---|---|
+| `duplicate_found` | printed/physical candidate score is at or above threshold |
+| `ambiguous_print_candidate` | printed/physical candidate exists but score is below duplicate threshold |
+| `electronic_only` | strong match exists only for electronic candidates |
+| `no_print_duplicate_found` | no strong printed/physical candidate found |
+
+## Endpoints
+
+### `GET /health`
+
+```json
+{"ok": true}
+```
+
+### `GET /sru/search`
+
+Debug endpoint for a raw Sudoc SRU query:
+
+```bash
+curl "http://localhost:8000/sru/search?query=mti%3Dhygiene%20and%20aut%3Dgani%20and%20tdo%3Dy"
+```
+
+### `POST /check/thesis`
+
+Forces the `thesis` profile (TDO=y, no NTH content requirement). Equivalent to
+`POST /check/document` with `"profile": "thesis"`.
+
+Example:
+
+```bash
+curl -X POST "http://localhost:8000/check/thesis" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "La question de l'\''hygiène aux Indes-Néerlandaises",
+    "subtitle": "Les enjeux médicaux, culturels et sociaux",
+    "author": "Gani Achmad JAE LANI",
+    "degree_type": "Thèse de doctorat",
+    "discipline": "Histoire et civilisations",
+    "granting_institution": "École des Hautes Études en Sciences Sociales",
+    "doctoral_school": "École doctorale de l'\''EHESS",
+    "defense_year": 2017,
+    "advisor": "Gérard JORLAND",
+    "committee_members": "Romain BERTRAND|Patrice BOURDELAIS|Charles ILLOUZ|Annick OPINEL|Patrick ZYLBERMAN|Gérard JORLAND",
+    "language": "fre"
+  }'
+```
+
+Response shape:
+
+```jsonc
+{
+  "source": "sudoc_sru_thesis_check",
+  "profile": {
+    "name": "thesis",
+    "description": "Doctoral thesis records identified by Sudoc TDO=y.",
+    "sru_type_filter": "tdo=y",
+    "note_required_substrings": []
+  },
+  "sru": {
+    "endpoint": "https://www.sudoc.abes.fr/cbs/sru/",
+    "indexes": ["MTI", "AUT", "NTH", "TDO"],
+    "doc_type_filter": "tdo=y",
+    "queries": [/* per-query trace */],
+    "excluded_by_profile_filter": 0
+  },
+  "status": "electronic_only",
+  "duplicate_score": 0.0,
+  "best_print_candidate": null,
+  "best_electronic_candidate": {
+    "ppn": "229969437",
+    "url": "https://www.sudoc.fr/229969437",
+    "title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux.",
+    "carrier": "electronic",
+    "counts_as_print_duplicate": false,
+	"thesis_state": "electronic",
+    "score": {"final": 0.9}
+  },
+  "candidates": []
+}
+```
+
+### `POST /check/dissertation`
+
+Forces the `dissertation` profile (no TDO predicate, NTH must contain
+`memoire`). Same request body as `/check/thesis`. Use this for master's
+mémoires and other dissertations Sudoc does not flag with TDO=y:
+
+```bash
+curl -X POST "http://localhost:8000/check/dissertation" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Représentations du genre dans la presse féminine",
+    "author": "Camille MARTIN",
+    "degree_type": "Mémoire de master recherche 2e année",
+    "discipline": "Sociologie",
+    "granting_institution": "EHESS",
+    "defense_year": 2021,
+    "language": "fre"
+  }'
+```
+
+Response carries the same shape; `profile.name` is `"dissertation"`,
+`sru.doc_type_filter` is `null`, and `sru.excluded_by_profile_filter` reports
+how many SRU hits failed the NTH content rule.
+
+## Run
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app:app --reload
+```
+
+With `uv` from this workspace:
+
+```bash
+uv run uvicorn app:app --reload
+```
+
+## Authentication
+
+Authentication is optional. Set `SUDOC_API_KEY` or `API_KEY`; clients must then
+send:
+
+```text
+X-API-Key: <key>
+```

@@ -1,0 +1,526 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Humatheque Sudoc Check API",
+        "description": "Search Sudoc SRU for academic records from VLM-extracted metadata, score possible duplicates, and keep electronic-version evidence separate from printed-record duplicate decisions. Document-kind specifics (TDO filter, required note content) are encapsulated in `DocumentProfile` strategies so the same pipeline can serve theses, mémoires, and further profiles.",
+        "version": "0.2.0"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "summary": "Root",
+                "operationId": "root__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Root  Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health",
+                "operationId": "health_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Health Health Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sru/search": {
+            "get": {
+                "summary": "Sru Search Endpoint",
+                "operationId": "sru_search_endpoint_sru_search_get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Raw Sudoc CQL query, for example mti=hygiene and aut=gani and tdo=y.",
+                            "title": "Query"
+                        },
+                        "description": "Raw Sudoc CQL query, for example mti=hygiene and aut=gani and tdo=y."
+                    },
+                    {
+                        "name": "max_records",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "default": 10,
+                            "title": "Max Records"
+                        }
+                    },
+                    {
+                        "name": "timeout",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 120.0,
+                            "exclusiveMinimum": 0.0,
+                            "default": 30.0,
+                            "title": "Timeout"
+                        }
+                    },
+                    {
+                        "name": "retries",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10,
+                            "minimum": 0,
+                            "default": 2,
+                            "title": "Retries"
+                        }
+                    },
+                    {
+                        "name": "backoff",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 30.0,
+                            "minimum": 0.0,
+                            "default": 1.0,
+                            "title": "Backoff"
+                        }
+                    },
+                    {
+                        "name": "include_unimarc_xml",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "Include Unimarc Xml"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "title": "Response Sru Search Endpoint Sru Search Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles": {
+            "get": {
+                "summary": "List Profiles",
+                "operationId": "list_profiles_profiles_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response List Profiles Profiles Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/check/thesis": {
+            "post": {
+                "summary": "Check Thesis Endpoint",
+                "operationId": "check_thesis_endpoint_check_thesis_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SudocCheckRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Check Thesis Endpoint Check Thesis Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/check/dissertation": {
+            "post": {
+                "summary": "Check Dissertation Endpoint",
+                "operationId": "check_dissertation_endpoint_check_dissertation_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SudocCheckRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Check Dissertation Endpoint Check Dissertation Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "SudocCheckRequest": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "description": "Extracted main title."
+                    },
+                    "subtitle": {
+                        "type": "string",
+                        "title": "Subtitle",
+                        "description": "Extracted subtitle.",
+                        "default": ""
+                    },
+                    "author": {
+                        "type": "string",
+                        "title": "Author",
+                        "description": "Extracted author name.",
+                        "default": ""
+                    },
+                    "degree_type": {
+                        "type": "string",
+                        "title": "Degree Type",
+                        "description": "Extracted degree or document type.",
+                        "default": ""
+                    },
+                    "discipline": {
+                        "type": "string",
+                        "title": "Discipline",
+                        "description": "Extracted discipline.",
+                        "default": ""
+                    },
+                    "granting_institution": {
+                        "type": "string",
+                        "title": "Granting Institution",
+                        "description": "Extracted granting institution.",
+                        "default": ""
+                    },
+                    "co_tutelle_institutions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Co Tutelle Institutions"
+                    },
+                    "doctoral_school": {
+                        "type": "string",
+                        "title": "Doctoral School",
+                        "description": "Extracted doctoral school.",
+                        "default": ""
+                    },
+                    "defense_year": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Defense Year",
+                        "description": "Extracted defense year."
+                    },
+                    "advisor": {
+                        "type": "string",
+                        "title": "Advisor",
+                        "description": "Extracted advisor name.",
+                        "default": ""
+                    },
+                    "jury_president": {
+                        "type": "string",
+                        "title": "Jury President",
+                        "description": "Extracted jury president.",
+                        "default": ""
+                    },
+                    "reviewers": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        ],
+                        "title": "Reviewers",
+                        "description": "Extracted reviewers, string or list.",
+                        "default": ""
+                    },
+                    "committee_members": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        ],
+                        "title": "Committee Members",
+                        "description": "Extracted committee members, string or list.",
+                        "default": ""
+                    },
+                    "language": {
+                        "type": "string",
+                        "title": "Language",
+                        "description": "ISO 639-2 language code if available.",
+                        "default": ""
+                    },
+                    "confidence": {
+                        "anyOf": [
+                            {
+                                "type": "number",
+                                "maximum": 1.0,
+                                "minimum": 0.0
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Confidence"
+                    },
+                    "profile": {
+                        "type": "string",
+                        "title": "Profile",
+                        "description": "Document profile key. Selects the SRU type filter (e.g. `tdo=y`) and the post-search note filter. Defaults to `thesis` for backward compatibility. The `/check/thesis` and `/check/dissertation` routes also force the matching profile regardless of this field.",
+                        "default": "thesis"
+                    },
+                    "max_records_per_query": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Records Per Query",
+                        "default": 10
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 20
+                    },
+                    "duplicate_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Duplicate Threshold",
+                        "default": 0.78
+                    },
+                    "ambiguous_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Ambiguous Threshold",
+                        "default": 0.62
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 30.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "include_unimarc_xml": {
+                        "type": "boolean",
+                        "title": "Include Unimarc Xml",
+                        "description": "Include raw record XML in candidate output.",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title"
+                ],
+                "title": "SudocCheckRequest"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        },
+        "securitySchemes": {
+            "APIKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        }
+    }
+}

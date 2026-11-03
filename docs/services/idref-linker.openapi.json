@@ -1,0 +1,1037 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Humatheque IdRef Qualinka API",
+        "description": "Resolve extracted person names to IdRef PPN candidates with Qualinka and IdRef evidence.",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "summary": "Root",
+                "operationId": "root__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Root  Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health",
+                "operationId": "health_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Health Health Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/find-person": {
+            "get": {
+                "summary": "Find Person Endpoint",
+                "operationId": "find_person_endpoint_find_person_get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Full person name.",
+                            "default": "",
+                            "title": "Name"
+                        },
+                        "description": "Full person name."
+                    },
+                    {
+                        "name": "first_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Optional first-name override.",
+                            "default": "",
+                            "title": "First Name"
+                        },
+                        "description": "Optional first-name override."
+                    },
+                    {
+                        "name": "last_name",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Optional last-name override.",
+                            "default": "",
+                            "title": "Last Name"
+                        },
+                        "description": "Optional last-name override."
+                    },
+                    {
+                        "name": "max_results",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "default": 20,
+                            "title": "Max Results"
+                        }
+                    },
+                    {
+                        "name": "timeout",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 120.0,
+                            "exclusiveMinimum": 0.0,
+                            "default": 20.0,
+                            "title": "Timeout"
+                        }
+                    },
+                    {
+                        "name": "retries",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10,
+                            "minimum": 0,
+                            "default": 2,
+                            "title": "Retries"
+                        }
+                    },
+                    {
+                        "name": "backoff",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 30.0,
+                            "minimum": 0.0,
+                            "default": 1.0,
+                            "title": "Backoff"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FindPersonResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/attrra/{ppn}": {
+            "get": {
+                "summary": "Attrra Endpoint",
+                "operationId": "attrra_endpoint_attrra__ppn__get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "ppn",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Ppn"
+                        }
+                    },
+                    {
+                        "name": "timeout",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 120.0,
+                            "exclusiveMinimum": 0.0,
+                            "default": 20.0,
+                            "title": "Timeout"
+                        }
+                    },
+                    {
+                        "name": "retries",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10,
+                            "minimum": 0,
+                            "default": 2,
+                            "title": "Retries"
+                        }
+                    },
+                    {
+                        "name": "backoff",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 30.0,
+                            "minimum": 0.0,
+                            "default": 1.0,
+                            "title": "Backoff"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "title": "Response Attrra Endpoint Attrra  Ppn  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/references/{ppn}": {
+            "get": {
+                "summary": "References Endpoint",
+                "operationId": "references_endpoint_references__ppn__get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "ppn",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Ppn"
+                        }
+                    },
+                    {
+                        "name": "max_docs_per_role",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 200,
+                            "minimum": 0,
+                            "default": 20,
+                            "title": "Max Docs Per Role"
+                        }
+                    },
+                    {
+                        "name": "timeout",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 120.0,
+                            "exclusiveMinimum": 0.0,
+                            "default": 20.0,
+                            "title": "Timeout"
+                        }
+                    },
+                    {
+                        "name": "retries",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10,
+                            "minimum": 0,
+                            "default": 2,
+                            "title": "Retries"
+                        }
+                    },
+                    {
+                        "name": "backoff",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 30.0,
+                            "minimum": 0.0,
+                            "default": 1.0,
+                            "title": "Backoff"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "title": "Response References Endpoint References  Ppn  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/align/person": {
+            "post": {
+                "summary": "Align Person Endpoint",
+                "operationId": "align_person_endpoint_align_person_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlignPersonRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Align Person Endpoint Align Person Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/org-index/search": {
+            "get": {
+                "summary": "Org Index Search Endpoint",
+                "operationId": "org_index_search_endpoint_org_index_search_get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Organization label to score against the referential.",
+                            "title": "Q"
+                        },
+                        "description": "Organization label to score against the referential."
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Optional defense-year filter.",
+                            "default": "",
+                            "title": "Year"
+                        },
+                        "description": "Optional defense-year filter."
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "\"etablissement\" or \"ecole_doctorale\".",
+                            "default": "etablissement",
+                            "title": "Type"
+                        },
+                        "description": "\"etablissement\" or \"ecole_doctorale\"."
+                    },
+                    {
+                        "name": "parent_ppn",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "description": "Optional institution PPN scoping doctoral schools.",
+                            "default": "",
+                            "title": "Parent Ppn"
+                        },
+                        "description": "Optional institution PPN scoping doctoral schools."
+                    },
+                    {
+                        "name": "max_results",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 50,
+                            "minimum": 1,
+                            "default": 5,
+                            "title": "Max Results"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "title": "Response Org Index Search Endpoint Org Index Search Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/align/organization": {
+            "post": {
+                "summary": "Align Organization Endpoint",
+                "operationId": "align_organization_endpoint_align_organization_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlignOrganizationRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Align Organization Endpoint Align Organization Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/align/thesis-organizations": {
+            "post": {
+                "summary": "Align Thesis Organizations Endpoint",
+                "operationId": "align_thesis_organizations_endpoint_align_thesis_organizations_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlignThesisOrganizationsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Align Thesis Organizations Endpoint Align Thesis Organizations Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AlignOrganizationRequest": {
+                "properties": {
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 20.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "label": {
+                        "type": "string",
+                        "title": "Label",
+                        "description": "Extracted organization label."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "title": "Kind",
+                        "description": "Either \"institution\" (granting / co-tutelle) or \"doctoral_school\".",
+                        "default": "institution"
+                    },
+                    "year": {
+                        "type": "string",
+                        "title": "Year",
+                        "description": "Extracted defense year; disambiguates temporal versions. The extraction schema's defense_year is accepted as an alias.",
+                        "default": ""
+                    },
+                    "parent_ppn": {
+                        "type": "string",
+                        "title": "Parent Ppn",
+                        "description": "Optional institution PPN. For a doctoral school, restricts candidates to that institution's schools.",
+                        "default": ""
+                    },
+                    "allow_remote": {
+                        "type": "boolean",
+                        "title": "Allow Remote",
+                        "description": "On a local miss, fall back to a live data.idref.fr SPARQL search (covers foreign co-tutelle partners).",
+                        "default": false
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 50.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 5
+                    },
+                    "accept_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Accept Threshold",
+                        "default": 0.72
+                    },
+                    "margin_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Margin Threshold",
+                        "default": 0.08
+                    },
+                    "low_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Low Threshold",
+                        "default": 0.45
+                    },
+                    "floor_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Floor Threshold",
+                        "default": 0.3
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "label"
+                ],
+                "title": "AlignOrganizationRequest"
+            },
+            "AlignPersonRequest": {
+                "properties": {
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 20.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "Name",
+                        "description": "Extracted full person name."
+                    },
+                    "first_name": {
+                        "type": "string",
+                        "title": "First Name",
+                        "description": "Optional parsed first-name override.",
+                        "default": ""
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "title": "Last Name",
+                        "description": "Optional parsed last-name override.",
+                        "default": ""
+                    },
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "description": "Extracted document title.",
+                        "default": ""
+                    },
+                    "subtitle": {
+                        "type": "string",
+                        "title": "Subtitle",
+                        "description": "Extracted document subtitle.",
+                        "default": ""
+                    },
+                    "discipline": {
+                        "type": "string",
+                        "title": "Discipline",
+                        "description": "Extracted discipline.",
+                        "default": ""
+                    },
+                    "institution": {
+                        "type": "string",
+                        "title": "Institution",
+                        "description": "Extracted granting institution.",
+                        "default": ""
+                    },
+                    "doctoral_school": {
+                        "type": "string",
+                        "title": "Doctoral School",
+                        "description": "Extracted doctoral school.",
+                        "default": ""
+                    },
+                    "degree_type": {
+                        "type": "string",
+                        "title": "Degree Type",
+                        "description": "Extracted degree or document type.",
+                        "default": ""
+                    },
+                    "year": {
+                        "type": "string",
+                        "title": "Year",
+                        "description": "Extracted defense year.",
+                        "default": ""
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 20
+                    },
+                    "max_docs_per_role": {
+                        "type": "integer",
+                        "maximum": 200.0,
+                        "minimum": 0.0,
+                        "title": "Max Docs Per Role",
+                        "default": 20
+                    },
+                    "reference_top_k": {
+                        "type": "integer",
+                        "maximum": 20.0,
+                        "minimum": 1.0,
+                        "title": "Reference Top K",
+                        "default": 3
+                    },
+                    "embedding_model": {
+                        "type": "string",
+                        "title": "Embedding Model",
+                        "description": "Optional sentence-transformers model. Leave empty for lexical token cosine similarity. Set a model name, for example sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2, to use embedding-based semantic similarity.",
+                        "default": ""
+                    },
+                    "accept_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Accept Threshold",
+                        "default": 0.65
+                    },
+                    "margin_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Margin Threshold",
+                        "default": 0.08
+                    },
+                    "weight_name": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "title": "Weight Name",
+                        "default": 0.4
+                    },
+                    "weight_attrra_source": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "title": "Weight Attrra Source",
+                        "default": 0.25
+                    },
+                    "weight_attrra_note": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "title": "Weight Attrra Note",
+                        "default": 0.15
+                    },
+                    "weight_references": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "title": "Weight References",
+                        "default": 0.15
+                    },
+                    "weight_institution_year": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "title": "Weight Institution Year",
+                        "default": 0.05
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "title": "AlignPersonRequest"
+            },
+            "AlignThesisOrganizationsRequest": {
+                "properties": {
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 20.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "granting_institution": {
+                        "type": "string",
+                        "title": "Granting Institution",
+                        "description": "Extracted granting institution.",
+                        "default": ""
+                    },
+                    "co_tutelle_institutions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Co Tutelle Institutions",
+                        "description": "Extracted co-tutelle institution names."
+                    },
+                    "doctoral_school": {
+                        "type": "string",
+                        "title": "Doctoral School",
+                        "description": "Extracted doctoral school.",
+                        "default": ""
+                    },
+                    "year": {
+                        "type": "string",
+                        "title": "Year",
+                        "description": "Extracted defense year; defense_year accepted as an alias.",
+                        "default": ""
+                    },
+                    "allow_remote": {
+                        "type": "boolean",
+                        "title": "Allow Remote",
+                        "description": "See AlignOrganizationRequest.allow_remote.",
+                        "default": false
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 50.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 5
+                    },
+                    "accept_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Accept Threshold",
+                        "default": 0.72
+                    },
+                    "margin_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Margin Threshold",
+                        "default": 0.08
+                    },
+                    "low_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Low Threshold",
+                        "default": 0.45
+                    },
+                    "floor_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Floor Threshold",
+                        "default": 0.3
+                    }
+                },
+                "type": "object",
+                "title": "AlignThesisOrganizationsRequest"
+            },
+            "FindPersonResponse": {
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "title": "Source"
+                    },
+                    "query": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Query"
+                    },
+                    "found": {
+                        "type": "integer",
+                        "title": "Found"
+                    },
+                    "returned": {
+                        "type": "integer",
+                        "title": "Returned"
+                    },
+                    "results": {
+                        "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "type": "array",
+                        "title": "Results"
+                    },
+                    "error": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Error"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "source",
+                    "query",
+                    "found",
+                    "returned",
+                    "results"
+                ],
+                "title": "FindPersonResponse"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        },
+        "securitySchemes": {
+            "APIKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        }
+    }
+}
