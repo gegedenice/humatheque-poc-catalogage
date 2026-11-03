@@ -1,0 +1,13 @@
+id,etat_alma,etat_sudoc,provenance,action,profil_cible,routage,statut
+S01,présent (avec ou sans PPN),*,*,Arrêt,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",sortie,seed
+S02,absent,originale imprimée,hors EPHE,Dériver de la notice de thèse originelle,these_reproduction_imprimee,sortie,seed
+S03,absent,électronique seule,hors EPHE,Dériver de la notice électronique,these_reproduction_imprimee,auto,à discuter
+S04,absent,reproduction imprimée,hors EPHE,Arrêt,,sortie,seed
+S05,absent,reproduction microfiche,hors EPHE,Dériver de la notice de thèse microfichée,these_reproduction_imprimee,auto,à discuter
+S06,absent,électronique seule,EPHE,Dériver de la notice électronique,these_originale_imprimee,auto,seed
+S07,absent,reproduction imprimée ou reproduction microfiche,EPHE,Dériver de la notice de reproduction,these_originale_imprimee,auto,à discuter
+S08,absent,rien,EPHE,Créer,these_originale_imprimee,auto,seed
+S09,absent,rien,hors EPHE,Créer,these_reproduction_imprimee,auto,seed
+S10,absent,ambigu,*,Arrêt,,décision,seed
+S12,absent,rien,mémoire,Créer,memoire_original_imprime,auto,à discuter
+S13,absent,électronique seule,mémoire,Dériver de la notice électronique,memoire_original_imprime,auto,

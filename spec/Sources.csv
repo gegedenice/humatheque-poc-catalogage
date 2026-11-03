@@ -1,0 +1,32 @@
+id,type_source,etape,description,cardinalité,disponible
+title,champ extrait,Extraction VLM,Titre,1,oui
+subtitle,champ extrait,Extraction VLM,Sous-titre,n,oui
+author,champ extrait,Extraction VLM,"Auteur, forme de la page de titre",1,oui
+degree_type,champ extrait,Extraction VLM,Type de diplôme (liste fermée selon type de doc),1,oui
+discipline,champ extrait,Extraction VLM,"Discipline, texte libre",1,oui
+volume,champ extrait,Extraction VLM,Numéro de volume mentionné (null si absent),1,oui
+volumaison,calcul,Générateur,"Volume normalisé pour zone 215(""1 volume"" si volume extrait est null ; ""? volumes"" si volume extrait n'est pas null",1,non — règle à écrire
+granting_institution,champ extrait,Extraction VLM,Établissement de soutenance,1,oui
+co_tutelle_institutions,champ extrait,Extraction VLM,Établissements de cotutelle (liste),n,oui
+doctoral_school,champ extrait,Extraction VLM,École doctorale,1,oui
+defense_year,champ extrait,Extraction VLM,Année de soutenance (aaaa),1,oui
+advisor,champ extrait,Extraction VLM,Directeur(s) (liste),n,oui
+jury_president,champ extrait,Extraction VLM,Président du jury,1,oui
+reviewers,champ extrait,Extraction VLM,Rapporteurs (liste),n,oui
+committee_members,champ extrait,Extraction VLM,Membres du jury (liste),n,oui
+language,champ extrait,Extraction VLM,Langue ISO 639-3,1,oui
+abstract,champ extrait,Extraction VLM,Résumé,1,oui
+abstract_lang,champ extrait,Extraction VLM,Langue du résumé,1,non — absent du schéma
+parallel_title,champ extrait,Extraction VLM,Titre parallèle,1,non — absent du schéma
+parallel_title_lang,champ extrait,Extraction VLM,Langue du titre parallèle,1,non — absent du schéma
+partner_institutions,champ extrait,Extraction VLM,Établissements partenaires,n,non — absent du schéma
+ppn_personne,sortie service,idref-linker /align/person,PPN IdRef d'une personne (accepted ou validé manuellement),1,oui
+ppn_etablissement,sortie service,idref-linker /align/thesis-organizations,PPN de l'établissement de soutenance (selon l'année),1,oui (brique à adosser à une API)
+code_etab,valeur fixe,idref-linker /align/thesis-organizations,Code établissement ABES (pour le NNT) : tjs EPHE,1,oui
+ppn_ecole_doctorale,sortie service,idref-linker /align/thesis-organizations,PPN de l'école doctorale,1,oui (brique à adosser à une API)
+ppn_cotutelle,sortie service,idref-linker /align/thesis-organizations,PPN des établissements de cotutelle,1,à vérifier
+dewey_code,sortie service,dewey-classifier,Code Dewey TEF retenu,1,oui
+notice_originale_328,sortie service,sudoc-checker,Zone 328 de la thèse originale (pour les reproductions),1,à vérifier
+nom_prenom,calcul,Générateur,Découpage nom / prénom d'une personne sans PPN,1,non — règle à écrire
+titre_classement,calcul,Générateur,Titre avec @ après l'article initial,1,non — règle à écrire
+numero_nnt,référentiel,Fichier des numéros disponibles,Numéro incrémental du NNT,1,non — fichier à définir

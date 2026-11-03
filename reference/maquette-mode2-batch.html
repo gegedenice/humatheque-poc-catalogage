@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mode 2 Lot nocturne + reporting</title>
+<style>
+  :root{--paper:#eef0f3;--card:#fff;--ink:#1b2430;--muted:#6c7684;--rule:#ced4dc;
+    --auto:#1e9e5a;--flag:#c47f10;--stop:#d5432f;--infra:#4a63a8;--b:#c47f10;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);line-height:1.45;font-size:15px;padding:18px;max-width:1120px;margin:0 auto}
+  h1{font-size:21px;margin:0 0 3px}.sub{color:var(--muted);font-size:13.5px;margin:0}
+  .mono{font-family:var(--mono)}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:14px 0}
+  .run{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .run .d{width:9px;height:9px;border-radius:50%;background:var(--auto)}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:8px 13px;border-radius:8px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer}
+  .btn:hover{background:var(--ink);color:#fff}.btn.p{background:var(--ink);color:#fff}.btn.sm{font-size:12px;padding:6px 10px}
+  .btn.ghost{border-color:var(--rule);color:var(--muted)}
+  details.anim{border:1.5px dashed var(--muted);border-radius:9px;background:#f5f6f8;padding:0 14px;margin-bottom:14px}
+  details.anim summary{cursor:pointer;font-weight:600;padding:10px 0;color:var(--muted);font-size:13px}
+  .animbank{display:flex;flex-wrap:wrap;gap:7px;padding-bottom:11px}
+  .animbank button{font-size:11.5px;font-weight:600;border:1px solid var(--rule);background:#fff;border-radius:20px;padding:5px 10px;cursor:pointer}
+  .animbank .cat{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
+  .cat.flag{background:var(--flag)}.cat.stop{background:var(--stop)}.cat.infra{background:var(--infra)}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:14px}
+  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--card);border:1px solid var(--rule);border-radius:11px;padding:13px 14px}
+  .kpi.tb{border-top:4px solid var(--b)}
+  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1}
+  .kpi .k{font-size:11.5px;color:var(--muted);margin-top:6px}
+  .kpi.warn .v{color:var(--flag)}.kpi.ok .v{color:var(--auto)}
+
+  .cols{display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start}
+  @media(max-width:840px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:11px;padding:16px}
+  .card h2{font-size:15px;margin:0 0 10px}
+  .filters{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+  .filters button{font-size:12px;font-weight:600;border:1.5px solid var(--rule);background:#fff;color:var(--ink);border-radius:20px;padding:5px 11px;cursor:pointer}
+  .filters button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{border-bottom:1px solid var(--rule);padding:8px 9px;text-align:left;vertical-align:top}
+  th{font-size:11px;color:var(--muted);font-weight:600}
+  td.d{font-family:var(--mono);font-size:12px;white-space:nowrap}
+  tr.resolved td{color:var(--muted)}
+  .mbadge{font-family:var(--mono);font-size:10px;padding:1px 7px;border-radius:20px;border:1px solid currentColor;white-space:nowrap}
+  .mbadge.flag{color:var(--flag)}.mbadge.stop{color:var(--stop)}.mbadge.infra{color:var(--infra)}
+  .card2{border:1px solid var(--rule);border-radius:9px;padding:12px;margin-top:8px;background:#fafbfc}
+  .card2.flagc{border-left:3px solid var(--flag)}.card2.stopc{border-left:3px solid var(--stop)}.card2.infrac{border-left:3px solid var(--infra)}
+  .card2 .situ{font-weight:600;font-size:13px}.card2 .det{font-size:12px;color:var(--muted);margin:5px 0 0}
+  .cands{margin-top:9px;border:1px solid var(--rule);border-radius:7px;overflow:hidden}
+  .cand{display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 9px;border-bottom:1px solid var(--rule);font-size:12px;align-items:center}
+  .cand:last-child{border-bottom:0}.cand .ppn{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .opts{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .empty{color:var(--auto);font-weight:600;font-size:13.5px;padding:14px 0}
+
+  .log{background:var(--card);border:1px solid var(--rule);border-radius:11px;padding:14px;position:sticky;top:12px}
+  .log h3{font-size:13px;margin:0 0 4px}
+  .log .meta{font-size:11.5px;color:var(--muted);margin-bottom:10px}
+  .logline{display:grid;grid-template-columns:auto 1fr;gap:8px;font-family:var(--mono);font-size:11px;padding:4px 0;border-bottom:1px solid #eef0f3;color:var(--muted)}
+  .logline:last-child{border-bottom:0}
+  .logline .t{color:var(--ink)}
+  .bars{margin-top:12px}
+  .barrow{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:11.5px}
+  .barrow .lb{width:78px;color:var(--muted)}
+  .barrow .track{flex:1;height:8px;background:#eef0f3;border-radius:4px;overflow:hidden}
+  .barrow .fill{height:100%;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Mode 2 : Lot nocturne + reporting</h1>
+<p class="sub" style="color:red">Maquettes de démonstration (scénarios factices, non branchés sur les services réels).</p>
+<p class="sub">Aucune interaction en direct. Reporting à reprendre après traitement par lot.</p>
+
+<div class="bar">
+  <span class="run"><span class="d"></span>lot <span class="mono">2026-09-21_nuit</span> · terminé à 02:47 · 42 documents</span>
+  <button class="btn ghost" data-a="reset">Rejouer en temps réel</button>
+  <button class="btn ghost" data-a="reset">Reprogrammer</button>
+</div>
+
+<details class="anim">
+  <summary>Panneau animateur — mettre un incident en avant dans la file</summary>
+  <div class="animbank" id="animbank"></div>
+</details>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="cols">
+  <div class="card">
+    <h2>File d'exceptions à reprendre</h2>
+    <div class="filters" id="filters"></div>
+    <div id="queue"></div>
+  </div>
+  <aside class="log">
+    <h3>Journal du traitement</h3>
+    <div class="meta">exécution automatique · 21/09 00:12 → 02:47</div>
+    <div id="logbox"></div>
+    <div class="bars" id="bars"></div>
+  </aside>
+</div>
+
+<script>
+const NODESN={vlm:"Extraction VLM",alma:"Interrogation Alma",sudoc:"Vérification Sudoc",pers:"IdRef — personnes",inst:"IdRef — institutions",dewey:"Classification Dewey"};
+const INC={
+ homonyme:{lbl:"Homonyme IdRef",node:"pers",cat:"flag",doc:"D-03",ti:"Écophysiologie des coraux tempérés",
+  situ:"Deux PPN IdRef possibles pour « Jean Martin ».",det:"Statut ambiguous, écart de score faible.",
+  cands:[["PPN 026594803","Jean Martin (1948-)"],["PPN 084521337","Jean Martin (1955-)"]],
+  opts:[{l:"PPN 026594803",r:"026594803 retenu"},{l:"PPN 084521337",r:"084521337 retenu"},{l:"Sans lien",r:"sans lien"}]},
+ notfound:{lbl:"Personne absente d'IdRef",node:"pers",cat:"stop",doc:"D-11",ti:"Réponse au stress salin chez le blé",
+  situ:"Un rapporteur est absent d'IdRef (not_found).",det:"Création d'autorité possible.",
+  opts:[{l:"Créer l'autorité",r:"autorité créée"},{l:"Sans lien",r:"sans lien"},{l:"À reprendre",r:"à reprendre"}]},
+ etab:{lbl:"Établissement fusionné",node:"inst",cat:"flag",doc:"D-06",ti:"Génétique des populations de truites",
+  situ:"« Grenoble 1 » (2011) aligné sur « Université Grenoble Alpes » (créée 2016).",det:"Seule l'année tranche.",
+  cands:[["PPN 026404103","Université Grenoble 1 (–2015)"],["PPN 199001740","Université Grenoble Alpes (2016–)"]],
+  opts:[{l:"Grenoble 1 (2011)",r:"Grenoble 1 retenu"},{l:"UGA",r:"UGA (erreur temporelle)"},{l:"À vérifier",r:"à vérifier"}]},
+ sudoc_orig:{lbl:"Notice originale au Sudoc",node:"sudoc",cat:"stop",doc:"D-05",ti:"Modélisation hydrologique de la Durance",
+  situ:"Notice imprimée originale déjà présente (PPN 04512233X, 0,94).",det:"Basculer vers",
+  opts:[{l:"Exemplariser",r:"exemplarisation"},{l:"Dériver (WinIBW)",r:"dérivation"},{l:"À décider",r:"reporté"}]},
+ sudoc_repro:{lbl:"Notice de reproduction",node:"sudoc",cat:"stop",doc:"D-12",ti:"Phénologie des hêtraies d'altitude",
+  situ:"Reproduction au Sudoc sans originale imprimée en main.",det:"Créer l'originale et lier ?",
+  opts:[{l:"Créer l'originale",r:"création originale"},{l:"Lier à la reproduction",r:"lien reproduction"},{l:"À décider",r:"reporté"}]},
+ dewey:{lbl:"Dewey sous le seuil",node:"dewey",cat:"flag",doc:"D-08",ti:"Approches numériques de la biodiversité",
+  situ:"1re classe 0,71 (< 0,8), trois classes proches.",det:"570 (0,71) · 004 (0,69) · 510 (0,66).",
+  cands:[["570","Sciences de la vie"],["004","Informatique"],["510","Mathématiques"]],
+  opts:[{l:"570",r:"570"},{l:"004",r:"004"},{l:"510",r:"510"}]},
+ sudoc_indispo:{lbl:"Sudoc indisponible",node:"sudoc",cat:"infra",doc:"D-09",ti:"Réponse au stress salin (lot A)",
+  situ:"3 documents non vérifiés : SRU Sudoc injoignable pendant la nuit.",det:"À revérifier ce matin.",
+  opts:[{l:"Relancer la vérif.",r:"revérifié"},{l:"Traiter sans vérif.",r:"sans vérif (risqué)"},{l:"Laisser en attente",r:"en attente"}]}
+};
+const ORDER=["homonyme","etab","sudoc_orig","dewey","notfound","sudoc_repro","sudoc_indispo"];
+const CATN={flag:"à reprendre pour décision",stop:"sortie",infra:"incident"};
+
+let S={res:{}, open:null, filter:"tous"};
+const $=s=>document.querySelector(s);
+const esc=s=>(""+s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+function counts(){
+  const total=42, exc=ORDER.length, done=Object.keys(S.res).length;
+  return {total, exc, passed:total-exc, restants:exc-done, done};
+}
+function renderKPIs(){
+  const c=counts();
+  $("#kpis").innerHTML=`
+   <div class="kpi tb"><div class="v">${c.total}</div><div class="k">documents traités cette nuit</div></div>
+   <div class="kpi ok"><div class="v">${c.passed}</div><div class="k">passés seuls · brouillon prêt</div></div>
+   <div class="kpi warn"><div class="v">${c.restants}</div><div class="k">en attente de reprise</div></div>
+   <div class="kpi"><div class="v">${c.done}</div><div class="k">repris ce matin</div></div>`;
+}
+function renderAnim(){$("#animbank").innerHTML=ORDER.map(id=>`<button data-a="anim" data-inc="${id}"><span class="cat ${INC[id].cat}"></span>${esc(INC[id].lbl)}</button>`).join("");}
+function renderFilters(){
+  const defs=[["tous","Tous"],["flag","Décisions"],["stop","Sorties du pipeline"],["infra","Incidents techniques"]];
+  $("#filters").innerHTML=defs.map(d=>`<button data-a="filter" data-v="${d[0]}" aria-pressed="${S.filter===d[0]}">${d[1]}</button>`).join("");
+}
+function candHTML(inc){if(!inc.cands)return"";return `<div class="cands">`+inc.cands.map(c=>`<div class="cand"><span>${esc(c[1])}</span><span class="ppn">${esc(c[0])}</span></div>`).join("")+`</div>`;}
+
+function renderQueue(){
+  const list=ORDER.filter(id=>S.filter==="tous"||INC[id].cat===S.filter);
+  const pending=list.filter(id=>!S.res[id]);
+  if(!pending.length && S.filter==="tous"){
+    $("#queue").innerHTML=`<div class="empty">File vidée — toutes les exceptions ont été reprises. Les ${counts().passed} documents passés seuls sont prêts pour import.</div>`;
+    return;
+  }
+  let rows=list.map(id=>{
+    const inc=INC[id],done=S.res[id];
+    let r=`<tr class="${done?'resolved':''}"><td class="d">${esc(inc.doc)}</td>
+      <td>${esc(inc.ti)}<br><span class="mono" style="font-size:11px;color:var(--muted)">${esc(NODESN[inc.node])}</span></td>
+      <td>${esc(inc.lbl)}<br><span class="mbadge ${inc.cat}">${CATN[inc.cat]}</span></td>
+      <td>${done?`<span class="mono" style="color:var(--auto)">✓ ${esc(done)}</span>`:`<button class="btn sm" data-a="open" data-inc="${id}">Reprendre</button>`}</td></tr>`;
+    if(S.open===id&&!done){
+      r+=`<tr><td colspan="4"><div class="card2 ${inc.cat}c"><div class="situ">${esc(inc.situ)}</div><p class="det">${esc(inc.det)}</p>${candHTML(inc)}
+        <div class="opts">${inc.opts.map((o,j)=>`<button class="btn sm" data-a="opt" data-inc="${id}" data-o="${j}">${esc(o.l)}</button>`).join("")}</div></div></td></tr>`;
+    }
+    return r;
+  }).join("");
+  $("#queue").innerHTML=`<table><tr><th>Doc</th><th>Document / étape</th><th>Motif</th><th></th></tr>${rows}</table>`;
+}
+function renderLog(){
+  const lines=[
+   ["00:12","lot ouvert : 42 images dans la file d'attente"],
+   ["00:38","extraction VLM · 42/42 · 2 en confiance basse"],
+   ["01:10","Alma · 42/42 · 1 déjà présent"],
+   ["01:52","Sudoc · 39/42 · 3 non vérifiés (SRU timeout)"],
+   ["02:19","IdRef · 42/42 · 4 en revue"],
+   ["02:41","Dewey · 42/42 · 1 sous le seuil"],
+   ["02:47","lot clos · 35 brouillons · 7 exceptions"]
+  ];
+  $("#logbox").innerHTML=lines.map(l=>`<div class="logline"><span class="t">${l[0]}</span><span>${esc(l[1])}</span></div>`).join("");
+  const bars=[["Auto → brouillon",35,"var(--auto)"],["Exceptions",7,"var(--flag)"]];
+  $("#bars").innerHTML=bars.map(b=>`<div class="barrow"><span class="lb">${b[0]}</span><span class="track"><span class="fill" style="width:${b[1]/42*100}%;background:${b[2]}"></span></span><span class="mono">${b[1]}</span></div>`).join("");
+}
+function render(){renderKPIs();renderFilters();renderQueue();}
+
+renderAnim();renderLog();render();
+document.body.addEventListener("click",e=>{
+  const t=e.target.closest("[data-a]");if(!t)return;const a=t.dataset.a;
+  if(a==="filter"){S.filter=t.dataset.v;S.open=null;render();}
+  else if(a==="open"){S.open=t.dataset.inc;render();const q=$("#queue");if(q)q.scrollIntoView({block:"nearest"});}
+  else if(a==="opt"){const inc=INC[t.dataset.inc];S.res[t.dataset.inc]=inc.opts[+t.dataset.o].r;S.open=null;render();}
+  else if(a==="anim"){S.filter="tous";S.open=t.dataset.inc;render();const q=$("#queue");if(q)q.scrollIntoView({block:"nearest"});}
+  else if(a==="reset"){S.res={};S.open=null;S.filter="tous";render();}
+});
+</script>
+</body>
+</html>
