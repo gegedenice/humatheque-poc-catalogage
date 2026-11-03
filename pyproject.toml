@@ -8,6 +8,7 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.7",
     "pydantic-settings>=2.7",
+    "pymarc>=5.4.0",
     "pyyaml>=6.0",
     "unidecode>=1.4.0",
 ]
@@ -30,4 +31,5 @@ packages = ["src/humatheque"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = "-q"
