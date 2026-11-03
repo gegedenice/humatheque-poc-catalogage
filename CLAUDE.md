@@ -29,11 +29,20 @@ identifiant dans les tests et les messages de commit qui les couvrent.
 
 ## Pile et commandes
 
-- Python 3.12, `uv`, FastAPI + Jinja2 (HTML rendu côté serveur, JS vanilla
-  minimal), SQLite (`data/humatheque.db`), `httpx`, `pydantic` v2, `pymarc`,
-  `pytest` + `respx`.
+- Python 3.12, `uv`, FastAPI + Jinja2 (HTML rendu côté serveur) + **HTMX**,
+  **Tailwind CSS** via l'exécutable autonome (pas de Node), îlots JavaScript
+  limités à l'éditeur de notice **Monaco** et à la visionneuse **OpenSeadragon**
+  (vendorisés, sans build), SQLite (`data/humatheque.db`), `httpx`,
+  `pydantic` v2, `pymarc`, `pytest` + `respx`.
+- **Couche de services** (`application/`) : toute logique passe par elle ; les
+  pages HTML et l'API JSON `/api/v1` l'appellent toutes les deux. Rien de
+  métier dans les routes ni les gabarits.
+- **Design** : partir de la maquette du mode 2 (palette, cartes, badges) ;
+  soigner états vides, chargement, erreurs ; mêmes composants sur tous les
+  écrans.
 - `uv sync` · `uv run pytest` · `uv run humatheque serve` (port 8000)
-  · `uv run humatheque check-spec` · `docker compose up -d`.
+  · `uv run humatheque check-spec` · `uv run humatheque css --watch`
+  · `docker compose up -d` (app + Grist).
 - Code et commentaires en français, identifiants en français ou anglais mais
   cohérents par module. Pas de dépendance lourde sans justification.
 

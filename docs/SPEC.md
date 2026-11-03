@@ -8,6 +8,9 @@ extraction → normalisation → vérifications Alma et Sudoc → situation → 
 création) alignements IdRef + Dewey → notice UNIMARC, avec un rapport par
 document et par lot.
 
+La notice produite (créée ou convertie) est **éditable** dans l'interface
+avant export (§9.2).
+
 Deux modes sur le même moteur :
 - **Mode 1, document unique** (optionnel) : on suit le dossier étape par étape et on tranche
   les exceptions dans la foulée.
@@ -29,7 +32,7 @@ humatheque-catalogage/
   reference/                POC, maquette, mindmap, générateur de départ (lecture seule)
   src/humatheque/
     config.py               settings pydantic (env), chemins, seuils
-    cli.py                  serve | check-spec | run-url | run-batch | scan-minio
+    cli.py                  serve | check-spec | run-url | run-batch | scan-minio | spec-export
     ingestion/              lecture du bucket MinIO, constitution des documents (§3)
     texte_unimarc/          normalisation de chaînes, « module NOR » du wiki (§4)
       _vendor/reaccentue/   reaccentue vendorisé (+ dico/)
@@ -43,8 +46,12 @@ humatheque-catalogage/
     conversion/             conversion d'une notice Sudoc existante (copie en v1)
     generateur/             moteur des Regles + sérialisation
     workflow/               orchestrateur : un document → un Dossier
-    store/                  SQLite (lots, dossiers)
-    web/                    FastAPI, templates, static
+    store/                  SQLite (lots, dossiers, versions de notices)
+    application/            couche de services : cas d'usage, renvoie des modèles pydantic
+    notice/                 notice éditable : analyse du texte WinIBW, validation, versions
+    web/                    FastAPI : pages HTML (Jinja2 + HTMX) et API JSON /api/v1
+      static/               CSS Tailwind compilé, htmx, Monaco, OpenSeadragon (vendorisés)
+      tailwind/             sources Tailwind (config, input.css)
   tests/
 ```
 
@@ -245,8 +252,7 @@ qu'imprimés** : casse d'origine, civilités comprises.
   - **Champs organismes** : `{forme, ppn, statut_idref}`.
   - **Valeurs calculées** :
     - `titre_classement` ;
-    - `volumaison` : `volume` null donne « 1 volume » ; `volume` non null donne
-      une zone omise et l'alerte `volumaison_a_completer` ;
+    - `volumaison` : `volume` null donne « 1 volume » ; `volume` non null donne « ? volumes » ;
     - `code_etab` = constante `EPHE` (configuration) ;
     - `numero_nnt` = bouchon `XXXX` avec une alerte.
 - **Cardinalité** : colonne `cardinalité` (`1` | `n`) de `Sources.csv` (présente
@@ -416,10 +422,16 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 
 ## 8. Spécification et générateur
 
-**Chargement** : `spec/*.csv` par défaut. Si `GRIST_URL`, `GRIST_DOC_ID` et
-`GRIST_API_KEY` sont définis, l'API Grist : les références numériques et les
+**Chargement** : source choisie par `SPEC_SOURCE` (`csv` par défaut, ou
+`grist`). En mode `csv`, `spec/*.csv`. En mode `grist` (`GRIST_URL`,
+`GRIST_DOC_ID`, `GRIST_API_KEY`), l'API Grist ; si Grist est injoignable, on
+retombe sur `spec/*.csv` avec un avertissement visible dans l'interface. Avec l'API Grist, les références numériques et les
 listes `["L", …]` sont résolues en codes (cf. `reference/generateur_unimarc.py`).
-Le bouton « Recharger la spec » de l'interface relit la source. La version
+Le bouton « Recharger la spec » de l'interface relit la source ; la page `/`
+affiche la source active (CSV ou Grist) et l'état de Grist (joignable ou non).
+**`humatheque spec-export`** écrit un instantané des tables Grist dans `spec/`,
+au même format que les exports manuels, plus une copie horodatée dans
+`spec/archives/` : c'est le moyen de figer une version de la spec. La version
 chargée (horodatage + empreinte) est enregistrée dans chaque dossier.
 
 **Tables attendues dans `spec/`** : `Regles`, `Sources`, `Situations`,
@@ -462,18 +474,73 @@ dans l'interface). Il signale :
 - les lignes alma-checker et sudoc-checker de `Statuts_services` autres que
   `error` (avertissement : elles sont ignorées).
 
-Avec les exports actuels, il doit au minimum signaler R009 (sous-zone vide) et
-R032 (`…`). R028 est syntaxiquement valide mais sémantiquement faux (voir §5) :
-à corriger dans Grist.
+Les défauts relevés dans les premiers exports (R009 sous-zone vide, R032 `…`,
+R028 sur `volume`) sont corrigés dans Grist : ils servent de cas de test du
+vérificateur sur des CSV fabriqués.
 
 **Sorties** : texte au format WinIBW, une zone par ligne, triée par étiquette
 (format de référence) ; MARCXML via `pymarc`. Les deux sont téléchargeables.
+L'export porte sur la **dernière version validée** de la notice (§9.2), à
+défaut sur la version générée.
 
 ## 9. Interface web
 
-Style : celui de la maquette (palette, cartes, badges de routage). Pas de
-framework front. Mise à jour par rafraîchissement périodique (polling) de
-fragments HTML, sans WebSocket.
+### 9.1 Principes techniques
+
+- **Rendu serveur + HTMX** : pages Jinja2, interactions par échange de
+  fragments HTML (filtres, reprise d'une exception, suivi d'un lot par
+  `hx-trigger="every 3s"` tant qu'il est en cours, compteurs mis à jour en
+  `hx-swap-oob`). Pas de framework front, pas de build JavaScript.
+- **Îlots JavaScript** là où HTMX ne suffit pas, et seulement là : l'éditeur
+  de notice (Monaco) et la visionneuse d'images (OpenSeadragon). Conventions
+  pour éviter les pièges connus d'HTMX :
+  - chaque îlot est un composant autonome (`static/js/<nom>.js`) initialisé
+    sur `htmx:load` et détruit proprement avant remplacement
+    (`htmx:beforeSwap`) ; un îlot n'est jamais à l'intérieur d'un fragment
+    rafraîchi périodiquement (`hx-preserve` sinon) ;
+  - les îlots échangent avec le serveur en JSON (`/api/v1`), pas en fragments ;
+  - navigation : `hx-push-url` sur les changements de vue pour que l'historique
+    du navigateur et les liens directs fonctionnent ;
+  - erreurs : un gestionnaire global `htmx:responseError` affiche un bandeau,
+    jamais d'échec silencieux.
+- **Couche de services** (`application/`) : chaque écran et chaque action
+  passe par une fonction qui renvoie des modèles pydantic. Les routes HTML et
+  l'API JSON `/api/v1` appellent les mêmes fonctions. Aucune logique métier
+  dans les routes ni dans les gabarits. Un front différent (React par exemple)
+  pourra se brancher sur l'API sans réécrire la logique.
+- **Style** : Tailwind CSS compilé par l'**exécutable autonome** (sans Node),
+  jetons de couleur repris de la maquette (palette, badges de routage), une
+  seule feuille compilée dans `static/`. Soigner les états vides, de
+  chargement et d'erreur ; badges de routage identiques sur tous les écrans.
+- **Visionneuse** : OpenSeadragon (zoom, déplacement, défilement entre les
+  images du document), vendorisé dans `static/`.
+
+### 9.2 Édition de la notice
+
+- **Éditeur** : Monaco (distribution `min` vendorisée, chargée par son
+  chargeur AMD, sans build), au format WinIBW (une zone par ligne,
+  `ZZZ II$a…`), avec un langage Monarch pour la coloration (étiquette,
+  indicateurs, codes de sous-zones).
+- **Validation** côté serveur (`notice/`), appelée par l'éditeur à la pause de
+  frappe et à l'enregistrement (`POST /api/v1/notices/{id}/validation`) ; les
+  résultats s'affichent comme marqueurs Monaco (ligne, gravité, message) :
+  - syntaxe : étiquette sur 3 chiffres, indicateurs, sous-zones `$x` non vides ;
+  - règles de la spec : zones de priorité 1 du profil absentes, zones ou
+    sous-zones produites par aucune règle du profil (avertissement), PPN mal
+    formés.
+- **Versions** : la notice générée (ou convertie) est conservée telle quelle ;
+  chaque enregistrement crée une version (auteur, date, différence avec la
+  précédente). Statuts : `générée` → `éditée` → `validée` (action explicite
+  du catalogueur, refusée s'il reste des erreurs).
+- **Régénération après édition** : si une résolution d'exception (PPN, classe
+  Dewey) régénère la notice alors qu'une version éditée existe, la nouvelle
+  version générée **n'écrase pas** l'édition : l'interface affiche les
+  différences et le catalogueur choisit de les reporter ou non.
+- **API** : `GET/PUT /api/v1/notices/{id}` (texte + version),
+  `GET /api/v1/notices/{id}/versions`, `POST …/validation`,
+  `POST …/valider` ; mêmes fonctions de `application/` que les pages.
+
+### 9.3 Écrans
 
 - **`/` Nouveau traitement** : le formulaire du §3, la liste des dossiers du
   bucket MinIO avec leur dernier statut et sélection multiple (ING-F-005),
@@ -497,9 +564,10 @@ fragments HTML, sans WebSocket.
   - **panneau droit, bas** : les informations du traitement (date, modèle,
     statut), le motif de l'arrêt s'il y a lieu (ALM-SUD-F-005), les sorties
     détaillées de chaque brique, et le bouton « Relancer l'extraction » ;
-  - pour le résultat final, la notice UNIMARC produite en vis-à-vis des images ;
+  - pour le résultat final, la notice UNIMARC en vis-à-vis des images, dans
+    l'éditeur (§9.2) ;
   - pour une conversion : images à gauche, notice Sudoc avant transformation en
-    haut à droite, notice produite par la conversion en bas à droite.
+    haut à droite, notice produite par la conversion en bas à droite, éditable.
 
   Contenu :
   - une frise des étapes avec statut et durée ;
@@ -534,7 +602,8 @@ fragments HTML, sans WebSocket.
 - **`.env.example`** :
   - les variables du `config.py` du POC (VLM, Albert, HF, sudoc, idref, dewey) ;
   - `ALMA_CHECKER_API_URL`, `ALMA_API_KEY` ;
-  - `GRIST_*` (optionnels) ;
+  - `SPEC_SOURCE=csv`, `GRIST_URL=http://grist:8484`, `GRIST_DOC_ID`,
+    `GRIST_API_KEY`, `GRIST_SESSION_SECRET`, `GRIST_DEFAULT_EMAIL` ;
   - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_SEUIL_CORRESPONDANCE` ;
   - `VLM_MODEL=google/gemma-4-26B-A4B-it`, `VLM_STRATEGIE=requete_unique`,
     `VLM_TIMEOUT`, `HTTP_TIMEOUT`, `RELANCES_AUTO=2` ;
@@ -544,10 +613,26 @@ fragments HTML, sans WebSocket.
   - `REGLES_STATUTS_EXCLUS=rejeté`.
 - **Déploiement** :
   - `Dockerfile` : image `python:3.12-slim` avec `uv` ; le cache reaccentue est
-    construit au build ;
-  - `docker-compose.yml` : un service `app`, un volume `./data`, `env_file` ;
-    même convention que les autres services smartbiblia ;
-  - en local : `uv run humatheque serve`.
+    construit au build ; l'exécutable autonome Tailwind est téléchargé (version
+    figée) et compile la feuille de style au build. En développement :
+    `uv run humatheque css --watch` ;
+  - `docker-compose.yml` : **deux services**, même convention que les autres
+    services smartbiblia :
+    - `app` : construit depuis le `Dockerfile`, port 8000, volume `./data`,
+      `env_file: .env`, `depends_on: grist` (sans en dépendre pour démarrer :
+      l'app fonctionne avec `spec/*.csv` si Grist est absent) ;
+    - `grist` : image officielle `gristlabs/grist`, port 8484, volume
+      `./grist-data:/persist`, variables `GRIST_SESSION_SECRET`,
+      `APP_HOME_URL`, `GRIST_DEFAULT_EMAIL`, `GRIST_SINGLE_ORG=humatheque` ;
+    - réseau commun : l'app joint Grist par `http://grist:8484`
+      (`GRIST_URL` dans `.env`) ;
+    - `./data` et `./grist-data` dans `.gitignore`.
+  - **Initialisation de Grist** (documentée dans le `README.md`, manuelle une
+    fois) : importer le classeur de spécification dans l'instance locale,
+    relever l'identifiant du document et créer une clé d'API, puis renseigner
+    `GRIST_DOC_ID`, `GRIST_API_KEY` et `SPEC_SOURCE=grist` ;
+  - en local : `uv run humatheque serve` seul (mode CSV), ou
+    `docker compose up -d` pour l'app et Grist.
 
 ## 11. Tests et ordre de construction
 
@@ -555,8 +640,11 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 (réponses d'exemple tirées des README et OpenAPI).
 
 1. **Socle** : `pyproject`, configuration, chargement de la spec et
-   vérificateur. Test : `check-spec` sur `spec/` signale R009 et R032, et avertit sur les
-   lignes alma-checker et sudoc-checker de `Statuts_services`.
+   vérificateur. Test : `check-spec` sur les exports actuels de `spec/` ne
+   signale aucune erreur bloquante (R009, R028 et R032 ont été corrigés dans
+   Grist) ; tests unitaires du vérificateur sur des CSV fabriqués contenant
+   chacun des défauts du §8. Chargement Grist testé avec des réponses d'API
+   simulées (`respx`), y compris le repli sur CSV quand Grist est injoignable.
 2. **`texte_unimarc`** : toutes les tables de cas du §4. **Provenance** : table
    de cas (« École pratique des hautes études », « EPHE », « E.P.H.E. Ve
    section » → EPHE ; « Université Paris 1 » → hors EPHE ; vide → absent ;
@@ -578,12 +666,20 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
    s'arrête ; une provenance ambiguë arrête en décision puis reprend après
    choix manuel.
 6. **Interface** : mode 2 (lot et file d'exceptions) en priorité, puis mode 1,
-   puis résolution et historique.
+   puis résolution et historique. Tests de la couche `application/` (sans
+   HTTP) et de quelques routes HTML et JSON.
+6 ter. **Édition de notice** : analyse et validation du texte WinIBW (table de
+   cas valides et invalides), versions, validation refusée en cas d'erreur,
+   régénération sans écrasement d'une version éditée ; essai manuel de
+   l'éditeur dans le navigateur.
 6 bis. **Ingestion MinIO** : constitution des documents à partir d'un bucket
    simulé (dossiers TH/MM, multi-images, dossier vide → `document_invalide`),
    sélection manuelle, historique.
-7. **Docker Compose**, puis essai réel sur 5 URL de `minio_urls.txt` et sur
-   5 dossiers du bucket `poc/`. Consigner les écarts dans `docs/ESSAI.md`.
+7. **Docker Compose** (app + Grist) : `docker compose up -d` démarre les deux
+   services ; après import du classeur dans Grist, `check-spec` en mode `grist`
+   donne le même résultat qu'en mode `csv` sur les mêmes exports, et
+   `spec-export` reproduit les CSV. Puis essai réel sur 5 URL de
+   `minio_urls.txt` et sur 5 dossiers du bucket `poc/`. Consigner les écarts dans `docs/ESSAI.md`.
 8. **Après arbitrage seulement** : détection automatique et planification
    (ING-F-003, ING-F-004).
 
