@@ -3,6 +3,7 @@
 import pytest
 
 from humatheque.texte_unimarc import casse_complement_titre, casse_phrase, reaccentuer
+from humatheque.texte_unimarc._vendor.reaccentue.dictionnaire import Dictionnaire
 
 
 # Cas d'acceptation minimaux du §4.1 (sans alerte attendue)
@@ -33,10 +34,38 @@ def test_apostrophe_typographique_conservee():
     assert casse_phrase("ETUDE DE L’ETE").valeur == "Étude de l’été"
 
 
-def test_accent_ambigu_sans_mot_precedent():
-    r = reaccentuer("DES")  # dés / des / dès, aucun mot précédent
-    assert r.valeur == "des"
-    assert r.alertes == ["accent_ambigu:DES"]
+def _dico(**champs):
+    base = dict(formes={}, bigrammes={}, noms_propres={}, noms_propres_ambigus=set(),
+                mots_connus=set(), frequences={})
+    base.update(champs)
+    return Dictionnaire(**base)
+
+
+@pytest.mark.parametrize("entree, sortie", [("DES", "des"), ("LA", "la"), ("LES", "les"), ("DE", "de")])
+def test_sans_mot_precedent_frequence_totale(entree, sortie):
+    r = reaccentuer(entree)
+    assert r.valeur == sortie and r.alertes == []
+    assert "fréquence totale" in r.trace[0]
+
+
+def test_egalite_ou_absence_de_donnees_accent_ambigu():
+    d = _dico(formes={"COTE": ["côte", "coté", "cote"]}, mots_connus={"COTE"})
+    r = reaccentuer("COTE", d=d)
+    assert r.valeur == "cote" and r.alertes == ["accent_ambigu:COTE"]
+    d = _dico(formes={"COTE": ["côte", "coté"]}, mots_connus={"COTE"}, frequences={"côte": 5, "coté": 5})
+    assert reaccentuer("COTE", d=d).alertes == ["accent_ambigu:COTE"]
+
+
+def test_bigramme_prioritaire_sur_frequence_totale():
+    d = _dico(formes={"COTE": ["côte", "coté"], "LA": ["la"]}, mots_connus={"COTE", "LA"},
+              bigrammes={"la côte": 3}, frequences={"coté": 100, "côte": 3})
+    assert reaccentuer("LA COTE", d=d).valeur == "la côte"
+
+
+def test_noms_propres_courts_ignores():
+    r = casse_phrase("QU'EST-CE QUE LA DEMOCRATIE ?")
+    assert r.valeur == "Qu'est-ce que la démocratie ?"
+    assert not any(a.startswith("nom_propre_possible") for a in r.alertes)
 
 
 def test_bigramme_tranche_et_trace():

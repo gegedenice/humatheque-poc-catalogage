@@ -3,11 +3,13 @@
 Seul le dictionnaire de reaccentue est utilisé ; la tokenisation et le choix
 des formes sont faits ici :
 - un seul candidat (minuscules, dédoublonnés, alphabet latin) : on le prend ;
-- plusieurs : bigramme avec le mot précédent ; égalité ou absence de données :
-  forme sans accent + alerte `accent_ambigu:<MOT>` ;
+- plusieurs : bigramme avec le mot précédent (sans mot précédent : fréquence
+  totale de la forme) ; égalité ou absence de données : forme sans accent +
+  alerte `accent_ambigu:<MOT>` ;
 - noms propres : majuscule conservée si le mot n'existe qu'avec une majuscule ;
   s'il existe aussi en minuscule, minuscule + `nom_propre_possible:<MOT>`,
-  sauf s'il figure parmi les noms propres connus du document.
+  sauf s'il figure parmi les noms propres connus du document ; les noms
+  propres de moins de 3 lettres sont ignorés.
 
 Compléments (non prévus par la spec, signalés par alerte ou trace) :
 - chiffres romains (`XIXE` → `XIXe`, `LOUIS XIV`) laissés en capitales ;
@@ -33,6 +35,8 @@ RE_ROMAIN = re.compile(
     r"(?=[IVXLCDM])(?P<n>M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3}))(?P<suffixe>E|ER|ERE|EME)?"
 )
 ROMAINS_ISOLES = {"I", "V", "X"}
+# Les noms propres plus courts (symboles chimiques Ce, La…) sont ignorés (décision du 03/11).
+LONGUEUR_MIN_NOM_PROPRE = 3
 
 
 def _latin(forme: str) -> bool:
@@ -91,11 +95,16 @@ class _Reaccentueur:
             return cands[0]
         if prec:
             scores = {c: self.d.bigrammes.get(f"{prec} {c}", 0) for c in cands}
-            meilleur = max(scores.values())
-            gagnants = [c for c, s in scores.items() if s == meilleur]
-            if meilleur > 0 and len(gagnants) == 1:
-                self._noter(mot, gagnants[0], f"bigramme « {prec} {gagnants[0]} » = {meilleur}")
-                return gagnants[0]
+            motif = "bigramme « " + prec + " {c} » = {n}"
+        else:
+            # Pas de mot précédent : fréquence totale de la forme (décision du 03/11)
+            scores = {c: self.d.frequences.get(c, 0) for c in cands}
+            motif = "fréquence totale de « {c} » = {n}, sans mot précédent"
+        meilleur = max(scores.values())
+        gagnants = [c for c, s in scores.items() if s == meilleur]
+        if meilleur > 0 and len(gagnants) == 1:
+            self._noter(mot, gagnants[0], motif.format(c=gagnants[0], n=meilleur))
+            return gagnants[0]
         forme = unidecode(mot).lower()
         self._alerter("accent_ambigu", mot)
         self._noter(mot, forme, f"ambigu entre {', '.join(cands)}")
@@ -121,7 +130,7 @@ class _Reaccentueur:
         if "-" in mot and k not in self.d.formes and k not in self.d.noms_propres:
             parties = mot.split("-")
             return "-".join(self.mot(p, prec if i == 0 else None) for i, p in enumerate(parties))
-        if len(k) > 1 and k in self.d.noms_propres:
+        if len(k) > LONGUEUR_MIN_NOM_PROPRE - 1 and k in self.d.noms_propres:
             if k not in self.d.noms_propres_ambigus:
                 return self._propre(mot, k, "nom propre")
             if k in self.connus:

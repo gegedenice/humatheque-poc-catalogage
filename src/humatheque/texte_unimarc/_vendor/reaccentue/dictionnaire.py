@@ -23,7 +23,7 @@ from pathlib import Path
 from unidecode import unidecode
 
 DOSSIER_DICO = Path(__file__).resolve().parent / "dico"
-VERSION_CACHE = 2
+VERSION_CACHE = 3
 
 
 @dataclass
@@ -38,6 +38,9 @@ class Dictionnaire:
     noms_propres_ambigus: set[str]
     # toutes les clés connues avant réduction (mots du dictionnaire)
     mots_connus: set[str]
+    # forme → somme des fréquences des bigrammes dont elle est le second mot
+    # (ajout : départage d'un mot sans mot précédent)
+    frequences: dict[str, int]
 
 
 # ------------------------------------------------- règles d'origine (inchangées)
@@ -128,7 +131,12 @@ def construire(dossier: Path = DOSSIER_DICO) -> Dictionnaire:
                 ambigus.add(k)
 
     formes = reduce_dico(complet)
-    return Dictionnaire(formes, charger_bigrammes(formes, dossier), noms_propres, ambigus, set(complet))
+    bigrammes = charger_bigrammes(formes, dossier)
+    frequences: dict[str, int] = {}
+    for k, v in bigrammes.items():
+        second = k.split()[-1]
+        frequences[second] = frequences.get(second, 0) + v
+    return Dictionnaire(formes, bigrammes, noms_propres, ambigus, set(complet), frequences)
 
 
 def _sources(dossier: Path) -> list[Path]:
