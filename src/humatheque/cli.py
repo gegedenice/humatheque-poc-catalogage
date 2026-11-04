@@ -1,16 +1,20 @@
 """Ligne de commande `humatheque`.
 
-Sous-commandes disponibles à ce stade : `check-spec`, `cache-reaccentue`
-(construit le cache du dictionnaire, appelé au build Docker). Les autres
-(`serve`, `run-url`, `run-batch`, `scan-minio`, `spec-export`) arrivent avec
-les étapes suivantes (SPEC §11).
+Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `css`,
+`cache-reaccentue` (cache du dictionnaire, appelé au build Docker).
+`scan-minio` et `spec-export` arrivent avec les étapes 6 bis et 7.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import platform
+import stat
+import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 from humatheque.config import reglages
@@ -50,6 +54,71 @@ def cache_reaccentue(args: argparse.Namespace) -> int:
     return 0
 
 
+# Exécutable autonome Tailwind (sans Node), version figée.
+TAILWIND_VERSION = "v3.4.17"
+TAILWIND_URL = "https://github.com/tailwindlabs/tailwindcss/releases/download/{version}/tailwindcss-{plateforme}"
+
+
+def _tailwind() -> Path:
+    systeme = {"Linux": "linux", "Darwin": "macos", "Windows": "windows"}[platform.system()]
+    arch = {"x86_64": "x64", "AMD64": "x64", "arm64": "arm64", "aarch64": "arm64"}[platform.machine()]
+    plateforme = f"{systeme}-{arch}" + (".exe" if systeme == "windows" else "")
+    chemin = reglages().racine / ".cache" / f"tailwindcss-{TAILWIND_VERSION}-{plateforme}"
+    if not chemin.exists():
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        url = TAILWIND_URL.format(version=TAILWIND_VERSION, plateforme=plateforme)
+        print(f"Téléchargement de {url}")
+        urllib.request.urlretrieve(url, chemin)  # noqa: S310 — URL figée
+        chemin.chmod(chemin.stat().st_mode | stat.S_IEXEC)
+    return chemin
+
+
+def css(args: argparse.Namespace) -> int:
+    racine = reglages().racine
+    web = racine / "src" / "humatheque" / "web"
+    commande = [str(_tailwind()), "-c", str(web / "tailwind" / "tailwind.config.js"),
+                "-i", str(web / "tailwind" / "input.css"), "-o", str(web / "static" / "css" / "app.css")]
+    commande.append("--watch" if args.watch else "--minify")
+    return subprocess.call(commande, cwd=racine)
+
+
+def serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from humatheque.web import create_app
+
+    uvicorn.run(create_app(), host=args.host, port=args.port)
+    return 0
+
+
+def _traiter_documents(documents: list[list[str]], args: argparse.Namespace) -> int:
+    """Lot exécuté dans le terminal (exécuteur synchrone), puis résumé."""
+    from humatheque.application import Application, EntreeLot, ExecuteurSynchrone
+
+    app = Application(executeur=ExecuteurSynchrone())
+    lot = app.creer_lot(EntreeLot(type_document=args.type, fournisseur=args.fournisseur, documents=documents,
+                                  source="url"))
+    vue = app.vue_lot(lot.id)
+    for ligne in app.store.lignes_du_lot(lot.id):
+        d = app.vue_dossier(ligne.id).dossier
+        print(f"{d.document.id} → {d.routage}" + (f" ({d.motif_arret})" if d.motif_arret else ""))
+        if args.notice and (d.notice_texte or d.notice_convertie):
+            print(d.notice_texte or d.notice_convertie.texte, end="\n\n")
+    i = vue.indicateurs
+    print(f"Lot {lot.id} : {i.documents} document(s), {i.passes_seuls} passé(s) seul(s), {i.en_attente} à reprendre")
+    return 0
+
+
+def run_url(args: argparse.Namespace) -> int:
+    return _traiter_documents([args.urls] if args.un_document else [[u] for u in args.urls], args)
+
+
+def run_batch(args: argparse.Namespace) -> int:
+    from humatheque.application import documents_depuis_liste
+
+    return _traiter_documents(documents_depuis_liste(Path(args.fichier).read_text(encoding="utf-8")), args)
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
@@ -63,6 +132,29 @@ def construire_parseur() -> argparse.ArgumentParser:
 
     c = sous.add_parser("cache-reaccentue", help="construit le cache du dictionnaire reaccentue dans data/")
     c.set_defaults(fonction=cache_reaccentue)
+
+    c = sous.add_parser("serve", help="lance l'interface web (port 8000)")
+    c.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"))
+    c.add_argument("--port", type=int, default=8000)
+    c.set_defaults(fonction=serve)
+
+    c = sous.add_parser("css", help="compile la feuille Tailwind (exécutable autonome, sans Node)")
+    c.add_argument("--watch", action="store_true", help="recompile à chaque modification")
+    c.set_defaults(fonction=css)
+
+    for nom, aide in (("run-url", "traite une ou plusieurs URL d'images"),
+                      ("run-batch", "traite un fichier d'URL (une par ligne, format minio_urls.txt)")):
+        c = sous.add_parser(nom, help=aide)
+        if nom == "run-url":
+            c.add_argument("urls", nargs="+")
+            c.add_argument("--un-document", action="store_true", help="les URL forment un seul document")
+            c.set_defaults(fonction=run_url)
+        else:
+            c.add_argument("fichier")
+            c.set_defaults(fonction=run_batch)
+        c.add_argument("--type", choices=["these", "memoire"], default="these")
+        c.add_argument("--fournisseur", default=None)
+        c.add_argument("--notice", action="store_true", help="affiche les notices produites")
     return p
 
 

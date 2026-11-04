@@ -105,7 +105,7 @@ def test_mode1_vue_dossier_et_telechargements(app, image):
     assert lot.mode == 1
     (ligne,) = app.store.lignes_du_lot(lot.id)
     v = app.vue_dossier(ligne.id)
-    assert v.etat == "termine" and v.titre == EXTRACTION["title"]
+    assert v.etat == "termine" and v.titre == "Contribution à l'étude de la démocratie en Afrique"
     assert [e.nom for e in v.etapes][:3] == ["extraction", "provenance", "alma"]
     assert v.etapes[0].libelle == "Extraction VLM" and v.etapes[0].statut == "ok"
     champ = next(c for c in v.champs if c.champ == "title")

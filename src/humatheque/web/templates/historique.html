@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_composants.html" import badge, vide %}
+{% block titre %}Historique{% endblock %}
+{% block contenu %}
+<h1>Historique</h1>
+<p class="text-sm text-sourdine mt-1">Balayages du bucket et traitements : date, déclencheur, documents, routages.</p>
+<section class="carte mt-4">
+  {% if vue.ingestions %}
+  <div class="defilant"><table class="tableau">
+    <thead><tr><th>Date</th><th>Type</th><th>Déclencheur</th><th>Documents</th><th>Résultat</th><th></th></tr></thead>
+    <tbody>
+    {% set lots = {} %}{% for r in vue.lots %}{% set _ = lots.update({r.lot.id: r}) %}{% endfor %}
+    {% for i in vue.ingestions %}{% set r = lots.get(i.lot_id) %}
+      <tr>
+        <td class="font-mono text-xs">{{ i.le | date("%d/%m/%Y %H:%M") }}</td>
+        <td class="text-xs">{{ i.type }}</td>
+        <td class="text-xs">{{ i.declencheur }}</td>
+        <td class="text-xs">{{ i.documents | length }}{% if i.documents | length <= 3 %} <span class="font-mono text-sourdine">{{ i.documents | join(", ") }}</span>{% endif %}</td>
+        <td class="space-x-1 text-xs">
+          {% if r %}{% if r.en_cours %}<span class="text-decision">en cours</span>{% endif %}
+            {% for routage, n in r.indicateurs.par_routage.items() %}{{ badge(routage) }}&nbsp;{{ n }}{% endfor %}
+          {% endif %}
+        </td>
+        <td>{% if i.lot_id %}<a class="btn-discret btn-sm" href="/lots/{{ i.lot_id }}">Lot</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}{{ vide("Aucun balayage ni traitement enregistré.") }}{% endif %}
+</section>
+{% endblock %}

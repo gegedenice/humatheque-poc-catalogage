@@ -291,7 +291,8 @@ class Application:
         if d.notice_source_iso:
             tel.update({"Notice source (ISO 2709)": "source.iso", "Notice convertie (ISO 2709)": "convertie.iso",
                         "Notice convertie (WinIBW)": "convertie.txt"})
-        return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=(d.metadonnees or {}).get("title"),
+        titre = (d.contexte.valeurs.get("title") if d.contexte else None) or (d.metadonnees or {}).get("title")
+        return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=titre,
                           etapes=etapes, images=images, champs=champs,
                           exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel)
 

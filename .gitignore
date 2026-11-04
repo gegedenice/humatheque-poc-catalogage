@@ -8,3 +8,6 @@ __pycache__/
 # Données d'exécution
 data/
 grist-data/
+
+# Exécutable Tailwind téléchargé par `humatheque css`
+.cache/

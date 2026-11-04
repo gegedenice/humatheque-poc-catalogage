@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_composants.html" import badge, vide %}
+{% block titre %}Nouveau traitement{% endblock %}
+{% block contenu %}
+<h1>Nouveau traitement</h1>
+<p class="text-sm text-sourdine mt-1">Un document donne un dossier suivi pas à pas (mode 1) ; plusieurs documents forment un lot traité en tâche de fond (mode 2).</p>
+
+<div class="grid grid-cols-1 gap-4 mt-4 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
+  <form class="carte min-w-0 space-y-4" method="post" action="/lots" enctype="multipart/form-data" hx-boost="false">
+    <h2>Images du ou des documents</h2>
+    <fieldset class="space-y-2">
+      <label class="etiquette" for="images">Téléverser des images</label>
+      <input class="champ" id="images" type="file" name="images" accept="image/*" multiple>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="un_seul_document" value="true" checked>
+        les fichiers forment un seul document multi-images (sinon : un document par fichier)
+      </label>
+    </fieldset>
+    <div class="flex items-center gap-3 text-xs text-sourdine"><span class="flex-1 border-t border-filet"></span>ou<span class="flex-1 border-t border-filet"></span></div>
+    <div>
+      <label class="etiquette" for="url">Une URL d'image (un document d'une image)</label>
+      <input class="champ" id="url" type="url" name="url" placeholder="https://minio.smartbiblia.fr/…/page_titre.jpg">
+    </div>
+    <div>
+      <label class="etiquette" for="liste_urls">Une liste d'URL, une par ligne (un document par ligne, suffixe « FAIT » ignoré)</label>
+      <textarea class="champ font-mono text-xs" id="liste_urls" name="liste_urls" rows="4"></textarea>
+    </div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label class="etiquette" for="type_document">Type de document</label>
+        <select class="champ" id="type_document" name="type_document">
+          <option value="these">Thèse</option>
+          <option value="memoire">Mémoire</option>
+        </select>
+      </div>
+      <div>
+        <label class="etiquette" for="fournisseur">Fournisseur VLM</label>
+        <select class="champ" id="fournisseur" name="fournisseur">
+          {% for f in vue.fournisseurs %}
+          <option value="{{ f }}" {% if f == vue.fournisseur_defaut %}selected{% endif %}>{{ f }}{% if f == vue.fournisseur_defaut %} (défaut){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <p class="text-xs text-sourdine">La provenance (EPHE ou hors EPHE) n'est pas saisie : elle est déduite de l'établissement de soutenance.</p>
+    <button class="btn-principal" type="submit" {% if vue.spec.nb_erreurs %}disabled title="La spécification contient des erreurs bloquantes"{% endif %}>Lancer le traitement</button>
+  </form>
+
+  <div class="space-y-4">
+    {% with spec = vue.spec %}{% include "_spec.html" %}{% endwith %}
+    <section class="carte">
+      <h2>Bucket MinIO</h2>
+      {{ vide("La sélection de dossiers du bucket arrive avec l'ingestion MinIO (étape 6 bis).") }}
+    </section>
+  </div>
+</div>
+
+<section class="carte mt-4">
+  <div class="flex items-center justify-between"><h2>Derniers traitements</h2><a class="text-sm" href="/historique">Tout l'historique →</a></div>
+  {% if vue.lots %}
+  <div class="defilant"><table class="tableau">
+    <thead><tr><th>Lot</th><th>Créé le</th><th>Documents</th><th>Résultat</th><th></th></tr></thead>
+    <tbody>
+    {% for r in vue.lots %}
+      <tr>
+        <td class="font-mono text-xs">{{ r.lot.id }}</td>
+        <td class="font-mono text-xs">{{ r.lot.cree_le | date }}</td>
+        <td>{{ r.lot.nb_documents }} · {{ "thèse" if r.lot.parametres.type_document == "these" else "mémoire" }}</td>
+        <td class="space-x-1">
+          {% if r.en_cours %}<span class="text-xs text-decision">en cours ({{ r.indicateurs.en_cours }})</span>{% endif %}
+          {% for routage, n in r.indicateurs.par_routage.items() %}{{ badge(routage) }}&nbsp;{{ n }}{% endfor %}
+        </td>
+        <td><a class="btn-discret btn-sm" href="/lots/{{ r.lot.id }}">Ouvrir</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}{{ vide("Aucun traitement pour l'instant.") }}{% endif %}
+</section>
+{% endblock %}

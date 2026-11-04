@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}Catalogage assisté{% endblock %} · humatheque</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/js/app.js" defer></script>
+  {% block tete %}{% endblock %}
+</head>
+<body hx-boost="true">
+  <header class="bg-carte border-b border-filet">
+    <nav class="max-w-[1280px] mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-1">
+      <a href="/" class="font-semibold no-underline">humatheque · catalogage assisté</a>
+      <a href="/" class="text-sm text-sourdine hover:text-encre no-underline">Nouveau traitement</a>
+      <a href="/historique" class="text-sm text-sourdine hover:text-encre no-underline">Historique</a>
+    </nav>
+  </header>
+  <div id="bandeau-erreur" role="alert" hidden
+       class="max-w-[1280px] mx-auto mt-3 mx-4 rounded-lg border border-sortie bg-white px-4 py-2.5 text-sm text-sortie flex items-start gap-3">
+    <span class="font-semibold">Erreur</span><span id="bandeau-erreur-texte" class="flex-1"></span>
+    <button type="button" class="text-sourdine hover:text-encre" onclick="this.parentElement.hidden = true" aria-label="Fermer">✕</button>
+  </div>
+  <main class="max-w-[1280px] mx-auto px-4 py-5">
+    {% block contenu %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

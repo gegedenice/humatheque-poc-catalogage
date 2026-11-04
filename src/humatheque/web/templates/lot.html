@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block titre %}Lot {{ vue.lot.id }}{% endblock %}
+{% block contenu %}
+<h1>Lot {{ "en cours" if vue.en_cours else "traité" }}</h1>
+<p class="text-sm text-sourdine mt-1">Reporting du lot : documents passés seuls et file d'exceptions à reprendre.</p>
+{% with oob = False %}{% include "_lot_entete.html" %}{% include "_lot_fragment.html" %}{% endwith %}
+{% endblock %}

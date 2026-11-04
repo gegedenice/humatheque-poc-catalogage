@@ -38,3 +38,4 @@ packages = ["src/humatheque"]
 testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = "-q"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titre %}{{ vue.dossier.document.id }}{% endblock %}
+{% block tete %}<script src="/static/vendor/openseadragon/openseadragon.min.js" defer></script>
+<script src="/static/js/visionneuse.js" defer></script>{% endblock %}
+{% block contenu %}
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,44%)_minmax(0,1fr)] items-start">
+  {# Îlot JavaScript : jamais dans un fragment rafraîchi (SPEC §9.1). #}
+  <section class="carte lg:sticky lg:top-3 p-2" aria-label="Images du document">
+    {% if vue.images | selectattr("url") | list %}
+    <div id="visionneuse" class="w-full h-[70vh] bg-papier rounded-lg" hx-preserve="true"
+         data-images='{{ vue.images | selectattr("url") | map(attribute="url") | list | tojson }}'></div>
+    <p class="text-xs text-sourdine px-1 pt-2">{{ vue.images | length }} image(s) · molette pour zoomer, flèches pour changer d'image.</p>
+    {% else %}
+    <p class="vide">Aucune image affichable pour ce document.</p>
+    {% endif %}
+  </section>
+  {% include "_dossier_panneau.html" %}
+</div>
+{% endblock %}
