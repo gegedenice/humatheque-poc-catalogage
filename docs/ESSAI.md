@@ -61,7 +61,30 @@ complètent l'essai.
    « labo ») au lieu de `TH/` et `MM/` ; ajout de ces noms dans
    `config/ingestion.yaml` (même principe : le dossier parent donne le type).
 
-### À arbitrer
+### Second passage IdRef (05/11)
+
+Après le réglage d'idref-linker (environnement du service :
+`IDREF_HTTP_TIMEOUT=8.0`, `IDREF_MAX_RETRIES=0`, `IDREF_MAX_CANDIDATES=5`,
+`IDREF_MAX_DOCS_PER_ROLE=5` ; `config/services.yaml` : `max_candidates` et
+`max_docs_per_role` = 5), les trois dossiers en incident IdRef ont été
+relancés (relance limitée à l'étape en échec) :
+
+| Dossier | Avant | Après |
+|---|---|---|
+| memoires/CESOR/doc_16 | incident, 3 × 180 s dépassés (929 s) | **27 s**, 2 personnes → décision S12, notice produite |
+| theses/EPHESVT_theses/doc_01 | incident (740 s) | **53 s**, 8 personnes → décision S08, notice produite |
+| theses/theses.fr/2024PA01E001 | incident (739 s) | **93 s**, 7 personnes → décision S09, notice produite |
+
+Appels de 0,3 à 17 s par personne (contre 65 à plus de 180 s). Les statuts
+restent surtout `low_confidence` / `not_found` : exceptions à trancher par
+les catalogueurs, sans arrêt de la génération.
+
+Décisions du 05/11 appliquées : titre non extrait → document invalide
+(décision) ; forme retraitée « Prénom Nom » en 200$f et 200$g
+(`$fChristelle Tesson$gsous la direction de Giovanni Stevanin`) avec accent
+restitué quand le dictionnaire n'en connaît qu'une forme.
+
+### À arbitrer (état au 04/11 ; points 1, 2 et 4 tranchés le 05/11)
 
 1. **Lenteur d'idref-linker `/align/person`** (cause de 3 incidents sur 10) :
    environ 65 s par personne, parfois plus de 180 s ; une thèse a 5 à 8
