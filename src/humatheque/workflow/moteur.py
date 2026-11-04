@@ -176,7 +176,7 @@ class Workflow:
         try:
             resultat, appel = fonction(*args)
         except ServiceIndisponible as e:
-            raise _Incident("service_indisponible", str(e), [e.appel], relancable=True) from e
+            raise _Incident("service_indisponible", str(e), [e.appel], relancable=e.relancable) from e
         dossier.etapes[nom].appels.append(appel)
         return resultat
 

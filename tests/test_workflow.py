@@ -312,3 +312,11 @@ def test_relance_automatique_sans_exceptions_en_double(workflow):
     d = workflow.executer(dossier())
     assert d.etapes["idref_personnes"].tentatives == 2
     assert len([e for e in d.exceptions if e.etape == "idref_personnes"]) == 3
+
+
+@respx.mock
+def test_erreur_400_non_relancee(workflow):  # essai réel du 04/11 : titre absent
+    routes = simuler()
+    routes["alma"].return_value = httpx.Response(400, json={"detail": "Unable to build Alma query"})
+    d = workflow.executer(dossier())
+    assert (d.routage, d.etapes["alma"].statut, d.etapes["alma"].tentatives) == ("incident", "service_indisponible", 1)

@@ -32,6 +32,11 @@ class ServiceIndisponible(Exception):
         super().__init__(f"{service} : {message}")
         self.service, self.appel, self.timeout = service, appel, timeout
 
+    @property
+    def relancable(self) -> bool:
+        """Une erreur de requête (4xx) ne se corrige pas en relançant (essai réel du 04/11)."""
+        return not (self.appel.statut_http is not None and 400 <= self.appel.statut_http < 500)
+
 
 class ClientService:
     """Client d'un service : URL de base, clé facultative (en-tête X-API-Key), délai."""

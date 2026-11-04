@@ -11,7 +11,7 @@ separateurs_segments: ":;.!?()[]«»\"/"
 # Personnes (SPEC §4.3)
 # Mots de liaison entre civilités (« Monsieur le Professeur ») : retirés avec elles.
 liaisons_civilites: [le, la, l']
-civilites: [Monsieur, Madame, Mademoiselle, M., Mme, Mme., Mlle, Mlle., Professeur, Professeure, Pr, Pr., Prof., Dr, Dr., Docteur, Docteure, Me, Me., Maître, Mgr, Monseigneur]
+civilites: [Monsieur, Madame, Mademoiselle, M., Mr, Mr., Mrs, Mrs., Ms, Ms., Mme, Mme., Mlle, Mlle., Professeur, Professeure, Pr, Pr., Prof., Dr, Dr., Docteur, Docteure, Me, Me., Maître, Mgr, Monseigneur]
 particules:
   # rejetées après le prénom dans la forme d'accès française (La Roche, Marie-France de)
   rejetees: [de, "d'", von]

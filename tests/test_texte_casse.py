@@ -111,3 +111,15 @@ def test_casse_complement_titre(entree, sortie):
 
 def test_vide():
     assert casse_phrase("").valeur == "" and casse_phrase(None).valeur == ""
+
+
+
+def test_sigle_dans_un_titre_en_casse_mixte():  # essai réel du 04/11
+    r = casse_phrase("Une forme sévère de Paraplégie Spastique Familiale (PSF) : Génétique")
+    assert "(PSF)" in r.valeur and not r.alertes
+
+
+def test_compose_nom_propre():
+    # Comme dans le contexte : le nom de l'organisme figure parmi les noms connus du document.
+    org = "UNIVERSITE PARIS 1 PANTHEON-SORBONNE"
+    assert casse_phrase(org, [org]).valeur == "Université Paris 1 Panthéon-Sorbonne"

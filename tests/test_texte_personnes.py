@@ -29,6 +29,7 @@ def test_table_spec(brut, nom, prenom, alertes):
     ("Monsieur le Professeur André GODIN", "Godin", "André"),
     ("Madame la Professeure Anne LEROY", "Leroy", "Anne"),
     ("le Professeur Jean MARTIN", "Martin", "Jean"),
+    ("Mr Giovanni Stevanin", "Stevanin", "Giovanni"),
 ])
 def test_decoupages(brut, nom, prenom):
     p = personne(brut)

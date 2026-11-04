@@ -12,6 +12,9 @@ des formes sont faits ici :
   propres de moins de 3 lettres sont ignorés.
 
 Compléments (non prévus par la spec, signalés par alerte ou trace) :
+- dans un texte en casse mixte, un segment d'un seul mot en capitales est un
+  sigle, laissé tel quel ; un composé dont une partie est un nom propre
+  prend une majuscule à chaque partie ;
 - chiffres romains (`XIXE` → `XIXe`, `LOUIS XIV`) laissés en capitales ;
 - mot absent du dictionnaire (sigle, terme rare) : minuscules + `mot_inconnu:<MOT>`.
 """
@@ -128,8 +131,11 @@ class _Reaccentueur:
             self._noter(mot, forme, "chiffre romain")
             return forme
         if "-" in mot and k not in self.d.formes and k not in self.d.noms_propres:
-            parties = mot.split("-")
-            return "-".join(self.mot(p, prec if i == 0 else None) for i, p in enumerate(parties))
+            parties = [self.mot(p, prec if i == 0 else None) for i, p in enumerate(mot.split("-"))]
+            # Un composé dont une partie est un nom propre est un nom propre (Panthéon-Sorbonne)
+            if any(p[:1].isupper() for p in parties):
+                parties = [p[:1].upper() + p[1:] for p in parties]
+            return "-".join(parties)
         if len(k) > LONGUEUR_MIN_NOM_PROPRE - 1 and k in self.d.noms_propres:
             if k not in self.d.noms_propres_ambigus:
                 return self._propre(mot, k, "nom propre")
@@ -167,9 +173,12 @@ def _reaccentuer(texte: str, noms_connus: Iterable[str], d: Dictionnaire | None)
     r = _Reaccentueur(d or dictionnaire(), cles_noms_connus(noms_connus), set(cfg["elisions"]))
     seps = re.escape(cfg["separateurs_segments"])
     morceaux = re.split(f"([{seps}])", texte or "")
+    casse_mixte = any(c.islower() for c in texte or "")
     premier_traite = None
     for i, morceau in enumerate(morceaux):
-        if i % 2 == 0 and _en_capitales(morceau):
+        # Dans un texte en casse mixte, un segment en capitales d'un seul mot est un sigle : « (PSF) »
+        sigle = casse_mixte and len(RE_MOT.findall(morceau)) == 1
+        if i % 2 == 0 and _en_capitales(morceau) and not sigle:
             morceaux[i] = r.segment(morceau)
             premier_traite = True if premier_traite is None else premier_traite
         elif any(c.isalpha() for c in morceau) and premier_traite is None:
