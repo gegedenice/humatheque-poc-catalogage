@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from humatheque.application import ActionImpossible, Application, Introuvable
+from humatheque.application import ActionImpossible, Application, Conflit, Introuvable
 
 ICI = Path(__file__).parent
 gabarits = Jinja2Templates(directory=str(ICI / "templates"))
@@ -47,10 +47,15 @@ def create_app(application: Application | None = None) -> FastAPI:
         return gabarits.TemplateResponse(request, "erreur.html", {"message": f"Introuvable : {exc}"},
                                          status_code=404)
 
+    @app.exception_handler(Conflit)
+    async def _conflit(request: Request, exc: Conflit):
+        return JSONResponse({"detail": str(exc)}, status_code=409)
+
     @app.exception_handler(ActionImpossible)
     async def _impossible(request: Request, exc: ActionImpossible):
         if request.url.path.startswith("/api/"):
-            return JSONResponse({"detail": str(exc)}, status_code=422)
+            details = [d.model_dump() if hasattr(d, "model_dump") else d for d in exc.details]
+            return JSONResponse({"detail": str(exc), "marqueurs": details}, status_code=422)
         # Requête HTMX : le texte est affiché par le bandeau d'erreur global.
         if request.headers.get("HX-Request"):
             return HTMLResponse(str(exc), status_code=422)

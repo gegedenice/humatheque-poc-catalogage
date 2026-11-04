@@ -21,10 +21,12 @@ from typing import Any
 
 from humatheque.application.vues import (
     Accueil, ChampVue, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs, LigneException,
-    LigneJournal, ResumeLot, VueDossier, VueLot,
+    LigneJournal, ResumeLot, VueDossier, VueLot, VueNotice, resume_version,
 )
 from humatheque.config import Reglages, reglages as reglages_par_defaut
-from humatheque.generateur import vers_marcxml
+from humatheque.notice import analyse as notice_analyse
+from humatheque.notice import validation as notice_validation
+from humatheque.notice import versions as nv
 from humatheque.spec import Spec, charger_spec, verifier
 from humatheque.store import Lot, Store
 from humatheque.workflow import ETAPES, Document, Dossier, Services, Workflow, services_depuis_reglages
@@ -46,7 +48,13 @@ class Introuvable(Exception):
 
 
 class ActionImpossible(Exception):
-    pass
+    def __init__(self, message: str, details: list | None = None) -> None:
+        super().__init__(message)
+        self.details = details or []
+
+
+class Conflit(Exception):
+    """Modification concurrente (version de base dépassée)."""
 
 
 class ExecuteurSynchrone(Executor):
@@ -173,8 +181,24 @@ class Application:
         except Exception as e:  # garde-fou : un dossier ne reste jamais « en cours »
             d.routage, d.motif_arret = "incident", f"erreur inattendue : {e}"
             d.noter("dossier", "alerte", d.motif_arret)
+        self._enregistrer_production(d)
         self.store.enregistrer_dossier(d, ligne.lot_id, ligne.rang, "termine")
         self._clore_si_termine(ligne.lot_id)
+
+    def _enregistrer_production(self, d: Dossier) -> None:
+        """Notice produite par le pipeline → version (sans écraser une édition)."""
+        if d.notice_texte:
+            texte, source = d.notice_texte, "générée"
+        elif d.notice_convertie:
+            texte, source = d.notice_convertie.texte, "convertie"
+        else:
+            return
+        v = nv.enregistrer_production(self.store.versions(d.id), d.id, texte, source)
+        if v is not None:
+            self.store.ajouter_version(v)
+            if v.statut == "proposée":
+                d.noter("generation", "alerte", f"régénération proposée (version {v.numero}) : "
+                                                "une version éditée existe, elle n'est pas écrasée")
 
     def _clore_si_termine(self, lot_id: str) -> None:
         lignes = self.store.lignes_du_lot(lot_id)
@@ -286,7 +310,7 @@ class Application:
         champs = [ChampVue(champ=c, brut=brut.get(c), normalise=ctx.get(c, (d.metadonnees or {}).get(c)))
                   for c in (d.metadonnees or {})]
         tel = {}
-        if d.notice_texte:
+        if d.notice_texte or self.store.versions(d.id):
             tel.update({"Notice (WinIBW)": "notice.txt", "Notice (MARCXML)": "notice.xml"})
         if d.notice_source_iso:
             tel.update({"Notice source (ISO 2709)": "source.iso", "Notice convertie (ISO 2709)": "convertie.iso",
@@ -317,10 +341,11 @@ class Application:
         """(nom, contenu, type MIME) d'un fichier du dossier."""
         d = self._dossier(dossier_id)
         base = re.sub(r"\W", "_", d.document.id)
-        if fichier == "notice.txt" and d.notice_texte:
-            return f"{base}.txt", d.notice_texte.encode("utf-8"), "text/plain; charset=utf-8"
-        if fichier == "notice.xml" and d.notice:
-            return f"{base}.xml", vers_marcxml(d.notice).encode("utf-8"), "application/xml"
+        texte = self._texte_a_exporter(d)
+        if fichier == "notice.txt" and texte:
+            return f"{base}.txt", texte.encode("utf-8"), "text/plain; charset=utf-8"
+        if fichier == "notice.xml" and texte:
+            return f"{base}.xml", notice_analyse.vers_marcxml(texte).encode("utf-8"), "application/xml"
         if fichier == "source.iso" and d.notice_source_iso:
             return f"{base}-source-{d.ppn_source}.iso", d.notice_source_iso.encode("utf-8"), "application/marc"
         if fichier == "convertie.iso" and d.notice_convertie:
@@ -383,13 +408,101 @@ class Application:
                         " | ".join(d.alertes), d.version_spec or ""])
         return sortie.getvalue()
 
+    def _texte_a_exporter(self, d: Dossier) -> str | None:
+        """Dernière version validée, à défaut la version générée (SPEC §8)."""
+        v = nv.a_exporter(self.store.versions(d.id))
+        if v is not None:
+            return v.texte
+        return d.notice_texte or (d.notice_convertie.texte if d.notice_convertie else None)
+
     def export_notices(self, lot_id: str) -> str:
-        """Toutes les notices produites (générées ou converties), séparées par une ligne vide."""
+        """Toutes les notices produites (validées, sinon générées ou converties), séparées par une ligne vide."""
         if self.store.lot(lot_id) is None:
             raise Introuvable(f"lot {lot_id}")
         blocs = []
         for _, d in self.store.dossiers_du_lot(lot_id):
-            texte = d.notice_texte or (d.notice_convertie.texte if d.notice_convertie else None)
+            texte = self._texte_a_exporter(d)
             if texte:
                 blocs.append(texte)
         return "\n\n".join(blocs) + ("\n" if blocs else "")
+
+    # ============================================================ notice éditable (SPEC §9.2)
+    def _profil(self, d: Dossier) -> str | None:
+        if d.notice:
+            return d.notice.profil
+        if d.notice_convertie:
+            return d.notice_convertie.profil_cible
+        return d.decision.profil_cible if d.decision else None
+
+    def vue_notice(self, dossier_id: str) -> VueNotice:
+        d = self._dossier(dossier_id)
+        versions = self.store.versions(dossier_id)
+        c = nv.courante(versions)
+        p = nv.proposition(versions)
+        profil = self._profil(d)
+        return VueNotice(dossier_id=dossier_id, profil=profil, version=c.numero if c else None,
+                         statut=c.statut if c else None, source=c.source if c else None,
+                         texte=c.texte if c else "",
+                         marqueurs=notice_validation.valider(c.texte, self.spec, profil) if c else [],
+                         proposition=resume_version(p) if p else None,
+                         versions=[resume_version(v) for v in reversed(versions)])
+
+    def valider_texte(self, dossier_id: str, texte: str) -> list[notice_validation.Marqueur]:
+        d = self._dossier(dossier_id)
+        return notice_validation.valider(texte, self.spec, self._profil(d))
+
+    def _version_ajoutee(self, d: Dossier, v: nv.VersionNotice, quoi: str) -> VueNotice:
+        self.store.ajouter_version(v)
+        d.noter("notice", "resolution", {"action": quoi, "version": v.numero, "statut": v.statut}, v.auteur)
+        ligne = self.store.ligne_dossier(d.id)
+        assert ligne is not None
+        self.store.enregistrer_dossier(d, ligne.lot_id, ligne.rang, ligne.etat)
+        return self.vue_notice(d.id)
+
+    def enregistrer_notice(self, dossier_id: str, texte: str, auteur: str, base: int) -> VueNotice:
+        if not auteur.strip():
+            raise ActionImpossible("un auteur est requis")
+        d = self._dossier(dossier_id)
+        try:
+            v = nv.editer(self.store.versions(dossier_id), dossier_id, texte, auteur.strip(), base)
+        except nv.ConflitVersion as e:
+            raise Conflit(str(e)) from e
+        return self._version_ajoutee(d, v, "édition")
+
+    def valider_notice(self, dossier_id: str, auteur: str) -> VueNotice:
+        if not auteur.strip():
+            raise ActionImpossible("un auteur est requis")
+        d = self._dossier(dossier_id)
+        versions = self.store.versions(dossier_id)
+        c = nv.courante(versions)
+        erreurs = [m for m in notice_validation.valider(c.texte, self.spec, self._profil(d))
+                   if m.gravite == "erreur"] if c else []
+        try:
+            v = nv.valider(versions, dossier_id, auteur.strip(), erreurs)
+        except nv.ValidationRefusee as e:
+            raise ActionImpossible(f"validation refusée : {len(e.erreurs)} erreur(s) dans la notice", e.erreurs) from e
+        except nv.ConflitVersion as e:
+            raise ActionImpossible(str(e)) from e
+        return self._version_ajoutee(d, v, "validation")
+
+    def reporter_proposition(self, dossier_id: str, numero: int, auteur: str) -> VueNotice:
+        d = self._dossier(dossier_id)
+        try:
+            v = nv.reporter(self.store.versions(dossier_id), dossier_id, numero, auteur.strip() or "catalogueur")
+        except nv.ConflitVersion as e:
+            raise ActionImpossible(str(e)) from e
+        self.store.statut_version(dossier_id, numero, "reportée")
+        return self._version_ajoutee(d, v, f"report de la régénération {numero}")
+
+    def ignorer_proposition(self, dossier_id: str, numero: int, auteur: str) -> VueNotice:
+        d = self._dossier(dossier_id)
+        p = nv.proposition(self.store.versions(dossier_id))
+        if p is None or p.numero != numero:
+            raise ActionImpossible("aucune proposition de régénération en attente")
+        self.store.statut_version(dossier_id, numero, "ignorée")
+        d.noter("notice", "resolution", {"action": "régénération ignorée", "version": numero},
+                auteur.strip() or "catalogueur")
+        ligne = self.store.ligne_dossier(d.id)
+        assert ligne is not None
+        self.store.enregistrer_dossier(d, ligne.lot_id, ligne.rang, ligne.etat)
+        return self.vue_notice(dossier_id)

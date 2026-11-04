@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from humatheque.notice.validation import Marqueur
+from humatheque.notice.versions import VersionNotice
 from humatheque.spec.verificateur import Constat
 from humatheque.store import Ingestion, Lot
 from humatheque.workflow.modeles import Dossier
@@ -125,3 +127,30 @@ class VueDossier(BaseModel):
 class Historique(BaseModel):
     ingestions: list[Ingestion]
     lots: list[ResumeLot]
+
+
+class ResumeVersion(BaseModel):
+    numero: int
+    le: datetime
+    auteur: str
+    source: str
+    statut: str
+    diff: str
+
+
+class VueNotice(BaseModel):
+    """Notice éditable d'un dossier (SPEC §9.2)."""
+
+    dossier_id: str
+    profil: str | None
+    version: int | None = Field(None, description="numéro de la version courante")
+    statut: str | None = None
+    source: str | None = None
+    texte: str = ""
+    marqueurs: list[Marqueur] = Field(default_factory=list)
+    proposition: ResumeVersion | None = Field(None, description="régénération en attente (non reportée)")
+    versions: list[ResumeVersion] = Field(default_factory=list)
+
+
+def resume_version(v: VersionNotice) -> ResumeVersion:
+    return ResumeVersion(numero=v.numero, le=v.le, auteur=v.auteur, source=v.source, statut=v.statut, diff=v.diff)

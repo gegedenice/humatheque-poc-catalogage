@@ -229,3 +229,55 @@ def test_lot_vide_ou_fournisseur_inconnu(app):
         app.creer_lot(EntreeLot(documents=[]))
     with pytest.raises(ActionImpossible):
         app.creer_lot(EntreeLot(documents=[["x"]], fournisseur="inconnu"))
+
+
+# ---------------------------------------------------------------- notice éditable (étape 6 ter)
+@respx.mock
+def test_notice_versions_validation_et_regeneration(app, image):
+    simuler(idref_statut="low_confidence")
+    lot = app.creer_lot(EntreeLot(documents=[[image]]))
+    (ligne,) = app.store.lignes_du_lot(lot.id)
+    n = app.vue_notice(ligne.id)
+    assert (n.version, n.statut, n.source, n.profil) == (1, "générée", "générée", "these_originale_imprimee")
+    assert n.marqueurs == []  # repli $a$b : pas de PPN
+
+    # validation refusée tant qu'il reste une erreur
+    casse = n.texte.replace("101 0#$afre", "101 0#$a")
+    assert [m.message for m in app.valider_texte(ligne.id, casse)] == ["sous-zone $a sans valeur"]
+    n2 = app.enregistrer_notice(ligne.id, casse, "cat", base=1)
+    assert (n2.version, n2.statut) == (2, "éditée")
+    with pytest.raises(ActionImpossible) as e:
+        app.valider_notice(ligne.id, "cat")
+    assert e.value.details and e.value.details[0].gravite == "erreur"
+    from humatheque.application import Conflit
+    with pytest.raises(Conflit):
+        app.enregistrer_notice(ligne.id, n.texte, "cat", base=1)
+
+    corrigee = casse.replace("101 0#$a\n", "101 0#$afre\n") + "\n610 ##$aDémocratie"
+    app.enregistrer_notice(ligne.id, corrigee, "cat", base=2)
+    n4 = app.valider_notice(ligne.id, "cat")
+    assert (n4.version, n4.statut) == (4, "validée")
+    _, contenu, _ = app.telecharger(ligne.id, "notice.txt")
+    assert contenu.decode().endswith("610 ##$aDémocratie")  # export = version validée
+    assert "610 ##$aDémocratie" in app.export_notices(lot.id)
+
+    # résolution IdRef → régénération proposée, l'édition n'est pas écrasée
+    i = next(i for i, e in enumerate(app.vue_dossier(ligne.id).dossier.exceptions) if e.objet.startswith("author"))
+    app.choisir_ppn(ligne.id, i, "026940345", auteur="cat")
+    n5 = app.vue_notice(ligne.id)
+    assert n5.version == 4 and n5.texte == corrigee
+    assert n5.proposition and "+700 #1$3026940345$4070" in n5.proposition.diff
+    n6 = app.reporter_proposition(ligne.id, n5.proposition.numero, "cat")
+    assert n6.statut == "éditée" and "700 #1$3026940345$4070" in n6.texte and n6.proposition is None
+    with pytest.raises(ActionImpossible):
+        app.ignorer_proposition(ligne.id, n5.proposition.numero, "cat")
+
+
+@respx.mock
+def test_notice_convertie_editable(app, image):
+    simuler(sudoc=sim.sudoc([("229969437", 0.95, "electronic")], "electronic_only"))
+    lot = app.creer_lot(EntreeLot(documents=[[image]]))
+    (ligne,) = app.store.lignes_du_lot(lot.id)
+    n = app.vue_notice(ligne.id)
+    assert (n.version, n.source, n.profil) == (1, "convertie", "these_originale_imprimee")
+    assert "001 229969437" in n.texte

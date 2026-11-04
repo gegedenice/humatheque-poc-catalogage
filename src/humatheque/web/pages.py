@@ -103,13 +103,37 @@ def notices(request: Request, lot_id: str):
 # ---------------------------------------------------------------- dossier (mode 1)
 @routeur.get("/dossiers/{dossier_id}")
 def dossier(request: Request, dossier_id: str):
-    return _rendre(request, "dossier.html", vue=_app(request).vue_dossier(dossier_id))
+    a = _app(request)
+    return _rendre(request, "dossier.html", vue=a.vue_dossier(dossier_id), notice=a.vue_notice(dossier_id))
 
 
 @routeur.get("/dossiers/{dossier_id}/fragment")
 def dossier_fragment(request: Request, dossier_id: str):
-    """Panneau droit du dossier (rafraîchi tant que le traitement est en cours)."""
-    return _rendre(request, "_dossier_panneau.html", vue=_app(request).vue_dossier(dossier_id))
+    """Panneau droit du dossier, rafraîchi tant que le traitement est en cours ; à la fin,
+    rechargement complet pour monter l'éditeur (îlot hors fragment rafraîchi)."""
+    vue = _app(request).vue_dossier(dossier_id)
+    reponse = _rendre(request, "_dossier_panneau.html", vue=vue)
+    if vue.etat == "termine":
+        reponse.headers["HX-Refresh"] = "true"
+    return reponse
+
+
+@routeur.get("/dossiers/{dossier_id}/versions")
+def versions_notice(request: Request, dossier_id: str):
+    """Versions de la notice et régénération en attente (rafraîchi après chaque enregistrement)."""
+    return _rendre(request, "_notice_versions.html", notice=_app(request).vue_notice(dossier_id),
+                   dossier_id=dossier_id)
+
+
+@routeur.post("/dossiers/{dossier_id}/propositions/{numero}")
+def proposition(request: Request, dossier_id: str, numero: int, choix: Annotated[str, Form()],
+                auteur: Annotated[str, Form()]):
+    a = _app(request)
+    if choix == "reporter":
+        a.reporter_proposition(dossier_id, numero, _auteur(auteur))
+    else:
+        a.ignorer_proposition(dossier_id, numero, _auteur(auteur))
+    return _rediriger(f"/dossiers/{dossier_id}", auteur)
 
 
 @routeur.get("/dossiers/{dossier_id}/telecharger/{fichier}")

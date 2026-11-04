@@ -15,6 +15,7 @@ from typing import Any, Iterator
 
 from pydantic import BaseModel, Field
 
+from humatheque.notice.versions import VersionNotice
 from humatheque.workflow.modeles import Dossier
 
 SCHEMA = """
@@ -40,6 +41,17 @@ CREATE TABLE IF NOT EXISTS dossiers (
 );
 CREATE INDEX IF NOT EXISTS dossiers_lot ON dossiers(lot_id, rang);
 CREATE INDEX IF NOT EXISTS dossiers_document ON dossiers(document_id, maj_le);
+CREATE TABLE IF NOT EXISTS notice_versions (
+    dossier_id TEXT NOT NULL REFERENCES dossiers(id),
+    numero INTEGER NOT NULL,
+    le TEXT NOT NULL,
+    auteur TEXT NOT NULL,
+    source TEXT NOT NULL,          -- générée | convertie | édition | report
+    statut TEXT NOT NULL,          -- générée | éditée | validée | proposée | reportée | ignorée
+    texte TEXT NOT NULL,
+    diff TEXT NOT NULL,
+    PRIMARY KEY (dossier_id, numero)
+);
 CREATE TABLE IF NOT EXISTS ingestions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     le TEXT NOT NULL,
@@ -202,3 +214,20 @@ class Store:
             rows = c.execute("SELECT * FROM ingestions ORDER BY le DESC, id DESC LIMIT ?", (limite,)).fetchall()
         return [Ingestion(id=r["id"], le=r["le"], type=r["type"], declencheur=r["declencheur"], lot_id=r["lot_id"],
                           documents=json.loads(r["documents"]), resultat=json.loads(r["resultat"])) for r in rows]
+
+    # ------------------------------------------------------------ versions de notice
+    def versions(self, dossier_id: str) -> list[VersionNotice]:
+        with self._connexion() as c:
+            rows = c.execute("SELECT * FROM notice_versions WHERE dossier_id = ? ORDER BY numero",
+                             (dossier_id,)).fetchall()
+        return [VersionNotice(**dict(r)) for r in rows]
+
+    def ajouter_version(self, v: VersionNotice) -> None:
+        with self._verrou, self._connexion() as c:
+            c.execute("INSERT INTO notice_versions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                      (v.dossier_id, v.numero, v.le.isoformat(), v.auteur, v.source, v.statut, v.texte, v.diff))
+
+    def statut_version(self, dossier_id: str, numero: int, statut: str) -> None:
+        with self._verrou, self._connexion() as c:
+            c.execute("UPDATE notice_versions SET statut = ? WHERE dossier_id = ? AND numero = ?",
+                      (statut, dossier_id, numero))

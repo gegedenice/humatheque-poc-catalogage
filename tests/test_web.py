@@ -169,3 +169,34 @@ def test_api_lot_dossier_resolution(client, tmp_path):
 
 def test_api_documentee(client):
     assert "/api/v1/lots" in client.get("/api/v1/openapi.json").json()["paths"]
+
+
+# ---------------------------------------------------------------- notice éditable (étape 6 ter)
+@respx.mock
+def test_api_notice(client):
+    simuler()
+    dossier = _televerser(client).headers["location"].rsplit("/", 1)[1]
+    page = client.get(f"/dossiers/{dossier}")
+    assert 'id="editeur-notice"' in page.text and "/static/vendor/monaco/vs/loader.js" in page.text
+    assert "/static/js/editeur.js" in client.get("/").text  # îlots chargés partout (navigation hx-boost)
+    n = client.get(f"/api/v1/notices/{dossier}").json()
+    assert n["version"] == 1 and n["statut"] == "générée"
+    m = client.post(f"/api/v1/notices/{dossier}/validation", json={"texte": "200 1#$a"}).json()
+    assert m[0]["gravite"] == "erreur" and m[0]["ligne"] == 1
+    r = client.put(f"/api/v1/notices/{dossier}", json={"texte": n["texte"] + "\n200 1#$a", "auteur": "cat",
+                                                       "version": 1})
+    assert r.status_code == 200 and r.json()["version"] == 2
+    assert client.put(f"/api/v1/notices/{dossier}", json={"texte": "x", "auteur": "cat", "version": 1}).status_code == 409
+    r = client.post(f"/api/v1/notices/{dossier}/valider", json={"auteur": "cat"})
+    assert r.status_code == 422 and r.json()["marqueurs"][0]["message"] == "sous-zone $a sans valeur"
+    assert len(client.get(f"/api/v1/notices/{dossier}/versions").json()) == 2
+    v = client.get(f"/dossiers/{dossier}/versions")
+    assert "Versions (2)" in v.text
+
+
+@respx.mock
+def test_fragment_dossier_termine_recharge_la_page(client):
+    simuler()
+    dossier = _televerser(client).headers["location"]
+    r = client.get(f"{dossier}/fragment", headers={"HX-Request": "true"})
+    assert r.headers.get("HX-Refresh") == "true"

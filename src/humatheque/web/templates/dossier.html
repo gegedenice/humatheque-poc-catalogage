@@ -1,7 +1,5 @@
 {% extends "base.html" %}
 {% block titre %}{{ vue.dossier.document.id }}{% endblock %}
-{% block tete %}<script src="/static/vendor/openseadragon/openseadragon.min.js" defer></script>
-<script src="/static/js/visionneuse.js" defer></script>{% endblock %}
 {% block contenu %}
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(320px,44%)_minmax(0,1fr)] items-start">
   {# Îlot JavaScript : jamais dans un fragment rafraîchi (SPEC §9.1). #}
@@ -14,6 +12,28 @@
     <p class="vide">Aucune image affichable pour ce document.</p>
     {% endif %}
   </section>
-  {% include "_dossier_panneau.html" %}
+
+  <div class="space-y-4 min-w-0">
+    {% if notice.version %}
+    {# Îlot éditeur (Monaco) : hors du panneau rafraîchi. #}
+    <section class="carte" aria-label="Édition de la notice">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h2 class="mb-0">Notice éditable <span class="text-xs font-normal text-sourdine">profil {{ notice.profil or "—" }} · <span id="editeur-statut">version {{ notice.version }} · {{ notice.statut }}</span></span></h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-xs text-sourdine">Catalogueur <input id="editeur-auteur" class="champ inline-block w-36 ml-1" value="{{ auteur }}"></label>
+          <button id="editeur-enregistrer" type="button" class="btn btn-sm" title="Ctrl+S">Enregistrer</button>
+          <button id="editeur-valider" type="button" class="btn-principal btn-sm">Valider la notice</button>
+        </div>
+      </div>
+      <div id="editeur-notice" data-dossier="{{ vue.dossier.id }}" class="h-[420px] border border-filet rounded-lg overflow-hidden" hx-preserve="true"></div>
+      <p id="editeur-etat" class="text-xs text-sourdine mt-2" aria-live="polite"></p>
+      <noscript><pre class="code mt-2">{{ notice.texte }}</pre></noscript>
+      <div hx-get="/dossiers/{{ vue.dossier.id }}/versions" hx-trigger="load, notice-enregistree from:body" hx-swap="innerHTML">
+        <p class="vide">Chargement des versions…</p>
+      </div>
+    </section>
+    {% endif %}
+    {% include "_dossier_panneau.html" %}
+  </div>
 </div>
 {% endblock %}

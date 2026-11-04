@@ -61,7 +61,7 @@
   {# ---------------------------------------------------------------- notice #}
   {% if d.notice %}
   <section class="carte">
-    <h2>Notice UNIMARC <span class="text-xs font-normal text-sourdine">profil {{ d.notice.profil }}</span></h2>
+    <h2>Notice générée, annotée par règle <span class="text-xs font-normal text-sourdine">profil {{ d.notice.profil }}</span></h2>
     <div class="defilant"><table class="tableau">
       <tbody>
       {% for z in d.notice.zones_triees() %}

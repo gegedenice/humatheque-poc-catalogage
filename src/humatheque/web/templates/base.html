@@ -7,6 +7,13 @@
   <link rel="stylesheet" href="/static/css/app.css">
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/js/app.js" defer></script>
+  {# Îlots chargés sur toutes les pages : la navigation hx-boost ne remplace que le body
+     et n'exécute pas les scripts du head de la page cible. Monaco (editor.main) est
+     chargé à la demande par son chargeur AMD, seulement si un éditeur est présent. #}
+  <script src="/static/vendor/openseadragon/openseadragon.min.js" defer></script>
+  <script src="/static/js/visionneuse.js" defer></script>
+  <script src="/static/vendor/monaco/vs/loader.js" defer></script>
+  <script src="/static/js/editeur.js" defer></script>
   {% block tete %}{% endblock %}
 </head>
 <body hx-boost="true">
