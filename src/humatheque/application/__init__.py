@@ -21,8 +21,9 @@ from typing import Any
 
 from humatheque.application.vues import (
     Accueil, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
-    LigneException, LigneJournal, ResumeLot, VueBucket, VueDossier, VueLot, VueNotice, resume_version,
+    LigneException, LigneJournal, Reglable, ResumeLot, VueBucket, VueDossier, VueLot, VueNotice, resume_version,
 )
+from humatheque.config import charger_yaml
 from humatheque import ingestion
 from humatheque.config import Reglages, reglages as reglages_par_defaut
 from humatheque.notice import analyse as notice_analyse
@@ -122,7 +123,40 @@ class Application:
     def accueil(self) -> Accueil:
         return Accueil(spec=self.etat_spec(), fournisseurs=FOURNISSEURS,
                        fournisseur_defaut=self.reglages.vlm_fournisseur,
-                       lots=[self._resume(l) for l in self.store.lots(10)])
+                       lots=[self._resume(l) for l in self.store.lots(10)], reglables=self.reglables())
+
+    # ============================================================ paramètres avancés (SPEC §3)
+    @staticmethod
+    def reglables() -> list[Reglable]:
+        cfg = charger_yaml("services")
+        return [Reglable(defaut=cfg[r["service"]]["parametres"][r["parametre"]], **r) for r in cfg.get("reglables") or []]
+
+    def valider_reglages(self, valeurs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Réglages du lot : seuls les paramètres déclarés réglables, dans leurs bornes ;
+        les valeurs égales au défaut sont omises."""
+        permis = {(r.service, r.parametre): r for r in self.reglables()}
+        retenus: dict[str, dict[str, Any]] = {}
+        for service, params in (valeurs or {}).items():
+            for parametre, brut in (params or {}).items():
+                r = permis.get((service, parametre))
+                if r is None:
+                    raise ActionImpossible(f"paramètre non réglable : {service}.{parametre}")
+                if brut in (None, ""):
+                    continue
+                if r.choix:
+                    if str(brut) not in r.choix:
+                        raise ActionImpossible(f"{r.libelle} : « {brut} » hors de {', '.join(r.choix)}")
+                    valeur: Any = str(brut)
+                else:
+                    try:
+                        valeur = float(str(brut).replace(",", "."))
+                    except ValueError as e:
+                        raise ActionImpossible(f"{r.libelle} : nombre attendu, « {brut} » reçu") from e
+                    if (r.min is not None and valeur < r.min) or (r.max is not None and valeur > r.max):
+                        raise ActionImpossible(f"{r.libelle} : {valeur} hors de [{r.min}, {r.max}]")
+                if valeur != r.defaut:
+                    retenus.setdefault(service, {})[parametre] = valeur
+        return retenus
 
     # ============================================================ envois
     def enregistrer_televersement(self, fichiers: list[tuple[str, bytes]], un_seul_document: bool) -> list[list[str]]:
@@ -149,11 +183,12 @@ class Application:
         if entree.fournisseur and entree.fournisseur not in FOURNISSEURS:
             raise ActionImpossible(f"fournisseur inconnu : {entree.fournisseur}")
         ids = entree.identifiants or [self._identifiant_document(d) for d in docs]
+        reglages_lot = self.valider_reglages(entree.reglages_services)
         lot = Lot(id=_identifiant("L"), cree_le=datetime.now(UTC), mode=1 if len(docs) == 1 else 2,
                   declencheur=entree.declencheur, nb_documents=len(docs),
                   parametres={"type_document": entree.type_document,
                               "fournisseur": entree.fournisseur or self.reglages.vlm_fournisseur,
-                              "source": entree.source})
+                              "source": entree.source, "services": reglages_lot})
         self.store.creer_lot(lot)
         dossiers = []
         types = entree.types or [entree.type_document] * len(docs)
@@ -185,6 +220,7 @@ class Application:
             services = self.fabrique(self.spec, (lot.parametres if lot else {}).get("fournisseur"))
             if services.depot is None:
                 services.depot = self.depot
+            services.reglages_lot = (lot.parametres if lot else {}).get("services") or {}
             Workflow(services).executer(d, depuis)
         except Exception as e:  # garde-fou : un dossier ne reste jamais « en cours »
             d.routage, d.motif_arret = "incident", f"erreur inattendue : {e}"
@@ -556,7 +592,7 @@ class Application:
         return VueBucket(configure=True, bucket=self.depot.bucket, prefixe=self.depot.prefixe, dossiers=lignes)
 
     def lancer_selection(self, identifiants: list[str], fournisseur: str | None = None,
-                         declencheur: str = "manuel") -> Lot:
+                         declencheur: str = "manuel", reglages: dict[str, dict[str, Any]] | None = None) -> Lot:
         """Traite une sélection de dossiers du bucket (ING-F-005) ; le type vient du dossier TH / MM."""
         if not identifiants:
             raise ActionImpossible("aucun dossier sélectionné")
@@ -564,7 +600,7 @@ class Application:
         inconnus = [i for i in identifiants if i not in par_id]
         if inconnus:
             raise ActionImpossible(f"dossier(s) absent(s) du bucket : {', '.join(inconnus)}")
-        return self._lot_de_documents([par_id[i] for i in identifiants], fournisseur, "minio", declencheur)
+        return self._lot_de_documents([par_id[i] for i in identifiants], fournisseur, "minio", declencheur, reglages)
 
     def traiter_nouveaux(self, declencheur: str) -> Lot | None:
         """Nouveaux dossiers (absents de l'historique) → un lot. Prévu pour le balayage
@@ -577,7 +613,7 @@ class Application:
         return self._lot_de_documents(nouveaux, None, "minio", declencheur)
 
     def televerser_dossiers(self, fichiers: list[tuple[str, bytes]], type_par_defaut: str,
-                            fournisseur: str | None = None) -> Lot:
+                            fournisseur: str | None = None, reglages: dict[str, dict[str, Any]] | None = None) -> Lot:
         """Téléversement d'une arborescence de dossiers : chaque dossier est un document,
         le type vient d'un dossier parent TH / MM, à défaut du formulaire."""
         if not fichiers:
@@ -596,10 +632,10 @@ class Application:
         documents = ingestion.constituer_documents(chemins, type_par_defaut, vers_image=lambda c: str(racine / c))
         if not documents:
             raise ActionImpossible("Aucun dossier contenant des images.")
-        return self._lot_de_documents(documents, fournisseur, "dossiers", "manuel")
+        return self._lot_de_documents(documents, fournisseur, "dossiers", "manuel", reglages)
 
     def _lot_de_documents(self, documents: list[ingestion.DocumentDetecte], fournisseur: str | None, source: str,
-                          declencheur: str) -> Lot:
+                          declencheur: str, reglages: dict[str, dict[str, Any]] | None = None) -> Lot:
         sans_type = [d.id for d in documents if d.type_document is None]
         if sans_type:
             raise ActionImpossible(f"type de document inconnu pour : {', '.join(sans_type)} "
@@ -608,7 +644,7 @@ class Application:
         return self.creer_lot(EntreeLot(type_document=types[0], types=types, fournisseur=fournisseur,
                                         documents=[d.images for d in documents],
                                         identifiants=[d.id for d in documents], source=source,
-                                        declencheur=declencheur))
+                                        declencheur=declencheur, reglages_services=reglages or {}))
 
     def objet_s3(self, u: str) -> tuple[bytes, str]:
         """Image du bucket relayée à l'interface (contenu, type MIME)."""

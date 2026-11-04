@@ -27,8 +27,10 @@ class EntreeLot(BaseModel):
     identifiants: list[str] | None = Field(None, description="identifiants des documents (chemin MinIO…)")
     types: list[TypeDocument] | None = Field(
         None, description="type par document (dossiers TH / MM du bucket) ; sinon type_document")
-    source: str = "url"  # televersement | url | liste | minio
+    source: str = "url"  # televersement | url | liste | minio | dossiers
     declencheur: str = "manuel"
+    reglages_services: dict[str, dict[str, Any]] = Field(
+        default_factory=dict, description="« Paramètres avancés » : {service: {paramètre: valeur}}")
 
 
 class EtatSpec(BaseModel):
@@ -57,11 +59,28 @@ class ResumeLot(BaseModel):
     en_cours: bool
 
 
+class Reglable(BaseModel):
+    """Paramètre de service modifiable par lot (config/services.yaml, `reglables`)."""
+
+    service: str
+    parametre: str
+    libelle: str
+    defaut: Any
+    min: float | None = None
+    max: float | None = None
+    choix: list[str] | None = None
+
+    @property
+    def nom(self) -> str:
+        return f"reglage.{self.service}.{self.parametre}"
+
+
 class Accueil(BaseModel):
     spec: EtatSpec
     fournisseurs: list[str]
     fournisseur_defaut: str
     lots: list[ResumeLot]
+    reglables: list[Reglable] = Field(default_factory=list)
 
 
 class LigneException(BaseModel):

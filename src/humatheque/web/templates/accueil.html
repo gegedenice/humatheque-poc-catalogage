@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_composants.html" import badge, vide %}
+{% from "_reglages.html" import parametres_avances %}
 {% block titre %}Nouveau traitement{% endblock %}
 {% block contenu %}
 <h1>Nouveau traitement</h1>
@@ -48,6 +49,7 @@
         </select>
       </div>
     </div>
+    {{ parametres_avances(vue.reglables) }}
     <p class="text-xs text-sourdine">La provenance (EPHE ou hors EPHE) n'est pas saisie : elle est déduite de l'établissement de soutenance. Pour un dossier TH / MM, le type vient du dossier.</p>
     <button class="btn-principal" type="submit" {% if vue.spec.nb_erreurs %}disabled title="La spécification contient des erreurs bloquantes"{% endif %}>Lancer le traitement</button>
   </form>

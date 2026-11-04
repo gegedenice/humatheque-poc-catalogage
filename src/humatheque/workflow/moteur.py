@@ -61,6 +61,15 @@ class Services:
     seuil_sudoc: float | None = None
     seuil_dewey: float | None = None
     depot: Any = None  # ingestion.Depot : lit les images s3:// (None : stockage non configuré)
+    # Réglages du lot (« Paramètres avancés ») : {service: {paramètre: valeur}}
+    reglages_lot: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def parametres(self, service: str) -> dict[str, Any]:
+        """Paramètres de requête : config/services.yaml, puis réglages du lot."""
+        p = {**(charger_yaml("services")[service].get("parametres") or {}), **self.reglages_lot.get(service, {})}
+        if service == "sudoc" and self.seuil_sudoc is not None:
+            p["duplicate_threshold"] = self.seuil_sudoc
+        return p
 
     def lire_s3(self, u: str) -> bytes:
         from humatheque.ingestion import cle_depuis_uri
@@ -223,7 +232,8 @@ class Workflow:
         return Suite()
 
     def _etape_alma(self, d: Dossier) -> Suite:
-        res = self._appel(d, "alma", verifier_alma, self.services.alma, d.metadonnees, d.document.type_document)
+        res = self._appel(d, "alma", verifier_alma, self.services.alma, d.metadonnees, d.document.type_document,
+                          self.services.parametres("alma"))
         d.alma = res
         if res.etat is None:
             rs = routage_service(self.services.spec, "alma-checker", res.statut)
@@ -242,7 +252,8 @@ class Workflow:
     def _etape_sudoc(self, d: Dossier) -> Suite:
         if self.services.seuil_sudoc is None:
             raise _Incident("service_indisponible", _cfg()["motifs"]["seuil_sudoc"])
-        reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees, d.document.type_document)
+        reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees, d.document.type_document,
+                              self.services.parametres("sudoc"))
         q = agreger(reponse, self.services.seuil_sudoc)
         d.sudoc = q
         d.noter("sudoc", "decision", {"etat": q.etat, "justification": q.justification, "ppn_source": q.ppn_source})
@@ -304,7 +315,8 @@ class Workflow:
             bruts = valeurs if isinstance(valeurs, list) else ([valeurs] if valeurs else [])
             resultats[champ] = []
             for i, brut in enumerate(bruts):
-                a = self._appel(d, "idref_personnes", aligner_personne, self.services.idref, m, brut)
+                a = self._appel(d, "idref_personnes", aligner_personne, self.services.idref, m, brut,
+                                self.services.parametres("idref_personne"))
                 resultats[champ].append(a)
                 bloquant = self._statut_idref(d, "idref_personnes", SERVICE_IDREF_PERSONNE, a,
                                               f"{champ}[{i + 1}] {brut}")
@@ -328,7 +340,8 @@ class Workflow:
         m = d.metadonnees or {}
         if not (m.get("granting_institution") or m.get("doctoral_school") or m.get("co_tutelle_institutions")):
             return Suite()
-        orgs = self._appel(d, "idref_organisations", aligner_organisations, self.services.idref, m)
+        orgs = self._appel(d, "idref_organisations", aligner_organisations, self.services.idref, m,
+                           self.services.parametres("idref_organisations"))
         d.idref_organisations = orgs
         entites = [("granting_institution", orgs.granting_institution, m.get("granting_institution")),
                    ("doctoral_school", orgs.doctoral_school, m.get("doctoral_school"))]
@@ -343,7 +356,8 @@ class Workflow:
         return Suite()
 
     def _etape_dewey(self, d: Dossier) -> Suite:
-        res = self._appel(d, "dewey", classer, self.services.dewey, d.metadonnees, self.services.seuil_dewey)
+        res = self._appel(d, "dewey", classer, self.services.dewey, d.metadonnees, self.services.seuil_dewey,
+                          self.services.parametres("dewey"))
         d.dewey = res
         rs = routage_service(self.services.spec, "dewey-classifier", res.statut)
         if rs.bloquant:
@@ -394,7 +408,7 @@ def services_depuis_reglages(spec: Spec, fournisseur_vlm: str | None = None) -> 
                             r.idref_timeout),
         dewey=ClientService("dewey-classifier", r.dewey_classification_api_url,
                             r.classification_api_key.get_secret_value(), r.http_timeout),
-        seuil_sudoc=r.sudoc_seuil_correspondance,
+        seuil_sudoc=r.sudoc_duplicate_threshold,
         seuil_dewey=r.dewey_seuil,
         depot=depot_depuis_reglages(r),
     )

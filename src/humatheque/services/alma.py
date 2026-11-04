@@ -81,7 +81,8 @@ def interpreter(reponse: dict[str, Any]) -> ResultatAlma:
     )
 
 
-def verifier_alma(client: ClientService, metadonnees: dict[str, Any], type_document: str) -> tuple[ResultatAlma, Appel]:
+def verifier_alma(client: ClientService, metadonnees: dict[str, Any], type_document: str,
+                  parametres: dict[str, Any] | None = None) -> tuple[ResultatAlma, Appel]:
     route = charger_yaml("services")["alma"]["routes"][type_document]
-    reponse, appel = client.post(route, payload_alma(metadonnees))
+    reponse, appel = client.post(route, {**payload_alma(metadonnees), **(parametres or {})})
     return interpreter(reponse), appel

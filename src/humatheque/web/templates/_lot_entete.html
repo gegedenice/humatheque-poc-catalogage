@@ -9,6 +9,8 @@
     · {{ vue.lot.nb_documents }} document(s)
     · {{ "thèses" if vue.lot.parametres.type_document == "these" else "mémoires" }}
     · fournisseur {{ vue.lot.parametres.fournisseur }}
+    {% for service, params in (vue.lot.parametres.services or {}).items() %}{% for p, v in params.items() %}
+    · <span class="font-mono">{{ service }}.{{ p }}={{ v }}</span>{% endfor %}{% endfor %}
   </span>
   <span class="flex gap-2">
     <a class="btn-discret btn-sm" href="/lots/{{ vue.lot.id }}/rapport.csv" hx-boost="false">Rapport CSV</a>

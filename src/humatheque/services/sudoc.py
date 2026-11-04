@@ -41,9 +41,10 @@ def payload_sudoc(m: dict[str, Any]) -> dict[str, Any]:
     return p
 
 
-def verifier_sudoc(client: ClientService, metadonnees: dict[str, Any], type_document: str) -> tuple[dict[str, Any], Appel]:
+def verifier_sudoc(client: ClientService, metadonnees: dict[str, Any], type_document: str,
+                   parametres: dict[str, Any] | None = None) -> tuple[dict[str, Any], Appel]:
     route = charger_yaml("services")["sudoc"]["routes"][type_document]
-    return client.post(route, payload_sudoc(metadonnees))
+    return client.post(route, {**payload_sudoc(metadonnees), **(parametres or {})})
 
 
 def lire_notice(client: ClientService, ppn: str) -> tuple[str, Appel]:

@@ -3,7 +3,7 @@
 Contrat : docs/services/idref-linker.README.md et .openapi.json (réponses
 relevées dans tests/fixtures/services). Statuts : accepted, ambiguous,
 low_confidence, not_found ; le PPN n'est renseigné que pour accepted.
-Paramètres de score laissés aux défauts du service.
+Paramètres de score envoyés depuis config/services.yaml (réglables par lot).
 """
 
 from __future__ import annotations
@@ -78,9 +78,10 @@ def _organisme(r: dict[str, Any] | None) -> AlignementIdref | None:
                            candidats=cands, erreur=r.get("error"))
 
 
-def aligner_personne(client: ClientService, m: dict[str, Any], nom_brut: str) -> tuple[AlignementIdref, Appel]:
-    route = charger_yaml("services")["idref"]["route_personne"]
-    reponse, appel = client.post(route, payload_personne(m, nom_brut))
+def aligner_personne(client: ClientService, m: dict[str, Any], nom_brut: str,
+                     parametres: dict[str, Any] | None = None) -> tuple[AlignementIdref, Appel]:
+    route = charger_yaml("services")["idref_personne"]["route"]
+    reponse, appel = client.post(route, {**payload_personne(m, nom_brut), **(parametres or {})})
     return _personne(reponse), appel
 
 
@@ -90,9 +91,10 @@ class AlignementOrganisations(BaseModel):
     doctoral_school: AlignementIdref | None = None
 
 
-def aligner_organisations(client: ClientService, m: dict[str, Any]) -> tuple[AlignementOrganisations, Appel]:
-    route = charger_yaml("services")["idref"]["route_organisations"]
-    r, appel = client.post(route, payload_organisations(m))
+def aligner_organisations(client: ClientService, m: dict[str, Any],
+                          parametres: dict[str, Any] | None = None) -> tuple[AlignementOrganisations, Appel]:
+    route = charger_yaml("services")["idref_organisations"]["route"]
+    r, appel = client.post(route, {**payload_organisations(m), **(parametres or {})})
     return AlignementOrganisations(
         granting_institution=_organisme(r.get("granting_institution")),
         co_tutelle_institutions=[a for a in (_organisme(x) for x in r.get("co_tutelle_institutions") or []) if a],

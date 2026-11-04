@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from humatheque.application import Application
 from humatheque.application.vues import (
-    EntreeLot, EtatSpec, Historique, ResumeVersion, VueBucket, VueDossier, VueLot, VueNotice,
+    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueBucket, VueDossier, VueLot, VueNotice,
 )
 from humatheque.notice.validation import Marqueur
 from humatheque.store import Lot
@@ -150,6 +150,12 @@ def proposition(request: Request, dossier_id: str, numero: int, choix: Literal["
 class Selection(BaseModel):
     identifiants: list[str]
     fournisseur: str | None = None
+    reglages_services: dict[str, dict] = {}
+
+
+@routeur.get("/reglables", response_model=list[Reglable])
+def reglables(request: Request) -> list[Reglable]:
+    return _app(request).reglables()
 
 
 @routeur.post("/minio/balayage", response_model=VueBucket)
@@ -159,4 +165,5 @@ def balayage(request: Request) -> VueBucket:
 
 @routeur.post("/minio/lots", response_model=Lot, status_code=201)
 def lancer_selection(request: Request, selection: Selection) -> Lot:
-    return _app(request).lancer_selection(selection.identifiants, selection.fournisseur)
+    return _app(request).lancer_selection(selection.identifiants, selection.fournisseur,
+                                          reglages=selection.reglages_services)

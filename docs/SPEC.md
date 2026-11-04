@@ -70,6 +70,12 @@ Formulaire unique (mode 1 et mode 2) :
 - **Provenance** : n'est **pas saisie**. Elle est déduite de
   `granting_institution` pour les thèses (§6, étape 2).
 - **Fournisseur VLM** : choix repris du POC, par défaut celui de `.env`.
+- **Paramètres avancés** (décision du 04/11), repliés par défaut : quelques
+  paramètres des services modifiables pour le lot (seuils d'acceptation et
+  marge IdRef des personnes, seuil d'acceptation IdRef des organismes,
+  méthode Dewey). La liste, les bornes et les valeurs par défaut sont dans
+  `config/services.yaml` (`reglables`) ; les valeurs retenues sont
+  enregistrées dans le lot et visibles dans son bandeau.
 
 Un envoi crée un **Lot** : un seul document donne un lot d'un document, en
 mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
@@ -310,7 +316,9 @@ dans le dossier :
    document (`qualification/`, fonction pure) :
 
    - candidats retenus : ceux de `candidates` dont `score.final` atteint
-     `SUDOC_SEUIL_CORRESPONDANCE` (`.env`, aligné sur le seuil du service) ;
+     `SUDOC_DUPLICATE_THRESHOLD` (`.env`), envoyé au service comme
+     `duplicate_threshold` : le statut du service et l'agrégation utilisent
+     le même seuil ;
    - correspondance `thesis_state` → `etat_sudoc` dans `config/etats_sudoc.yaml` :
 
      | `thesis_state` | `etat_sudoc` |
@@ -343,8 +351,16 @@ dans le dossier :
    personne, puis **idref-linker organisations** (`/align/thesis-organizations` ;
    lire l'OpenAPI) pour l'établissement de soutenance, l'école doctorale et les
    cotutelles.
-7. **dewey-classifier** (`/classify`, payload repris du POC). La première classe
-   donne `dewey_code`.
+7. **dewey-classifier** (`/classify`, payload repris du POC, méthode `albert`
+   par défaut, décision du 04/11). La première classe donne `dewey_code`.
+
+**Paramètres de requête des services** (décision du 04/11) : les paramètres
+qu'une requête peut porter (seuils, nombres de candidats, poids IdRef,
+méthode Dewey…) sont envoyés explicitement à chaque appel, avec les valeurs
+de l'environnement des services reprises dans `config/services.yaml` ; ils
+sont donc journalisés avec la requête. Les paramètres internes aux services
+(points d'accès SRU et Qualinka, modèles, clés Albert) restent dans leur
+propre environnement.
 8. **Générateur** (§8), puis rapport.
 
 Le dossier mémorise les résultats de chaque étape. **Relancer un dossier**
@@ -607,7 +623,7 @@ défaut sur la version générée.
   - `ALMA_CHECKER_API_URL`, `ALMA_API_KEY` ;
   - `SPEC_SOURCE=csv`, `GRIST_URL=http://grist:8484`, `GRIST_DOC_ID`,
     `GRIST_API_KEY`, `GRIST_SESSION_SECRET`, `GRIST_DEFAULT_EMAIL` ;
-  - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_SEUIL_CORRESPONDANCE` ;
+  - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_DUPLICATE_THRESHOLD` ;
   - `VLM_MODEL=google/gemma-4-26B-A4B-it`, `VLM_STRATEGIE=requete_unique`,
     `VLM_TIMEOUT`, `HTTP_TIMEOUT`, `RELANCES_AUTO=2` ;
   - `PROVENANCE_CONFIRMATION_LLM=false` ;

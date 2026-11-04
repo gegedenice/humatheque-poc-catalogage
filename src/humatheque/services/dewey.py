@@ -34,9 +34,10 @@ def texte_dewey(m: dict[str, Any]) -> str:
     return " ".join(p for p in (texte(m.get("title")), texte(m.get("subtitle")), texte(m.get("discipline"))) if p)
 
 
-def classer(client: ClientService, m: dict[str, Any], seuil: float | None) -> tuple[ResultatDewey, Appel]:
+def classer(client: ClientService, m: dict[str, Any], seuil: float | None,
+            parametres: dict[str, Any] | None = None) -> tuple[ResultatDewey, Appel]:
     cfg = charger_yaml("services")["dewey"]
-    reponse, appel = client.post(cfg["route"], {"text": texte_dewey(m), **cfg["requete"]})
+    reponse, appel = client.post(cfg["route"], {"text": texte_dewey(m), **cfg["parametres"], **(parametres or {})})
     brutes = ((reponse.get("results") or [{}])[0] or {}).get("classes") or []
     classes = [ClasseDewey(code=c.get("dewey"), libelle=c.get("label"), score=c.get("score")) for c in brutes]
     if not classes or not classes[0].code:

@@ -1,0 +1,40 @@
+{
+    "source": "albert_rerank_classification",
+    "method": "albert",
+    "model": "BAAI/bge-m3 + BAAI/bge-reranker-v2-m3",
+    "classification_type": "multi-label",
+    "threshold": 0.0,
+    "count": 1,
+    "results": [
+        {
+            "text": "La question de l hygiène aux Indes-Néerlandaises Histoire et civilisations",
+            "classes": [
+                {
+                    "dewey": "930",
+                    "label": "Histoire ancienne et préhistoire",
+                    "score": 0.0204
+                },
+                {
+                    "dewey": "950",
+                    "label": "Histoire générale de l'Asie, Orient, Extrême-Orient",
+                    "score": 0.0032
+                },
+                {
+                    "dewey": "940",
+                    "label": "Histoire moderne et contemporaine de l'Europe",
+                    "score": 0.0012
+                },
+                {
+                    "dewey": "900",
+                    "label": "Géographie et histoire",
+                    "score": 0.0009
+                },
+                {
+                    "dewey": "990",
+                    "label": "Histoire générale des autres parties du monde, des mondes extraterrestres. Iles du Pacifique",
+                    "score": 0.0007
+                }
+            ]
+        }
+    ]
+}

@@ -63,7 +63,8 @@ async def creer_lot(
     if arborescence:
         if type_document not in ("these", "memoire"):
             raise ActionImpossible(f"type de document inconnu : {type_document}")
-        lot = a.televerser_dossiers(arborescence, type_document, fournisseur or None)
+        lot = a.televerser_dossiers(arborescence, type_document, fournisseur or None,
+                                    await _reglages_formulaire(request))
         return _rediriger(f"/lots/{lot.id}")
     fichiers = [(f.filename or "image", await f.read()) for f in (images or []) if f.filename]
     if fichiers:
@@ -77,7 +78,8 @@ async def creer_lot(
     if type_document not in ("these", "memoire"):
         raise ActionImpossible(f"type de document inconnu : {type_document}")
     lot = a.creer_lot(EntreeLot(type_document=type_document, fournisseur=fournisseur or None,
-                                documents=documents, source=source))
+                                documents=documents, source=source,
+                                reglages_services=await _reglages_formulaire(request)))
     if lot.mode == 1:
         (ligne,) = a.store.lignes_du_lot(lot.id)
         return _rediriger(f"/dossiers/{ligne.id}")
@@ -192,6 +194,16 @@ def hors_outil(request: Request, dossier_id: str, auteur: Annotated[str, Form()]
     return _rediriger(f"/dossiers/{dossier_id}", auteur)
 
 
+async def _reglages_formulaire(request: Request) -> dict:
+    """Champs « reglage.<service>.<paramètre> » du formulaire → {service: {paramètre: valeur}}."""
+    reglages: dict = {}
+    for cle, valeur in (await request.form()).multi_items():
+        if cle.startswith("reglage.") and cle.count(".") == 2 and isinstance(valeur, str):
+            _, service, parametre = cle.split(".")
+            reglages.setdefault(service, {})[parametre] = valeur
+    return reglages
+
+
 def _auteur(auteur: str) -> str:
     if not auteur.strip():
         raise ActionImpossible("Indiquez votre nom (catalogueur) pour journaliser la résolution.")
@@ -213,14 +225,16 @@ def fichier(request: Request, chemin: str):
 @routeur.post("/minio/balayer")
 def balayer(request: Request):
     """Liste les dossiers du bucket et leur dernier statut (balayage journalisé)."""
-    return _rendre(request, "_minio.html", vue=_app(request).balayer("manuel"),
-                   fournisseurs=_app(request).accueil().fournisseurs)
+    a = _app(request)
+    return _rendre(request, "_minio.html", vue=a.balayer("manuel"), fournisseurs=a.accueil().fournisseurs,
+                   reglables=a.reglables())
 
 
 @routeur.post("/minio/lancer")
-def lancer_selection(request: Request, dossiers: Annotated[list[str] | None, Form()] = None,
-                     fournisseur: Annotated[str, Form()] = ""):
-    lot = _app(request).lancer_selection(dossiers or [], fournisseur or None)
+async def lancer_selection(request: Request, dossiers: Annotated[list[str] | None, Form()] = None,
+                           fournisseur: Annotated[str, Form()] = ""):
+    lot = _app(request).lancer_selection(dossiers or [], fournisseur or None,
+                                         reglages=await _reglages_formulaire(request))
     if request.headers.get("HX-Request"):
         r = Response(status_code=204)
         r.headers["HX-Redirect"] = f"/lots/{lot.id}"
