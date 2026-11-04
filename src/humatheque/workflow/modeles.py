@@ -81,6 +81,14 @@ class ExceptionDossier(BaseModel):
     resolue: bool = False
 
 
+class Cloture(BaseModel):
+    """Dossier traité hors outil (situation tranchée par le catalogueur, SPEC §9.3)."""
+
+    par: str
+    le: datetime = Field(default_factory=maintenant)
+    commentaire: str
+
+
 class Document(BaseModel):
     id: str
     type_document: str  # these | memoire
@@ -125,6 +133,7 @@ class Dossier(BaseModel):
     routage: str | None = None
     motif_arret: str | None = None
     etape_arret: str | None = None
+    cloture: Cloture | None = None
 
     def noter(self, etape: str, type_: str, detail: Any, auteur: str = "système") -> None:
         self.journal.append(Evenement(etape=etape, type=type_, detail=detail, auteur=auteur))

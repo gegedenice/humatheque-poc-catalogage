@@ -65,3 +65,78 @@ def idref_organisations() -> dict:
 
 def dewey() -> dict:
     return fixture("dewey")
+
+
+# ---------------------------------------------------------------- scénario complet
+VLM = "https://vlm.test/v1/chat/completions"
+
+EXTRACTION = {
+    "title": "CONTRIBUTION A L'ETUDE DE LA DEMOCRATIE EN AFRIQUE",
+    "subtitle": None,
+    "author": "Jean-Daniel DUBOIS",
+    "degree_type": "Thèse de doctorat",
+    "discipline": "Science politique",
+    "volume": None,
+    "granting_institution": "École pratique des hautes études",
+    "co_tutelle_institutions": [],
+    "doctoral_school": None,
+    "defense_year": "1998",
+    "advisor": ["Pr Marie-France de LA ROCHE"],
+    "jury_president": None,
+    "reviewers": ["Luc PETIT"],
+    "committee_members": [],
+    "language": "fre",
+    "abstract": None,
+    "confidence": 0.9,
+}
+
+
+def png() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (100, 140), "white").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def services(spec, fournisseur=None):
+    """Services du workflow pointant vers les URL simulées."""
+    from humatheque.extraction.fournisseurs import FournisseurOpenAICompatible
+    from humatheque.services import ClientService
+    from humatheque.workflow import Services
+
+    return Services(
+        spec=spec,
+        vlm=FournisseurOpenAICompatible(fournisseur or "vlm", VLM, "google/gemma-4-26B-A4B-it", timeout=5),
+        alma=ClientService("alma-checker", ALMA_URL),
+        sudoc=ClientService("sudoc-checker", SUDOC_URL),
+        idref=ClientService("idref-linker", IDREF_URL),
+        dewey=ClientService("dewey-classifier", DEWEY_URL),
+        seuil_sudoc=0.78,
+    )
+
+
+def _orgs_acceptees() -> dict:
+    o = copy.deepcopy(idref_organisations())
+    o["co_tutelle_institutions"] = []
+    o["doctoral_school"] = None
+    return o
+
+
+def simuler(extraction=None, alma=None, sudoc=None, orgs=None, idref_statut="accepted"):
+    """Monte les routes respx de tous les services (dans un contexte respx actif)."""
+    import respx
+
+    contenu = json.dumps(EXTRACTION if extraction is None else extraction, ensure_ascii=False)
+    return {
+        "vlm": respx.post(VLM).respond(json={"choices": [{"message": {"content": contenu}}]}),
+        "alma": respx.post(url__regex=rf"{ALMA_URL}/check/.*").respond(json=alma or globals()["alma"]()),
+        "sudoc": respx.post(url__regex=rf"{SUDOC_URL}/check/.*").respond(json=sudoc or globals()["sudoc"]([])),
+        "idref": respx.post(f"{IDREF_URL}/align/person").respond(json=idref_personne(idref_statut)),
+        "orgs": respx.post(f"{IDREF_URL}/align/thesis-organizations").respond(
+            json=orgs if orgs is not None else _orgs_acceptees()),
+        "dewey": respx.post(f"{DEWEY_URL}/classify").respond(json=dewey()),
+        "notice": respx.get(url__regex=r"https://www\.sudoc\.fr/\d+X?\.xml").respond(text=notice_xml()),
+    }

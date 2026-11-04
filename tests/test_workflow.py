@@ -10,41 +10,13 @@ import respx
 from PIL import Image
 
 import services_simules as sim
+from services_simules import EXTRACTION, VLM, png, simuler
 from humatheque.extraction.fournisseurs import FournisseurOpenAICompatible
 from humatheque.services import ClientService
 from humatheque.spec import charger_spec
 from humatheque.workflow import (
     Document, Dossier, ResolutionImpossible, Services, Workflow, choisir_provenance, declarer_faux_positif,
 )
-
-VLM = "https://vlm.test/v1/chat/completions"
-
-EXTRACTION = {
-    "title": "CONTRIBUTION A L'ETUDE DE LA DEMOCRATIE EN AFRIQUE",
-    "subtitle": None,
-    "author": "Jean-Daniel DUBOIS",
-    "degree_type": "Thèse de doctorat",
-    "discipline": "Science politique",
-    "volume": None,
-    "granting_institution": "École pratique des hautes études",
-    "co_tutelle_institutions": [],
-    "doctoral_school": None,
-    "defense_year": "1998",
-    "advisor": ["Pr Marie-France de LA ROCHE"],
-    "jury_president": None,
-    "reviewers": ["Luc PETIT"],
-    "committee_members": [],
-    "language": "fre",
-    "abstract": None,
-    "confidence": 0.9,
-}
-
-
-def png() -> bytes:
-    buf = BytesIO()
-    Image.new("RGB", (100, 140), "white").save(buf, format="PNG")
-    return buf.getvalue()
-
 
 @pytest.fixture(scope="module")
 def spec():
@@ -53,15 +25,7 @@ def spec():
 
 @pytest.fixture
 def services(spec):
-    return Services(
-        spec=spec,
-        vlm=FournisseurOpenAICompatible("vlm", VLM, "google/gemma-4-26B-A4B-it", timeout=5),
-        alma=ClientService("alma-checker", sim.ALMA_URL),
-        sudoc=ClientService("sudoc-checker", sim.SUDOC_URL),
-        idref=ClientService("idref-linker", sim.IDREF_URL),
-        dewey=ClientService("dewey-classifier", sim.DEWEY_URL),
-        seuil_sudoc=0.78,
-    )
+    return sim.services(spec)
 
 
 @pytest.fixture
@@ -83,29 +47,6 @@ def _images(tmp_path_factory):
 def dossier(type_document="these", images=None):
     return Dossier(id="d1", document=Document(id="TH/TH-01", type_document=type_document,
                                               images=images if images is not None else [IMAGES["page"]]))
-
-
-def simuler(extraction=EXTRACTION, alma=None, sudoc=None, orgs=None, idref_statut="accepted"):
-    """Monte les routes respx de tous les services ; renvoie les routes."""
-    contenu = json.dumps(extraction, ensure_ascii=False)
-    r = {
-        "vlm": respx.post(VLM).respond(json={"choices": [{"message": {"content": contenu}}]}),
-        "alma": respx.post(url__regex=rf"{sim.ALMA_URL}/check/.*").respond(json=alma or sim.alma()),
-        "sudoc": respx.post(url__regex=rf"{sim.SUDOC_URL}/check/.*").respond(json=sudoc or sim.sudoc([])),
-        "idref": respx.post(f"{sim.IDREF_URL}/align/person").respond(json=sim.idref_personne(idref_statut)),
-        "orgs": respx.post(f"{sim.IDREF_URL}/align/thesis-organizations").respond(
-            json=orgs if orgs is not None else _orgs_acceptees()),
-        "dewey": respx.post(f"{sim.DEWEY_URL}/classify").respond(json=sim.dewey()),
-        "notice": respx.get(url__regex=r"https://www\.sudoc\.fr/\d+X?\.xml").respond(text=sim.notice_xml()),
-    }
-    return r
-
-
-def _orgs_acceptees():
-    o = copy.deepcopy(sim.idref_organisations())
-    o["co_tutelle_institutions"] = []
-    o["doctoral_school"] = None
-    return o
 
 
 # ================================================================ scénarios du §11
