@@ -281,3 +281,10 @@ def test_notice_convertie_editable(app, image):
     n = app.vue_notice(ligne.id)
     assert (n.version, n.source, n.profil) == (1, "convertie", "these_originale_imprimee")
     assert "001 229969437" in n.texte
+
+
+def test_identifiant_document_par_url():
+    ident = Application._identifiant_document
+    assert ident(["https://minio.smartbiblia.fr/images/memoires/CESOR/doc_01/page_de_titre.jpg?x=1"]) == \
+        "images/memoires/CESOR/doc_01/page_de_titre.jpg"
+    assert ident(["/data/uploads/ab/001_p.png"]) == "001_p.png"

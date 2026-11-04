@@ -93,6 +93,10 @@ class Reglages(BaseSettings):
     ingestion_auto: bool = False
     planification_cron: str = ""
 
+    # Cache du dictionnaire reaccentue (défaut : data/reaccentue-cache.pz). L'image
+    # Docker le construit au build hors du volume data/.
+    reaccentue_cache: Path | None = None
+
     @field_validator("dewey_seuil", "sudoc_duplicate_threshold", mode="before")
     @classmethod
     def _vide_none(cls, v: Any) -> Any:

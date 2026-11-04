@@ -1,8 +1,8 @@
 """Ligne de commande `humatheque`.
 
 Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `scan-minio`,
-`css`, `cache-reaccentue` (cache du dictionnaire, appelé au build Docker).
-`spec-export` arrive avec l'étape 7.
+`spec-export`, `css`, `cache-reaccentue` (cache du dictionnaire, appelé au
+build Docker).
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def cache_reaccentue(args: argparse.Namespace) -> int:
     from humatheque.texte_unimarc.ressources import NOM_CACHE, dictionnaire
 
     d = dictionnaire()
-    print(f"Cache {reglages().dossier_data / NOM_CACHE} : {len(d.formes)} formes, "
+    print(f"Cache {reglages().reaccentue_cache or reglages().dossier_data / NOM_CACHE} : {len(d.formes)} formes, "
           f"{len(d.bigrammes)} bigrammes, {len(d.noms_propres)} noms propres")
     return 0
 
@@ -146,6 +146,22 @@ def scan_minio(args: argparse.Namespace) -> int:
     return 0
 
 
+def spec_export(args: argparse.Namespace) -> int:
+    """Instantané des tables Grist dans spec/ (+ copie horodatée dans spec/archives/)."""
+    from humatheque.spec.export import exporter
+    from humatheque.spec.grist import GristInjoignable
+
+    try:
+        r = exporter(reglages(), args.dossier)
+    except (GristInjoignable, SpecIntrouvable) as e:
+        print(f"ERREUR : {e}", file=sys.stderr)
+        return 2
+    for table, n in r["tables"].items():
+        print(f"  {table:<18} {n} ligne(s)")
+    print(f"Instantané {r['horodatage']} (empreinte {r['empreinte']}) ; archive {r['archive']}")
+    return 0
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
@@ -164,6 +180,10 @@ def construire_parseur() -> argparse.ArgumentParser:
     c.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"))
     c.add_argument("--port", type=int, default=8000)
     c.set_defaults(fonction=serve)
+
+    c = sous.add_parser("spec-export", help="écrit un instantané des tables Grist dans spec/")
+    c.add_argument("--dossier", type=Path, default=None, help="dossier cible (défaut : spec/)")
+    c.set_defaults(fonction=spec_export)
 
     c = sous.add_parser("scan-minio", help="liste les dossiers du bucket S3 et leur dernier statut")
     c.add_argument("--lancer-nouveaux", action="store_true", help="traite les dossiers jamais traités")

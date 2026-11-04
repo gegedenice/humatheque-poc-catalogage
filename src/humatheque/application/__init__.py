@@ -203,9 +203,13 @@ class Application:
 
     @staticmethod
     def _identifiant_document(images: list[str]) -> str:
+        """URL : chemin sans l'hôte (le nom de fichier seul est ambigu : page_de_titre.jpg
+        se répète dans chaque dossier du bucket, constaté à l'essai réel du 04/11)."""
+        from urllib.parse import unquote, urlsplit
+
         premiere = images[0]
         if premiere.startswith(("http://", "https://")):
-            return premiere.split("?")[0].rstrip("/").rsplit("/", 1)[-1] or premiere
+            return unquote(urlsplit(premiere).path).strip("/") or premiere
         return Path(premiere).name
 
     # ============================================================ traitement

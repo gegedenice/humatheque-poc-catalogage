@@ -14,7 +14,8 @@ NOM_CACHE = "reaccentue-cache.pz"
 @lru_cache
 def dictionnaire() -> Dictionnaire:
     """Dictionnaire de reaccentue ; cache dans `data/` (construit au premier appel)."""
-    return charger(reglages().dossier_data / NOM_CACHE)
+    r = reglages()
+    return charger(r.reaccentue_cache or r.dossier_data / NOM_CACHE)
 
 
 @lru_cache
