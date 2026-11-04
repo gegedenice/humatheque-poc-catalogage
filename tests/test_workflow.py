@@ -301,3 +301,14 @@ def test_dossier_serialisable(workflow):
     d = workflow.executer(dossier())
     copie = Dossier.model_validate_json(d.model_dump_json())
     assert copie.notice_texte == d.notice_texte and copie.schema_version == 1
+
+
+@respx.mock
+def test_relance_automatique_sans_exceptions_en_double(workflow):
+    routes = simuler(idref_statut="low_confidence")
+    routes["idref"].side_effect = [httpx.Response(200, json=sim.idref_personne("low_confidence")),
+                                   httpx.ReadTimeout("lent"),
+                                   *[httpx.Response(200, json=sim.idref_personne("low_confidence"))] * 3]
+    d = workflow.executer(dossier())
+    assert d.etapes["idref_personnes"].tentatives == 2
+    assert len([e for e in d.exceptions if e.etape == "idref_personnes"]) == 3

@@ -222,7 +222,8 @@ class Application:
         self.store.changer_etat(dossier_id, "en_cours")
         try:
             services = self.fabrique(self.spec, (lot.parametres if lot else {}).get("fournisseur"))
-            if services.depot is None:
+            # Le dépôt qui a constitué les documents est celui qui lit leurs images.
+            if self.depot is not None:
                 services.depot = self.depot
             services.reglages_lot = (lot.parametres if lot else {}).get("services") or {}
             Workflow(services).executer(d, depuis)

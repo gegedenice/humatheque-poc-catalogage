@@ -25,6 +25,10 @@ def test_table_spec(brut, nom, prenom, alertes):
     ("Madame Marie Curie", "Curie", "Marie"),                 # tout en casse mixte
     ("J.-D. DUBOIS", "Dubois", "J.-D."),                      # initiales
     ("Docteur Anne-Marie O'BRIEN", "O'Brien", "Anne-Marie"),
+    # Essai réel du 04/11
+    ("Monsieur le Professeur André GODIN", "Godin", "André"),
+    ("Madame la Professeure Anne LEROY", "Leroy", "Anne"),
+    ("le Professeur Jean MARTIN", "Martin", "Jean"),
 ])
 def test_decoupages(brut, nom, prenom):
     p = personne(brut)
@@ -33,6 +37,12 @@ def test_decoupages(brut, nom, prenom):
 
 def test_forme_sans_civilite_casse_d_origine():
     assert personne("M. Jean-Daniel DUBOIS").forme == "Jean-Daniel DUBOIS"
+    assert personne("Monsieur le Professeur André GODIN").forme == "André GODIN"
+
+
+def test_article_non_civilite_conserve():
+    # « La » n'est retiré que suivi d'une civilité
+    assert personne("LA FONTAINE Jean").nom == "La Fontaine"
 
 
 def test_pas_de_reaccentuation_mais_alerte_si_capitales():

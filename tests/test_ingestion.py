@@ -218,3 +218,17 @@ def test_api_bucket(client):
     r = client.post("/api/v1/minio/balayage")
     assert r.status_code == 200 and len(r.json()["dossiers"]) == 3
     assert client.post("/api/v1/minio/lots", json={"identifiants": ["TH/TH-99"]}).status_code == 422
+
+
+@respx.mock
+def test_depot_de_l_application_prioritaire(app):
+    """Les services fournissent leur propre dépôt (.env) : celui de l'application, qui a
+    constitué les documents, doit lire les images (essai réel du 04/11)."""
+    autre = BucketSimule({}, bucket="poc", prefixe="")
+    fabrique = app.fabrique
+    app.fabrique = lambda s, f: (lambda svc: (setattr(svc, "depot", autre), svc)[1])(fabrique(s, f))
+    simuler()
+    lot = app.lancer_selection(["TH/TH-01"])
+    (ligne,) = app.store.lignes_du_lot(lot.id)
+    assert app.vue_dossier(ligne.id).dossier.routage == "auto"
+    assert app.depot.lectures and not autre.lectures

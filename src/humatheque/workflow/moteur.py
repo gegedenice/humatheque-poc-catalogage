@@ -146,6 +146,8 @@ class Workflow:
         while True:
             tentative += 1
             etape.tentatives = tentative
+            # Une nouvelle tentative repart de zéro : pas d'exceptions en double (essai réel du 04/11)
+            dossier.exceptions = [e for e in dossier.exceptions if e.etape != nom or e.resolue]
             try:
                 suite = self._etapes[nom](dossier)
                 break

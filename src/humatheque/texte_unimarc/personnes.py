@@ -55,8 +55,10 @@ def personne(brut: str, d: Dictionnaire | None = None) -> Personne:
     alertes: list[str] = []
     trace: list[str] = []
 
+    liaisons = {_norm(m) for m in cfg.get("liaisons_civilites") or []}
     mots = (brut or "").split()
-    while mots and _norm(mots[0]) in civilites:
+    while mots and (_norm(mots[0]) in civilites
+                    or (len(mots) > 1 and _norm(mots[0]) in liaisons and _norm(mots[1]) in civilites)):
         trace.append(f"civilité retirée : {mots.pop(0)}")
     forme = " ".join(mots)
     if not mots:
