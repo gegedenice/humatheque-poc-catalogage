@@ -1,8 +1,8 @@
 """Ligne de commande `humatheque`.
 
-Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `css`,
-`cache-reaccentue` (cache du dictionnaire, appelé au build Docker).
-`scan-minio` et `spec-export` arrivent avec les étapes 6 bis et 7.
+Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `scan-minio`,
+`css`, `cache-reaccentue` (cache du dictionnaire, appelé au build Docker).
+`spec-export` arrive avec l'étape 7.
 """
 
 from __future__ import annotations
@@ -119,6 +119,33 @@ def run_batch(args: argparse.Namespace) -> int:
     return _traiter_documents(documents_depuis_liste(Path(args.fichier).read_text(encoding="utf-8")), args)
 
 
+def scan_minio(args: argparse.Namespace) -> int:
+    """Dossiers du bucket et dernier statut (ING-F-005) ; --lancer-nouveaux traite les nouveaux."""
+    from humatheque.application import Application, ExecuteurSynchrone
+
+    app = Application(executeur=ExecuteurSynchrone())
+    vue = app.balayer("manuel")
+    if not vue.configure:
+        print("Stockage S3 non configuré (MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY).",
+              file=sys.stderr)
+        return 2
+    if vue.erreur:
+        print(f"ERREUR : {vue.erreur}", file=sys.stderr)
+        return 2
+    for l in vue.dossiers:
+        d = l.document
+        statut = "nouveau" if l.nouveau else (l.routage or l.etat or "")
+        print(f"{d.id:<30} {d.type_document or '?':<8} {len(d.images):>3} image(s)  {statut}"
+              + (f"  [{d.invalide}]" if d.invalide else ""))
+    nouveaux = [l.document.id for l in vue.dossiers if l.nouveau]
+    print(f"{len(vue.dossiers)} dossier(s) dans {vue.bucket}/{vue.prefixe}, {len(nouveaux)} nouveau(x)")
+    if args.lancer_nouveaux and nouveaux:
+        lot = app.lancer_selection(nouveaux, args.fournisseur)
+        i = app.vue_lot(lot.id).indicateurs
+        print(f"Lot {lot.id} : {i.passes_seuls} passé(s) seul(s), {i.en_attente} à reprendre")
+    return 0
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
@@ -137,6 +164,11 @@ def construire_parseur() -> argparse.ArgumentParser:
     c.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"))
     c.add_argument("--port", type=int, default=8000)
     c.set_defaults(fonction=serve)
+
+    c = sous.add_parser("scan-minio", help="liste les dossiers du bucket S3 et leur dernier statut")
+    c.add_argument("--lancer-nouveaux", action="store_true", help="traite les dossiers jamais traités")
+    c.add_argument("--fournisseur", default=None)
+    c.set_defaults(fonction=scan_minio)
 
     c = sous.add_parser("css", help="compile la feuille Tailwind (exécutable autonome, sans Node)")
     c.add_argument("--watch", action="store_true", help="recompile à chaque modification")

@@ -35,10 +35,18 @@ def compresser(donnees: bytes, max_size: int = 768, qualite: int = 85) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def lire(source: str | bytes, timeout: float = 30.0, client: httpx.Client | None = None) -> bytes:
-    """Octets d'une image : bytes, chemin local ou URL http(s)."""
+def lire(source: str | bytes, timeout: float = 30.0, client: httpx.Client | None = None,
+         lecteur_s3=None) -> bytes:
+    """Octets d'une image : bytes, chemin local, URL http(s) ou URI s3:// (lue par `lecteur_s3`)."""
     if isinstance(source, bytes):
         return source
+    if source.startswith("s3://"):
+        if lecteur_s3 is None:
+            raise ImageInaccessible(f"{source} : stockage S3 non configuré")
+        try:
+            return lecteur_s3(source)
+        except Exception as e:  # erreurs du client S3 (réseau, droits, objet absent)
+            raise ImageInaccessible(f"{source} : {e}") from e
     if source.startswith(("http://", "https://")):
         try:
             r = (client or httpx).get(source, timeout=timeout, follow_redirects=True)

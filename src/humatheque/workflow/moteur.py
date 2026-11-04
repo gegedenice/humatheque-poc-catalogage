@@ -60,6 +60,12 @@ class Services:
     dewey: ClientService
     seuil_sudoc: float | None = None
     seuil_dewey: float | None = None
+    depot: Any = None  # ingestion.Depot : lit les images s3:// (None : stockage non configuré)
+
+    def lire_s3(self, u: str) -> bytes:
+        from humatheque.ingestion import cle_depuis_uri
+
+        return self.depot.lire(cle_depuis_uri(u, self.depot.bucket))
 
 
 @dataclass
@@ -171,7 +177,8 @@ class Workflow:
     def _etape_extraction(self, d: Dossier) -> Suite:
         decision = _cfg()["non_prevue"]["routage"]
         try:
-            res = extraire(self.services.vlm, d.document.images, d.document.type_document)
+            res = extraire(self.services.vlm, d.document.images, d.document.type_document,
+                           lecteur_s3=self.services.lire_s3 if self.services.depot else None)
         except ImageIllisible as e:  # dossier vide, image illisible (ING-F-008)
             d.alerter(f"document_invalide:{e}")
             return self._arret(decision, f"{_cfg()['motifs']['document_invalide']} : {e}")
@@ -375,6 +382,7 @@ class Workflow:
 def services_depuis_reglages(spec: Spec, fournisseur_vlm: str | None = None) -> Services:
     """Services réels configurés par `.env`."""
     from humatheque.extraction.fournisseurs import fournisseur
+    from humatheque.ingestion import depot_depuis_reglages
 
     r = reglages()
     return Services(
@@ -388,4 +396,5 @@ def services_depuis_reglages(spec: Spec, fournisseur_vlm: str | None = None) -> 
                             r.classification_api_key.get_secret_value(), r.http_timeout),
         seuil_sudoc=r.sudoc_seuil_correspondance,
         seuil_dewey=r.dewey_seuil,
+        depot=depot_depuis_reglages(r),
     )

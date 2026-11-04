@@ -19,6 +19,9 @@
         <td class="space-x-1 text-xs">
           {% if r %}{% if r.en_cours %}<span class="text-decision">en cours</span>{% endif %}
             {% for routage, n in r.indicateurs.par_routage.items() %}{{ badge(routage) }}&nbsp;{{ n }}{% endfor %}
+          {% elif i.type == "balayage" %}
+            {% if i.resultat.erreur %}<span class="text-sortie">{{ i.resultat.erreur }}</span>
+            {% else %}{{ i.resultat.nouveaux or 0 }} nouveau(x){% endif %}
           {% endif %}
         </td>
         <td>{% if i.lot_id %}<a class="btn-discret btn-sm" href="/lots/{{ i.lot_id }}">Lot</a>{% endif %}</td>

@@ -17,6 +17,12 @@
       </label>
     </fieldset>
     <div class="flex items-center gap-3 text-xs text-sourdine"><span class="flex-1 border-t border-filet"></span>ou<span class="flex-1 border-t border-filet"></span></div>
+    <fieldset class="space-y-1">
+      <label class="etiquette" for="dossiers">Téléverser des dossiers (un dossier = un document)</label>
+      <input class="champ" id="dossiers" type="file" name="dossiers" webkitdirectory multiple>
+      <p class="text-xs text-sourdine">Les sous-dossiers <span class="font-mono">TH/</span> et <span class="font-mono">MM/</span> donnent le type ; sinon, le type choisi ci-dessous.</p>
+    </fieldset>
+    <div class="flex items-center gap-3 text-xs text-sourdine"><span class="flex-1 border-t border-filet"></span>ou<span class="flex-1 border-t border-filet"></span></div>
     <div>
       <label class="etiquette" for="url">Une URL d'image (un document d'une image)</label>
       <input class="champ" id="url" type="url" name="url" placeholder="https://minio.smartbiblia.fr/…/page_titre.jpg">
@@ -42,15 +48,18 @@
         </select>
       </div>
     </div>
-    <p class="text-xs text-sourdine">La provenance (EPHE ou hors EPHE) n'est pas saisie : elle est déduite de l'établissement de soutenance.</p>
+    <p class="text-xs text-sourdine">La provenance (EPHE ou hors EPHE) n'est pas saisie : elle est déduite de l'établissement de soutenance. Pour un dossier TH / MM, le type vient du dossier.</p>
     <button class="btn-principal" type="submit" {% if vue.spec.nb_erreurs %}disabled title="La spécification contient des erreurs bloquantes"{% endif %}>Lancer le traitement</button>
   </form>
 
   <div class="space-y-4">
     {% with spec = vue.spec %}{% include "_spec.html" %}{% endwith %}
     <section class="carte">
-      <h2>Bucket MinIO</h2>
-      {{ vide("La sélection de dossiers du bucket arrive avec l'ingestion MinIO (étape 6 bis).") }}
+      <h2>Stockage S3 (MinIO)</h2>
+      <div id="bucket">
+        <p class="text-xs text-sourdine mb-2">Liste les dossiers du bucket (un dossier = un document) avec leur dernier statut.</p>
+        <button class="btn btn-sm" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Balayer le bucket</button>
+      </div>
     </section>
   </div>
 </div>

@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from humatheque.ingestion import DocumentDetecte
 from humatheque.notice.validation import Marqueur
 from humatheque.notice.versions import VersionNotice
 from humatheque.spec.verificateur import Constat
@@ -24,6 +25,8 @@ class EntreeLot(BaseModel):
     fournisseur: str | None = None
     documents: list[list[str]] = Field(description="un document = liste ordonnée d'images (URL ou chemins)")
     identifiants: list[str] | None = Field(None, description="identifiants des documents (chemin MinIO…)")
+    types: list[TypeDocument] | None = Field(
+        None, description="type par document (dossiers TH / MM du bucket) ; sinon type_document")
     source: str = "url"  # televersement | url | liste | minio
     declencheur: str = "manuel"
 
@@ -154,3 +157,22 @@ class VueNotice(BaseModel):
 
 def resume_version(v: VersionNotice) -> ResumeVersion:
     return ResumeVersion(numero=v.numero, le=v.le, auteur=v.auteur, source=v.source, statut=v.statut, diff=v.diff)
+
+
+class DossierBucket(BaseModel):
+    """Un dossier du bucket et son dernier traitement."""
+
+    document: DocumentDetecte
+    nouveau: bool
+    dossier_id: str | None = None
+    lot_id: str | None = None
+    etat: str | None = None
+    routage: str | None = None
+
+
+class VueBucket(BaseModel):
+    configure: bool
+    bucket: str | None = None
+    prefixe: str | None = None
+    erreur: str | None = None
+    dossiers: list[DossierBucket] = Field(default_factory=list)

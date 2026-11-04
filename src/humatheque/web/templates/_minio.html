@@ -1,0 +1,41 @@
+{% from "_composants.html" import badge, vide %}
+{# Dossiers du bucket S3 et dernier statut (ING-F-005) ; balayage journalisé. #}
+<div id="bucket">
+  {% if not vue.configure %}
+    {{ vide("Stockage S3 non configuré : renseignez MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY et MINIO_SECRET_KEY dans .env.") }}
+  {% elif vue.erreur %}
+    <p class="text-sm rounded-lg border border-sortie text-sortie px-3 py-2">{{ vue.erreur }}</p>
+    <button class="btn-discret btn-sm mt-2" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Réessayer</button>
+  {% elif not vue.dossiers %}
+    {{ vide("Aucun dossier sous " ~ vue.bucket ~ "/" ~ vue.prefixe ~ ".") }}
+  {% else %}
+  <form hx-post="/minio/lancer" hx-target="#bucket" hx-swap="outerHTML">
+    <p class="text-xs text-sourdine mb-2"><span class="font-mono">{{ vue.bucket }}/{{ vue.prefixe }}</span> · {{ vue.dossiers | length }} dossier(s), {{ vue.dossiers | selectattr("nouveau") | list | length }} nouveau(x) · type déterminé par le dossier TH / MM</p>
+    <div class="max-h-80 overflow-y-auto border border-filet rounded-lg">
+      <table class="tableau">
+        <tbody>
+        {% for l in vue.dossiers %}{% set d = l.document %}
+          <tr class="{% if d.invalide and d.images %}text-sourdine{% endif %}">
+            <td class="w-6"><input type="checkbox" name="dossiers" value="{{ d.id }}" aria-label="{{ d.id }}"
+                 {% if d.invalide and d.images %}disabled{% elif l.nouveau %}checked{% endif %}></td>
+            <td class="font-mono text-xs">{{ d.id }}<br><span class="text-sourdine">{{ d.images | length }} image(s){% if d.invalide %} · {{ d.invalide }}{% endif %}</span></td>
+            <td class="text-xs text-right whitespace-nowrap">
+              {% if l.nouveau %}<span class="pastille text-incident">nouveau</span>
+              {% elif l.etat != "termine" %}<span class="text-decision">en cours</span>
+              {% else %}<a href="/dossiers/{{ l.dossier_id }}">{{ badge(l.routage or "auto") }}</a>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 mt-3">
+      <select class="champ w-auto" name="fournisseur" aria-label="Fournisseur VLM">
+        {% for f in fournisseurs %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+      </select>
+      <button class="btn-principal btn-sm">Traiter la sélection</button>
+      <button type="button" class="btn-discret btn-sm" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Rebalayer</button>
+    </div>
+  </form>
+  {% endif %}
+</div>

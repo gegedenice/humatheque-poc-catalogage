@@ -93,13 +93,15 @@ def consolider(extraits: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
 
 
 def extraire(fournisseur: FournisseurVLM, images: list[str | bytes], type_document: str,
-             strategie: Literal["requete_unique", "par_image"] | None = None) -> ResultatExtraction:
+             strategie: Literal["requete_unique", "par_image"] | None = None,
+             lecteur_s3=None) -> ResultatExtraction:
     r = reglages()
     strategie = strategie or r.vlm_strategie
     prompt = charger_prompt(type_document)
     if not images:
         raise DocumentSansImage("dossier sans image")
-    donnees = [compresser(lire(i, r.http_timeout), r.vlm_image_max_size, r.vlm_image_jpeg_quality) for i in images]
+    donnees = [compresser(lire(i, r.http_timeout, lecteur_s3=lecteur_s3), r.vlm_image_max_size,
+                          r.vlm_image_jpeg_quality) for i in images]
     lots = [donnees] if strategie == "requete_unique" else [[d] for d in donnees]
 
     bruts: list[str] = []

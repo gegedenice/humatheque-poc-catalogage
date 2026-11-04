@@ -9,7 +9,9 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from humatheque.application import Application
-from humatheque.application.vues import EntreeLot, EtatSpec, Historique, ResumeVersion, VueDossier, VueLot, VueNotice
+from humatheque.application.vues import (
+    EntreeLot, EtatSpec, Historique, ResumeVersion, VueBucket, VueDossier, VueLot, VueNotice,
+)
 from humatheque.notice.validation import Marqueur
 from humatheque.store import Lot
 
@@ -141,3 +143,20 @@ def proposition(request: Request, dossier_id: str, numero: int, choix: Literal["
     if choix == "reporter":
         return a.reporter_proposition(dossier_id, numero, corps.auteur)
     return a.ignorer_proposition(dossier_id, numero, corps.auteur)
+
+
+
+# ---------------------------------------------------------------- stockage S3 (SPEC §3.1)
+class Selection(BaseModel):
+    identifiants: list[str]
+    fournisseur: str | None = None
+
+
+@routeur.post("/minio/balayage", response_model=VueBucket)
+def balayage(request: Request) -> VueBucket:
+    return _app(request).balayer("manuel")
+
+
+@routeur.post("/minio/lots", response_model=Lot, status_code=201)
+def lancer_selection(request: Request, selection: Selection) -> Lot:
+    return _app(request).lancer_selection(selection.identifiants, selection.fournisseur)

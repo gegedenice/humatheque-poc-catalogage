@@ -55,8 +55,16 @@ async def creer_lot(
     liste_urls: Annotated[str, Form()] = "",
     un_seul_document: Annotated[bool, Form()] = False,
     images: Annotated[list[UploadFile] | None, File()] = None,
+    dossiers: Annotated[list[UploadFile] | None, File()] = None,
 ):
     a = _app(request)
+    # Téléversement d'une arborescence (input webkitdirectory : nom = chemin relatif)
+    arborescence = [(f.filename or "", await f.read()) for f in (dossiers or []) if f.filename]
+    if arborescence:
+        if type_document not in ("these", "memoire"):
+            raise ActionImpossible(f"type de document inconnu : {type_document}")
+        lot = a.televerser_dossiers(arborescence, type_document, fournisseur or None)
+        return _rediriger(f"/lots/{lot.id}")
     fichiers = [(f.filename or "image", await f.read()) for f in (images or []) if f.filename]
     if fichiers:
         documents, source = a.enregistrer_televersement(fichiers, un_seul_document), "televersement"
@@ -199,3 +207,39 @@ def historique(request: Request):
 @routeur.get("/fichiers/{chemin:path}")
 def fichier(request: Request, chemin: str):
     return FileResponse(_app(request).chemin_fichier(chemin))
+
+
+# ---------------------------------------------------------------- stockage S3 (SPEC §3.1)
+@routeur.post("/minio/balayer")
+def balayer(request: Request):
+    """Liste les dossiers du bucket et leur dernier statut (balayage journalisé)."""
+    return _rendre(request, "_minio.html", vue=_app(request).balayer("manuel"),
+                   fournisseurs=_app(request).accueil().fournisseurs)
+
+
+@routeur.post("/minio/lancer")
+def lancer_selection(request: Request, dossiers: Annotated[list[str] | None, Form()] = None,
+                     fournisseur: Annotated[str, Form()] = ""):
+    lot = _app(request).lancer_selection(dossiers or [], fournisseur or None)
+    if request.headers.get("HX-Request"):
+        r = Response(status_code=204)
+        r.headers["HX-Redirect"] = f"/lots/{lot.id}"
+        return r
+    return _rediriger(f"/lots/{lot.id}")
+
+
+@routeur.get("/minio/objet")
+def objet_s3(request: Request, uri: str):
+    contenu, mime = _app(request).objet_s3(uri)
+    return Response(contenu, media_type=mime, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@routeur.post("/minio/evenements")
+def evenements_s3(request: Request):
+    """Notifications d'évènements S3 (ING-F-003) : architecture prévue, désactivée tant que
+    INGESTION_AUTO=false (arbitrage en attente, SPEC §11 étape 8)."""
+    a = _app(request)
+    if not a.reglages.ingestion_auto:
+        return Response("Ingestion automatique désactivée (INGESTION_AUTO=false).", status_code=403)
+    lot = a.traiter_nouveaux("evenement")
+    return Response(lot.id if lot else "aucun nouveau dossier", status_code=202)

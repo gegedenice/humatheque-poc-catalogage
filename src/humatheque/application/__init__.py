@@ -20,9 +20,10 @@ from pathlib import Path
 from typing import Any
 
 from humatheque.application.vues import (
-    Accueil, ChampVue, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs, LigneException,
-    LigneJournal, ResumeLot, VueDossier, VueLot, VueNotice, resume_version,
+    Accueil, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
+    LigneException, LigneJournal, ResumeLot, VueBucket, VueDossier, VueLot, VueNotice, resume_version,
 )
+from humatheque import ingestion
 from humatheque.config import Reglages, reglages as reglages_par_defaut
 from humatheque.notice import analyse as notice_analyse
 from humatheque.notice import validation as notice_validation
@@ -90,12 +91,14 @@ def documents_depuis_liste(texte: str) -> list[list[str]]:
 class Application:
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
-                 spec: Spec | None = None) -> None:
+                 spec: Spec | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
         self.reglages = reglages or reglages_par_defaut()
         self.store = store or Store(self.reglages.dossier_data / "humatheque.db")
         self.fabrique = fabrique or (lambda spec, fournisseur: services_depuis_reglages(spec, fournisseur))
         self.executeur = executeur or ThreadPoolExecutor(max_workers=self.reglages.max_workers)
         self._verrou = threading.Lock()
+        # depot=True : stockage S3 d'après MINIO_* (None s'il n'est pas configuré)
+        self.depot = ingestion.depot_depuis_reglages(self.reglages) if depot is True else (depot or None)
         self.spec = spec or charger_spec(self.reglages)
         self._rapport = verifier(self.spec, statuts_exclus=self.reglages.regles_statuts_exclus)
 
@@ -137,9 +140,12 @@ class Application:
         return [chemins] if un_seul_document else [[c] for c in chemins]
 
     def creer_lot(self, entree: EntreeLot) -> Lot:
-        docs = [d for d in entree.documents if d]
+        # Un dossier vide du bucket reste un document (invalide, ING-F-008) ; ailleurs, on l'écarte.
+        docs = entree.documents if entree.source in ("minio", "dossiers") else [d for d in entree.documents if d]
         if not docs:
             raise ActionImpossible("aucun document à traiter")
+        if entree.types and len(entree.types) != len(docs):
+            raise ActionImpossible("un type par document attendu")
         if entree.fournisseur and entree.fournisseur not in FOURNISSEURS:
             raise ActionImpossible(f"fournisseur inconnu : {entree.fournisseur}")
         ids = entree.identifiants or [self._identifiant_document(d) for d in docs]
@@ -150,9 +156,9 @@ class Application:
                               "source": entree.source})
         self.store.creer_lot(lot)
         dossiers = []
-        for rang, (images, doc_id) in enumerate(zip(docs, ids), start=1):
-            d = Dossier(id=_identifiant("D"), document=Document(id=doc_id, type_document=entree.type_document,
-                                                                images=images))
+        types = entree.types or [entree.type_document] * len(docs)
+        for rang, (images, doc_id, type_doc) in enumerate(zip(docs, ids, types), start=1):
+            d = Dossier(id=_identifiant("D"), document=Document(id=doc_id, type_document=type_doc, images=images))
             self.store.enregistrer_dossier(d, lot.id, rang, "en_attente")
             dossiers.append(d.id)
         self.store.noter_ingestion("traitement", entree.declencheur, ids, {"documents": len(ids)}, lot.id)
@@ -177,6 +183,8 @@ class Application:
         self.store.changer_etat(dossier_id, "en_cours")
         try:
             services = self.fabrique(self.spec, (lot.parametres if lot else {}).get("fournisseur"))
+            if services.depot is None:
+                services.depot = self.depot
             Workflow(services).executer(d, depuis)
         except Exception as e:  # garde-fou : un dossier ne reste jamais « en cours »
             d.routage, d.motif_arret = "incident", f"erreur inattendue : {e}"
@@ -323,6 +331,10 @@ class Application:
     def url_image(self, image: str) -> str:
         if image.startswith(("http://", "https://")):
             return image
+        if image.startswith("s3://"):
+            from urllib.parse import quote
+
+            return "/minio/objet?uri=" + quote(image, safe="")
         uploads = (self.reglages.dossier_data / "uploads").resolve()
         try:
             return "/fichiers/" + Path(image).resolve().relative_to(uploads).as_posix()
@@ -506,3 +518,105 @@ class Application:
         assert ligne is not None
         self.store.enregistrer_dossier(d, ligne.lot_id, ligne.rang, ligne.etat)
         return self.vue_notice(dossier_id)
+
+    # ============================================================ ingestion S3 et dossiers (SPEC §3.1)
+    def _depot(self) -> "ingestion.Depot":
+        if self.depot is None:
+            raise ActionImpossible("Stockage S3 non configuré : renseignez MINIO_ENDPOINT, MINIO_BUCKET, "
+                                   "MINIO_ACCESS_KEY et MINIO_SECRET_KEY dans .env.")
+        return self.depot
+
+    def _documents_du_depot(self) -> list[ingestion.DocumentDetecte]:
+        try:
+            return ingestion.documents_du_depot(self._depot())
+        except ingestion.DepotIndisponible as e:
+            raise ActionImpossible(f"Stockage S3 injoignable : {e}") from e
+
+    def balayer(self, declencheur: str = "manuel") -> VueBucket:
+        """Liste les dossiers du bucket avec leur dernier statut ; le balayage est journalisé (ING-T-003)."""
+        if self.depot is None:
+            return VueBucket(configure=False)
+        try:
+            documents = self._documents_du_depot()
+        except ActionImpossible as e:
+            self.store.noter_ingestion("balayage", declencheur, [], {"erreur": str(e)})
+            return VueBucket(configure=True, bucket=self.depot.bucket, prefixe=self.depot.prefixe, erreur=str(e))
+        derniers = self.store.derniers_par_document()
+        lignes = []
+        for doc in documents:
+            dernier = derniers.get(doc.id)
+            lignes.append(DossierBucket(document=doc, nouveau=dernier is None,
+                                        dossier_id=dernier.id if dernier else None,
+                                        lot_id=dernier.lot_id if dernier else None,
+                                        etat=dernier.etat if dernier else None,
+                                        routage=dernier.routage if dernier else None))
+        nouveaux = [l.document.id for l in lignes if l.nouveau]
+        self.store.noter_ingestion("balayage", declencheur, [l.document.id for l in lignes],
+                                   {"documents": len(lignes), "nouveaux": len(nouveaux)})
+        return VueBucket(configure=True, bucket=self.depot.bucket, prefixe=self.depot.prefixe, dossiers=lignes)
+
+    def lancer_selection(self, identifiants: list[str], fournisseur: str | None = None,
+                         declencheur: str = "manuel") -> Lot:
+        """Traite une sélection de dossiers du bucket (ING-F-005) ; le type vient du dossier TH / MM."""
+        if not identifiants:
+            raise ActionImpossible("aucun dossier sélectionné")
+        par_id = {d.id: d for d in self._documents_du_depot()}
+        inconnus = [i for i in identifiants if i not in par_id]
+        if inconnus:
+            raise ActionImpossible(f"dossier(s) absent(s) du bucket : {', '.join(inconnus)}")
+        return self._lot_de_documents([par_id[i] for i in identifiants], fournisseur, "minio", declencheur)
+
+    def traiter_nouveaux(self, declencheur: str) -> Lot | None:
+        """Nouveaux dossiers (absents de l'historique) → un lot. Prévu pour le balayage
+        périodique, la planification et les évènements S3 (ING-F-003, ING-F-004), qui ne
+        sont pas activés tant que l'arbitrage n'est pas rendu (INGESTION_AUTO=false)."""
+        vue = self.balayer(declencheur)
+        nouveaux = [l.document for l in vue.dossiers if l.nouveau]
+        if not nouveaux:
+            return None
+        return self._lot_de_documents(nouveaux, None, "minio", declencheur)
+
+    def televerser_dossiers(self, fichiers: list[tuple[str, bytes]], type_par_defaut: str,
+                            fournisseur: str | None = None) -> Lot:
+        """Téléversement d'une arborescence de dossiers : chaque dossier est un document,
+        le type vient d'un dossier parent TH / MM, à défaut du formulaire."""
+        if not fichiers:
+            raise ActionImpossible("aucun fichier téléversé")
+        racine = self.reglages.dossier_data / "uploads" / secrets.token_hex(6)
+        chemins = []
+        for nom, contenu in fichiers:
+            parties = [re.sub(r"[^\w.() -]", "_", p)[:120] for p in (nom or "").replace("\\", "/").split("/")
+                       if p not in ("", ".", "..")]
+            if len(parties) < 2:
+                raise ActionImpossible("Téléversement de dossiers : chaque fichier doit être dans un dossier.")
+            relatif = "/".join(parties)
+            (racine / relatif).parent.mkdir(parents=True, exist_ok=True)
+            (racine / relatif).write_bytes(contenu)
+            chemins.append(relatif)
+        documents = ingestion.constituer_documents(chemins, type_par_defaut, vers_image=lambda c: str(racine / c))
+        if not documents:
+            raise ActionImpossible("Aucun dossier contenant des images.")
+        return self._lot_de_documents(documents, fournisseur, "dossiers", "manuel")
+
+    def _lot_de_documents(self, documents: list[ingestion.DocumentDetecte], fournisseur: str | None, source: str,
+                          declencheur: str) -> Lot:
+        sans_type = [d.id for d in documents if d.type_document is None]
+        if sans_type:
+            raise ActionImpossible(f"type de document inconnu pour : {', '.join(sans_type)} "
+                                   "(dossier parent TH ou MM attendu)")
+        types = [d.type_document for d in documents]
+        return self.creer_lot(EntreeLot(type_document=types[0], types=types, fournisseur=fournisseur,
+                                        documents=[d.images for d in documents],
+                                        identifiants=[d.id for d in documents], source=source,
+                                        declencheur=declencheur))
+
+    def objet_s3(self, u: str) -> tuple[bytes, str]:
+        """Image du bucket relayée à l'interface (contenu, type MIME)."""
+        import mimetypes
+
+        depot = self._depot()
+        try:
+            contenu = depot.lire(ingestion.cle_depuis_uri(u, depot.bucket))
+        except ingestion.DepotIndisponible as e:
+            raise Introuvable(str(e)) from e
+        return contenu, mimetypes.guess_type(u)[0] or "application/octet-stream"
