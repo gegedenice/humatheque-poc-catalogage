@@ -9,8 +9,12 @@
    passent après le prénom, les articles (`La`, `Du`…) restent en tête du nom
    (alerte `particule_a_verifier`) ;
 4. casse : majuscule initiale à chaque élément, y compris après un trait
-   d'union ; pas de réaccentuation. Un mot imprimé en capitales qui existe
-   avec accent dans le dictionnaire donne l'alerte `accent_possible:<MOT>`.
+   d'union. Un mot imprimé en capitales sans accent reçoit l'accent si le
+   dictionnaire n'en connaît qu'une forme de nom propre, accentuée (alerte
+   `accent_restitue:<MOT>`) ; sinon, s'il existe avec accent, alerte
+   `accent_possible:<MOT>` (décision du 05/11) ;
+5. forme retraitée « Prénom Nom » (200$f, 200$g) ; la forme imprimée,
+   civilités retirées, est conservée à part.
 
 Les initiales (`J.`, `J.-D.`) ne comptent ni comme capitales ni comme casse mixte.
 """
@@ -62,7 +66,7 @@ def personne(brut: str, d: Dictionnaire | None = None) -> Personne:
         trace.append(f"civilité retirée : {mots.pop(0)}")
     forme = " ".join(mots)
     if not mots:
-        return Personne(forme="", nom="", prenom="", alertes=["personne_vide"], trace=trace)
+        return Personne(forme="", forme_imprimee="", nom="", prenom="", alertes=["personne_vide"], trace=trace)
 
     # « D'ORMESSON » → « D' » + « ORMESSON » (particule élidée)
     jetons: list[str] = []
@@ -107,21 +111,51 @@ def personne(brut: str, d: Dictionnaire | None = None) -> Personne:
         alertes.append("particule_a_verifier")
         trace.append(f"particule(s) : {' '.join(jetons[debut:fin + 1])} → nom « {' '.join(groupe)} », rejet « {' '.join(rejet)} »")
 
-    def mot_prenom(j: str) -> str:
-        return _norm(j) if _norm(j) in particules else _majuscules_initiales(j)
-
-    nom = " ".join(_majuscules_initiales(j) for j in groupe).replace("' ", "'")
-    prenom = " ".join(mot_prenom(j) for j in avant + apres + rejet)
-
     d = d or dictionnaire()
-    for j in groupe + avant + apres:
-        if _capitales(j) and _norm(j) not in particules and _accentuable(j, d):
-            alertes.append(f"accent_possible:{j}")
-    return Personne(forme=forme, nom=nom, prenom=prenom, alertes=alertes, trace=trace)
+
+    def casse(j: str) -> str:
+        """Majuscule initiale à chaque élément ; accent restitué pour un mot imprimé en
+        capitales sans accent si le dictionnaire n'en connaît qu'une forme, accentuée
+        (décision du 05/11), sinon alerte accent_possible."""
+        forme_j = _majuscules_initiales(j)
+        if not _capitales(j) or _norm(j) in particules or j != unidecode(j):
+            return forme_j
+        parties = []
+        for partie in forme_j.split("-"):
+            unique = _accent_unique(partie, d)
+            if unique:
+                alertes.append(f"accent_restitue:{partie.upper()}")
+                trace.append(f"accent restitué : {partie.upper()} → {unique}")
+                parties.append(unique)
+            else:
+                if _accentuable(partie, d):
+                    alertes.append(f"accent_possible:{partie.upper()}")
+                parties.append(partie)
+        return "-".join(parties)
+
+    def mot_prenom(j: str) -> str:
+        return _norm(j) if _norm(j) in particules else casse(j)
+
+    nom = " ".join(casse(j) for j in groupe).replace("' ", "'")
+    prenom = " ".join(mot_prenom(j) for j in avant + apres + rejet)
+    # Forme retraitée, dans l'ordre de lecture (décision du 05/11 : 200$f, 200$g)
+    forme_retraitee = f"{prenom} {nom}".strip().replace("' ", "'") if prenom else nom
+    return Personne(forme=forme_retraitee, forme_imprimee=forme, nom=nom, prenom=prenom, alertes=alertes,
+                    trace=trace)
+
+
+def _accent_unique(mot: str, d: Dictionnaire) -> str | None:
+    """Unique forme (accentuée) d'un nom propre sans accent, sinon None."""
+    if not mot or mot != unidecode(mot):
+        return None
+    formes = list(dict.fromkeys(f for f in d.noms_propres.get(cle(mot), []) if f[:1].isupper()))
+    if len(formes) == 1 and formes[0] != unidecode(formes[0]) and cle(mot) not in d.noms_propres_ambigus:
+        return formes[0]
+    return None
 
 
 def _accentuable(mot: str, d: Dictionnaire) -> bool:
-    """Le mot (en capitales, sans accent) existe-t-il avec accent dans le dictionnaire ?"""
+    """Le mot (sans accent) existe-t-il avec accent dans le dictionnaire ?"""
     if mot != unidecode(mot):
         return False
     k = cle(mot)

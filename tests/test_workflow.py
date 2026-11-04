@@ -82,7 +82,7 @@ def test_s08_sans_civilite_dans_200g(workflow):
     simuler()
     d = workflow.executer(dossier())
     (z200,) = d.notice.zones_de("200")
-    assert z200.texte().endswith("$gsous la direction de Marie-France de LA ROCHE")
+    assert z200.texte().endswith("$fJean-Daniel Dubois$gsous la direction de Marie-France de La Roche")
 
 
 @respx.mock
@@ -320,3 +320,21 @@ def test_erreur_400_non_relancee(workflow):  # essai réel du 04/11 : titre abse
     routes["alma"].return_value = httpx.Response(400, json={"detail": "Unable to build Alma query"})
     d = workflow.executer(dossier())
     assert (d.routage, d.etapes["alma"].statut, d.etapes["alma"].tentatives) == ("incident", "service_indisponible", 1)
+
+
+@respx.mock
+def test_titre_non_extrait_document_invalide(workflow):  # décision du 05/11
+    routes = simuler(extraction=EXTRACTION | {"title": None})
+    d = workflow.executer(dossier())
+    assert (d.routage, d.etape_arret) == ("décision", "extraction")
+    assert "document_invalide:titre non extrait" in d.alertes and not routes["alma"].called
+
+
+@respx.mock
+def test_relance_idref_limitee_aux_personnes_en_echec(workflow):  # décision du 05/11
+    routes = simuler()
+    ok = httpx.Response(200, json=sim.idref_personne("accepted"))
+    routes["idref"].side_effect = [ok, ok, httpx.ReadTimeout("lent"), ok]  # auteur, directeur, rapporteur
+    d = workflow.executer(dossier())
+    assert d.routage == "auto" and d.etapes["idref_personnes"].tentatives == 2
+    assert routes["idref"].call_count == 4  # 3 personnes + 1 relance du seul rapporteur

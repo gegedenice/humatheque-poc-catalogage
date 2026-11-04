@@ -156,7 +156,7 @@ def test_contexte_valeurs():
     assert c["discipline"] == "Science politique"
     assert c["granting_institution"] == {"forme": "École pratique des hautes études", "ppn": "026375478",
                                          "statut_idref": "accepted"}
-    assert c["author"] == [{"forme": "Jean-Daniel DUBOIS", "nom": "Dubois", "prenom": "Jean-Daniel",
+    assert c["author"] == [{"forme": "Jean-Daniel Dubois", "nom": "Dubois", "prenom": "Jean-Daniel",
                             "ppn": "TEST00001", "statut_idref": "accepted"}]
     assert c["advisor"][0]["nom"] == "La Roche" and c["advisor"][0]["ppn"] is None
     assert [r["ppn"] for r in c["reviewers"]] == [None, "P2"]  # low_confidence : pas de PPN

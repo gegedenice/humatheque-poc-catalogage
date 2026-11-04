@@ -103,8 +103,9 @@ mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
   Ordre des images : ordre lexicographique des noms de fichiers. L'identifiant
   du document est son chemin (`TH/TH-01`).
 - **Document incomplet ou invalide** (ING-F-008) : dossier sans image, image
-  illisible, ou extraction ne renvoyant aucune métadonnée du schéma (page ne
-  correspondant à rien). Le document est signalé avec l'alerte
+  illisible, extraction ne renvoyant aucune métadonnée du schéma (page ne
+  correspondant à rien) ou sans titre (décision du 05/11 : les vérifications
+  Alma et Sudoc exigent un titre). Le document est signalé avec l'alerte
   `document_invalide` et le motif, routage `décision`.
 - **Sélection manuelle** (ING-F-005) : la page `/` liste les dossiers du bucket
   (déjà traités ou non, avec leur dernier statut) et permet d'en lancer une
@@ -194,9 +195,15 @@ qu'imprimés** : casse d'origine, civilités comprises.
    forme d'accès française (`$aLa Roche$bMarie-France de`). Ajouter l'alerte
    `particule_a_verifier` tant que les catalogueurs n'ont pas validé ce traitement.
 4. Casse finale : chaque élément de nom ou de prénom commence par une majuscule,
-   y compris après un trait d'union (`Jean-Daniel`). Pas de réaccentuation
-   automatique des noms de personnes : un nom sans accent sur la page reste
-   sans accent, et une alerte est ajoutée seulement s'il était en capitales.
+   y compris après un trait d'union (`Jean-Daniel`). Accent (décision du
+   05/11) : un mot imprimé en capitales sans accent reçoit l'accent si le
+   dictionnaire ne connaît qu'une forme de ce nom propre, accentuée
+   (`HELENE` → `Hélène`, alerte `accent_restitue`) ; sinon il reste sans
+   accent, avec l'alerte `accent_possible` s'il existe une forme accentuée.
+5. Forme retraitée (décision du 05/11) : `forme` = « Prénom Nom » après ces
+   traitements (`Monsieur le Professeur André GODIN` → `André Godin`) ; c'est
+   elle qu'utilisent 200$f et 200$g. La forme imprimée (civilités retirées)
+   est conservée pour la trace.
 
 | Entrée | `nom` | `prenom` | Alertes |
 |---|---|---|---|

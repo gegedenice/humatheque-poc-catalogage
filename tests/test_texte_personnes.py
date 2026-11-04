@@ -36,9 +36,13 @@ def test_decoupages(brut, nom, prenom):
     assert (p.nom, p.prenom) == (nom, prenom)
 
 
-def test_forme_sans_civilite_casse_d_origine():
-    assert personne("M. Jean-Daniel DUBOIS").forme == "Jean-Daniel DUBOIS"
-    assert personne("Monsieur le Professeur André GODIN").forme == "André GODIN"
+def test_forme_retraitee_et_forme_imprimee():  # décision du 05/11 : 200$f, 200$g
+    p = personne("M. Jean-Daniel DUBOIS")
+    assert (p.forme, p.forme_imprimee) == ("Jean-Daniel Dubois", "Jean-Daniel DUBOIS")
+    assert personne("Monsieur le Professeur André GODIN").forme == "André Godin"
+    assert personne("Pr Marie-France de LA ROCHE").forme == "Marie-France de La Roche"
+    assert personne("Jean D'ORMESSON").forme == "Jean d'Ormesson"
+    assert personne("DUBOIS").forme == "Dubois"
 
 
 def test_article_non_civilite_conserve():
@@ -46,11 +50,13 @@ def test_article_non_civilite_conserve():
     assert personne("LA FONTAINE Jean").nom == "La Fontaine"
 
 
-def test_pas_de_reaccentuation_mais_alerte_si_capitales():
+def test_accent_restitue_si_forme_unique():  # décision du 05/11
     p = personne("HELENE MARTIN")
-    assert p.prenom == "Helene"
-    assert "accent_possible:HELENE" in p.alertes
-    assert not any(a.startswith("accent_possible") for a in personne("Helene MARTIN").alertes)
+    assert (p.prenom, p.forme) == ("Hélène", "Hélène Martin")
+    assert "accent_restitue:HELENE" in p.alertes
+    # imprimé en casse mixte : rien n'est modifié
+    q = personne("Helene MARTIN")
+    assert q.prenom == "Helene" and not any(a.startswith("accent_") for a in q.alertes)
 
 
 def test_personne_vide():

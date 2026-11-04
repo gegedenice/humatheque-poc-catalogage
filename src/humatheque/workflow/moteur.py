@@ -100,6 +100,7 @@ class Workflow:
     delai: float | None = None
     attendre: Callable[[float], None] = time.sleep
     _etapes: dict[str, Callable[[Dossier], Suite]] = field(init=False)
+    _alignements_acquis: dict[str, dict] = field(init=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         r = reglages()
@@ -213,6 +214,12 @@ class Workflow:
         if document_vide(d.metadonnees):
             d.alerter("document_invalide:aucune métadonnée extraite")
             return self._arret(decision, f"{_cfg()['motifs']['document_invalide']} : aucune métadonnée du schéma")
+        if not d.metadonnees.get("title"):
+            # Décision du 05/11 : sans titre, les vérifications ne peuvent pas être faites
+            # (alma-checker répond 400) ; document invalide, à vérifier.
+            motif = _cfg()["motifs"]["titre_absent"]
+            d.alerter(f"document_invalide:{motif}")
+            return self._arret(decision, f"{_cfg()['motifs']['document_invalide']} : {motif}")
         self._contexte(d)  # contexte partiel
         return Suite()
 
@@ -311,20 +318,27 @@ class Workflow:
 
     def _etape_idref_personnes(self, d: Dossier) -> Suite:
         m = d.metadonnees or {}
+        # Alignements déjà obtenus lors d'une tentative précédente : non rappelés
+        # (relance limitée aux personnes en échec, décision du 05/11).
+        acquis = self._alignements_acquis.setdefault(d.id, {})
         resultats: dict[str, list] = {}
         for champ in _cfg_contexte()["personnes"]:
             valeurs = m.get(champ)
             bruts = valeurs if isinstance(valeurs, list) else ([valeurs] if valeurs else [])
             resultats[champ] = []
             for i, brut in enumerate(bruts):
-                a = self._appel(d, "idref_personnes", aligner_personne, self.services.idref, m, brut,
-                                self.services.parametres("idref_personne"))
+                a = acquis.get((champ, i, brut))
+                if a is None:
+                    a = self._appel(d, "idref_personnes", aligner_personne, self.services.idref, m, brut,
+                                    self.services.parametres("idref_personne"))
+                    acquis[(champ, i, brut)] = a
                 resultats[champ].append(a)
                 bloquant = self._statut_idref(d, "idref_personnes", SERVICE_IDREF_PERSONNE, a,
                                               f"{champ}[{i + 1}] {brut}")
                 if bloquant:
                     return bloquant
         d.idref_personnes = resultats
+        self._alignements_acquis.pop(d.id, None)
         return Suite()
 
     def _statut_idref(self, d: Dossier, etape: str, service: str, a, objet: str) -> Suite | None:
