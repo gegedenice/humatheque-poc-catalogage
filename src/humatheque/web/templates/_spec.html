@@ -1,10 +1,20 @@
 {% from "_composants.html" import vide %}
-<section id="etat-spec" class="carte">
-  <div class="flex items-start justify-between gap-3">
-    <h2>Spécification chargée</h2>
+<section id="etat-spec" class="carte flex flex-col gap-4">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="mb-0">Spécification chargée</h2>
     <button class="btn-discret btn-sm" hx-post="/spec/recharger" hx-target="#etat-spec" hx-swap="outerHTML">Recharger la spec</button>
   </div>
-  <dl class="text-sm grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+  <div class="flex items-center gap-3">
+    {% if spec.nb_erreurs %}
+    <span aria-hidden="true" class="w-11 h-11 rounded-[14px] bg-sortie-clair text-sortie-fonce flex items-center justify-center font-bold text-lg">!</span>
+    <div class="flex flex-col"><span class="font-semibold text-sortie">{{ spec.nb_erreurs }} erreur(s) bloquante(s)</span>
+    {% else %}
+    <span aria-hidden="true" class="w-11 h-11 rounded-[14px] bg-auto-clair flex items-center justify-center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f5132" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 5 5 9-10"/></svg></span>
+    <div class="flex flex-col"><span class="font-semibold">Vérificateur : aucune erreur bloquante</span>
+    {% endif %}
+      <span class="text-[13px] text-sourdine">{{ spec.nb_avertissements }} avertissement(s) du vérificateur</span></div>
+  </div>
+  <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
     <dt class="text-sourdine">Source</dt>
     <dd>{{ "Grist" if spec.source == "grist" else "CSV" }} <span class="font-mono text-xs text-sourdine break-all">{{ spec.emplacement }}</span></dd>
     {% if spec.grist_joignable is not none %}
@@ -12,21 +22,16 @@
     <dd>{% if spec.grist_joignable %}<span class="text-auto">joignable</span>{% else %}<span class="text-sortie">injoignable</span>{% endif %}</dd>
     {% endif %}
     <dt class="text-sourdine">Version</dt><dd class="font-mono text-xs">{{ spec.version }}</dd>
-    <dt class="text-sourdine">Vérificateur</dt>
-    <dd>
-      {% if spec.nb_erreurs %}<span class="text-sortie font-semibold">{{ spec.nb_erreurs }} erreur(s) bloquante(s)</span>{% else %}<span class="text-auto">aucune erreur bloquante</span>{% endif %}
-      · {{ spec.nb_avertissements }} avertissement(s)
-    </dd>
   </dl>
   {% for a in spec.avertissements %}
-  <p class="mt-3 text-sm rounded-lg border border-decision text-decision px-3 py-2">{{ a }}</p>
+  <p class="avis bg-decision-clair text-decision-fonce">{{ a }}</p>
   {% endfor %}
   {% if spec.constats %}
-  <details class="mt-3">
+  <details>
     <summary class="cursor-pointer text-sm text-sourdine">Constats du vérificateur ({{ spec.constats | length }})</summary>
-    <ul class="mt-2 space-y-1 text-xs">
+    <ul class="mt-2 space-y-1.5 text-xs">
       {% for c in spec.constats %}
-      <li><span class="pastille {{ 'text-sortie' if c.gravite == 'erreur' else 'text-decision' }}">{{ c.gravite }}</span>
+      <li><span class="puce {{ 'bg-sortie-clair text-sortie-fonce' if c.gravite == 'erreur' else 'bg-decision-clair text-decision-fonce' }}">{{ c.gravite }}</span>
         <span class="font-mono">{{ c.table }} {{ c.ligne }}</span> — {{ c.message }}</li>
       {% endfor %}
     </ul>

@@ -1,3 +1,8 @@
+{%- set chemin = request.url.path -%}
+{%- macro lien_rail(href, libelle, actif, icone) -%}
+  <a href="{{ href }}" class="rail-lien" {% if actif %}aria-current="page"{% endif %}>
+    <span class="rail-icone"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ icone | safe }}</svg></span>{{ libelle }}</a>
+{%- endmacro -%}
 <!doctype html>
 <html lang="fr">
 <head>
@@ -16,23 +21,39 @@
   <script src="/static/js/editeur.js" defer></script>
   {% block tete %}{% endblock %}
 </head>
-<body hx-boost="true">
-  <header class="bg-carte border-b border-filet">
-    <nav class="max-w-[1280px] mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-1">
-      <a href="/" class="font-semibold no-underline">humatheque · catalogage assisté</a>
-      <a href="/" class="text-sm text-sourdine hover:text-encre no-underline">Nouveau traitement</a>
-      <a href="/historique" class="text-sm text-sourdine hover:text-encre no-underline">Historique</a>
-      <a href="/admin" class="text-sm text-sourdine hover:text-encre no-underline">Administration</a>
-    </nav>
-  </header>
-  <div id="bandeau-erreur" role="alert" hidden
-       class="max-w-[1280px] mx-auto mt-3 mx-4 rounded-lg border border-sortie bg-white px-4 py-2.5 text-sm text-sortie flex items-start gap-3">
-    <span class="font-semibold">Erreur</span><span id="bandeau-erreur-texte" class="flex-1"></span>
-    <button type="button" class="text-sourdine hover:text-encre" onclick="this.parentElement.hidden = true" aria-label="Fermer">✕</button>
+<body hx-boost="true" class="min-h-screen md:flex">
+  {% block rail %}
+  <nav aria-label="Navigation principale" class="bg-rail md:w-24 flex-none">
+   <div class="flex md:flex-col items-center gap-3 md:gap-4 px-3 py-2 md:px-0 md:py-5 md:sticky md:top-0">
+    <a href="/" aria-label="humatheque · accueil" class="w-12 h-12 rounded-[14px] bg-primaire text-white flex items-center justify-center text-xl font-bold no-underline hover:text-white md:mb-3">h</a>
+    {{ lien_rail("/", "Traiter", chemin == "/", '<path d="M12 5v14M5 12h14"/>') }}
+    {{ lien_rail("/lots", "Lots", chemin.startswith(("/lots", "/dossiers")), '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>') }}
+    {{ lien_rail("/historique", "Historique", chemin.startswith("/historique"), '<path d="M4 7a8 8 0 1 1-1 5"/><path d="M4 3v4h4M12 8v4l3 2"/>') }}
+    {{ lien_rail("/admin", "Admin", chemin.startswith("/admin"), '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>') }}
+   </div>
+  </nav>
+  {% endblock %}
+  <div class="flex-1 min-w-0 flex flex-col">
+    <header class="flex flex-wrap items-center gap-4 px-4 md:px-8 pt-5 pb-3">
+      <div class="flex-1 min-w-[16rem] flex flex-col gap-1">
+        <span class="text-[13px] text-sourdine">{% block fil %}{% endblock %}</span>
+        {% block entete %}{% endblock %}
+      </div>
+      {% block entete_droite %}{% endblock %}
+      {% if auteur %}
+      <span class="flex items-center gap-2.5 text-sm text-sourdine" title="Catalogueur (dernier nom saisi)">
+        <span class="w-10 h-10 rounded-full bg-[#ffddb8] text-[#5b3b00] flex items-center justify-center font-semibold uppercase">{{ auteur[:2] }}</span>{{ auteur }}</span>
+      {% endif %}
+    </header>
+    <div id="bandeau-erreur" role="alert" hidden
+         class="mx-4 md:mx-8 mb-2 avis bg-sortie-clair text-sortie-fonce flex items-start gap-3">
+      <span class="font-semibold">Erreur</span><span id="bandeau-erreur-texte" class="flex-1"></span>
+      <button type="button" class="btn-icone w-7 h-7 text-sortie-fonce" onclick="this.parentElement.hidden = true" aria-label="Fermer">✕</button>
+    </div>
+    <main class="w-full max-w-[1400px] px-4 md:px-8 pt-2 pb-16">
+      {% block contenu %}{% endblock %}
+    </main>
   </div>
-  <main class="max-w-[1280px] mx-auto px-4 py-5">
-    {% block contenu %}{% endblock %}
-  </main>
   {% block scripts %}{% endblock %}
 </body>
 </html>

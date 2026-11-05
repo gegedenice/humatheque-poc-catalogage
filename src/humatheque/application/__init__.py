@@ -21,7 +21,7 @@ from typing import Any
 
 from humatheque.application.vues import (
     Accueil, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
-    LigneException, LigneJournal, Reglable, ResumeLot, VueBucket, VueDossier, VueLot, VueNotice, resume_version,
+    LigneException, LigneJournal, Reglable, ResumeLot, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
 )
 from humatheque.config import charger_yaml
 from humatheque import ingestion
@@ -292,6 +292,22 @@ class Application(Administration):
     def _resume(self, lot: Lot) -> ResumeLot:
         dossiers = self.store.dossiers_du_lot(lot.id)
         return ResumeLot(lot=lot, indicateurs=self._indicateurs(dossiers), en_cours=lot.termine_le is None)
+
+    def vue_lots(self, etat: str = "", declencheur: str = "", type_document: str = "",
+                 limite: int = 200) -> VueLots:
+        """Lots les plus récents, filtrés par état (en_cours / termines), déclencheur et type."""
+        if etat not in ("", "en_cours", "termines"):
+            raise ActionImpossible(f"état de lot inconnu : {etat}")
+        tous = self.store.lots(limite)
+        retenus = [l for l in tous
+                   if (not etat or (l.termine_le is None) == (etat == "en_cours"))
+                   and (not declencheur or l.declencheur == declencheur)
+                   and (not type_document or l.parametres.get("type_document") == type_document)]
+        resumes = [self._resume(l) for l in retenus]
+        return VueLots(lots=resumes, a_reprendre=sorted((r for r in resumes if not r.en_cours and r.indicateurs.en_attente),
+                                           key=lambda r: -r.indicateurs.en_attente),
+                       etat=etat, declencheur=declencheur, type_document=type_document,
+                       declencheurs=sorted({l.declencheur for l in tous}), total=len(tous))
 
     def vue_lot(self, lot_id: str, filtre: str = "tous") -> VueLot:
         lot = self.store.lot(lot_id)

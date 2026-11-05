@@ -1,25 +1,29 @@
 {% from "_composants.html" import kpi, en_cours %}
 {# Bandeau et indicateurs du lot ; avec oob=True, remplacés hors bande lors du rafraîchissement. #}
-<div id="bandeau-lot" class="flex flex-wrap items-center justify-between gap-3 my-3" {% if oob %}hx-swap-oob="true"{% endif %}>
-  <span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-sourdine min-w-0">
-    {% if vue.en_cours %}{{ en_cours("lot en cours") }}{% else %}<span class="w-2.5 h-2.5 rounded-full bg-auto"></span>{% endif %}
-    lot <span class="font-mono break-all">{{ vue.lot.id }}</span>
-    · créé le {{ vue.lot.cree_le | date }}
-    {% if vue.lot.termine_le %}· terminé à {{ vue.lot.termine_le | date("%H:%M") }}{% endif %}
-    · {{ vue.lot.nb_documents }} document(s)
-    · {{ "thèses" if vue.lot.parametres.type_document == "these" else "mémoires" }}
-    · fournisseur {{ vue.lot.parametres.fournisseur }}
-    {% for service, params in (vue.lot.parametres.services or {}).items() %}{% for p, v in params.items() %}
-    · <span class="font-mono">{{ service }}.{{ p }}={{ v }}</span>{% endfor %}{% endfor %}
-  </span>
-  <span class="flex gap-2">
-    <a class="btn-discret btn-sm" href="/lots/{{ vue.lot.id }}/rapport.csv" hx-boost="false">Rapport CSV</a>
-    <a class="btn-discret btn-sm" href="/lots/{{ vue.lot.id }}/notices.txt" hx-boost="false">Notices produites</a>
-  </span>
+{% set ind = vue.indicateurs %}
+<div id="bandeau-lot" class="flex flex-wrap items-center gap-3 mb-6" {% if oob %}hx-swap-oob="true"{% endif %}>
+  {% if vue.en_cours %}
+  <span class="inline-flex items-center gap-2 h-8 px-3.5 rounded-lg bg-primaire-clair text-primaire-fonce text-sm font-medium">{{ en_cours("lot en cours") }}</span>
+  {% else %}
+  <span class="inline-flex items-center gap-2 h-8 px-3.5 rounded-lg bg-auto-clair text-auto-fonce text-sm font-medium">
+    <span class="w-2 h-2 rounded-full bg-auto"></span>Terminé{% if vue.lot.termine_le %} à {{ vue.lot.termine_le | date("%H:%M") }}{% endif %}</span>
+  {% endif %}
+  <span class="puce-contour">créé le {{ vue.lot.cree_le | date }}</span>
+  <span class="puce-contour">{{ vue.lot.nb_documents }} document(s) · {{ "thèses" if vue.lot.parametres.type_document == "these" else "mémoires" }}</span>
+  <span class="puce-contour">VLM {{ vue.lot.parametres.fournisseur }}</span>
+  <span class="puce-contour">déclencheur : {{ vue.lot.declencheur }}</span>
+  {% for service, params in (vue.lot.parametres.services or {}).items() %}{% for p, v in params.items() %}
+  <span class="puce-contour font-mono text-xs">{{ service }}.{{ p }}={{ v }}</span>{% endfor %}{% endfor %}
+  <span class="flex-1"></span>
+  <a class="btn btn-sm" href="/lots/{{ vue.lot.id }}/rapport.csv" hx-boost="false">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>Rapport CSV</a>
+  <a class="btn-principal btn-sm" href="/lots/{{ vue.lot.id }}/notices.txt" hx-boost="false">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>Notices produites</a>
 </div>
-<div id="kpis-lot" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" {% if oob %}hx-swap-oob="true"{% endif %}>
-  {{ kpi(vue.indicateurs.documents, "documents dans le lot", "principal") }}
-  {{ kpi(vue.indicateurs.passes_seuls, "passés seuls · notice prête", "ok") }}
-  {{ kpi(vue.indicateurs.en_attente, "en attente de reprise", "attente") }}
-  {{ kpi(vue.indicateurs.repris, "repris par un catalogueur") }}
+{% set attente = [] %}{% for r, n in ind.par_routage.items() %}{% if r != "auto" %}{% set _ = attente.append(n ~ " " ~ libelle_routage(r)) %}{% endif %}{% endfor %}
+<div id="kpis-lot" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] mb-6" {% if oob %}hx-swap-oob="true"{% endif %}>
+  {{ kpi(ind.documents, "Documents", "dans le lot" ~ (" · " ~ ind.en_cours ~ " en cours" if ind.en_cours else ""), "principal") }}
+  {{ kpi(ind.passes_seuls, "Passés seuls", "notice prête", "ok") }}
+  {{ kpi(ind.en_attente, "En attente de reprise", attente | join(" · "), "attente") }}
+  {{ kpi(ind.repris, "Repris", "par un catalogueur", "repris") }}
 </div>

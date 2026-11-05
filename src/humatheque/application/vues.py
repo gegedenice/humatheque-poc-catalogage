@@ -146,6 +146,17 @@ class VueDossier(BaseModel):
     telechargements: dict[str, str] = Field(default_factory=dict, description="libellé → nom de fichier")
 
 
+class VueLots(BaseModel):
+    """Liste des lots (page « Lots ») : filtres appliqués, lots à reprendre en tête."""
+    lots: list[ResumeLot]
+    a_reprendre: list[ResumeLot] = Field(default_factory=list, description="lots terminés avec des documents en attente, les plus chargés d'abord")
+    etat: str = Field("", description="'' | en_cours | termines")
+    declencheur: str = ""
+    type_document: str = ""
+    declencheurs: list[str] = Field(default_factory=list, description="déclencheurs présents (choix du filtre)")
+    total: int = Field(0, description="nombre de lots avant filtrage")
+
+
 class Historique(BaseModel):
     ingestions: list[Ingestion]
     lots: list[ResumeLot]
