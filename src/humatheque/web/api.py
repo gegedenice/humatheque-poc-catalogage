@@ -81,6 +81,17 @@ class Resolution(BaseModel):
     code: str | None = None
 
 
+class ChoixPpn(BaseModel):
+    auteur: str
+    choix: dict[int, str | None] = Field(description="index de l'exception → PPN (null : sans lien)")
+
+
+@routeur.post("/dossiers/{dossier_id}/resolutions/ppns", response_model=VueDossier)
+def resoudre_ppns(request: Request, dossier_id: str, r: ChoixPpn) -> VueDossier:
+    """Plusieurs exceptions IdRef d'un coup (tout ou rien, une seule relance)."""
+    return _app(request).choisir_ppns(dossier_id, r.choix, r.auteur)
+
+
 @routeur.post("/dossiers/{dossier_id}/resolutions/{type_}", response_model=VueDossier)
 def resoudre(request: Request, dossier_id: str, type_: Literal["provenance", "faux-positif", "ppn", "dewey",
                                                               "hors-outil"], r: Resolution) -> VueDossier:

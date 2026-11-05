@@ -177,6 +177,28 @@ def test_api_spec(client):
 
 
 @respx.mock
+def test_formulaire_idref_un_seul_bouton(client, app):
+    """Choix IdRef : présentation par autorité, un seul bouton de validation pour tous."""
+    simuler(idref_statut="low_confidence")
+    dossier = _televerser(client).headers["location"]
+    page = client.get(dossier).text
+    assert page.count('action="/dossiers/') and page.count('id="choix-idref"') == 1
+    assert page.count("Valider les choix IdRef") == 1 and ">Valider</button>" not in page
+    d = app.vue_dossier(dossier.rsplit("/", 1)[1]).dossier
+    idref = [i for i, e in enumerate(d.exceptions) if e.etape.startswith("idref")]
+    auteur_i = next(i for i in idref if d.exceptions[i].objet.startswith("author"))
+    autre = next(i for i in idref if i != auteur_i)
+    # PPN saisi prioritaire sur le bouton radio ; une autorité laissée sans choix reste ouverte
+    r = client.post(f"{dossier}/ppns", data={"auteur": "Camille", f"ppn_{auteur_i}": "sans-lien",
+                                             f"saisie_{auteur_i}": "026940345", f"ppn_{autre}": "sans-lien"})
+    assert r.status_code == 303
+    d = app.vue_dossier(d.id)
+    assert d.exceptions_ouvertes == len(idref) - 2
+    assert "700 #1$3026940345$4070" in d.dossier.notice_texte.splitlines()
+    assert client.post(f"{dossier}/ppns", data={"auteur": "Camille"}).status_code == 422
+
+
+@respx.mock
 def test_api_lot_dossier_resolution(client, tmp_path):
     simuler(idref_statut="low_confidence")
     image = tmp_path / "p.png"
@@ -194,6 +216,11 @@ def test_api_lot_dossier_resolution(client, tmp_path):
     r = client.post(f"/api/v1/dossiers/{dossier_id}/resolutions/ppn", json={"auteur": "api", "exception": i,
                                                                              "ppn": "026940345"})
     assert r.status_code == 422 and "déjà résolue" in r.json()["detail"]
+    restantes = [j for j, e in enumerate(d["dossier"]["exceptions"]) if e["etape"].startswith("idref") and j != i]
+    r = client.post(f"/api/v1/dossiers/{dossier_id}/resolutions/ppns",
+                    json={"auteur": "api", "choix": {str(j): None for j in restantes}})
+    assert r.status_code == 200 and all(e["resolue"] for e in r.json()["dossier"]["exceptions"]
+                                        if e["etape"].startswith("idref"))
     assert client.get("/api/v1/dossiers/inconnu").status_code == 404
     assert client.post(f"/api/v1/dossiers/{dossier_id}/relancer", json={"depuis": "dewey"}).status_code == 200
     assert client.get("/api/v1/historique").json()["lots"][0]["lot"]["id"]

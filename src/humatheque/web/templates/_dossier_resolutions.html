@@ -12,6 +12,7 @@
 {% set faux_sudoc = a_decider and d.routage == "décision" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
 {% if ouvertes or a_decider %}
 <div class="flex flex-col gap-3">
+  {% set ns_idref = namespace(n=0) %}
   {% for e in d.exceptions %}{% if not e.resolue %}{% set i = loop.index0 %}
     <div class="sous-carte">
       <div class="flex flex-wrap justify-between gap-2"><p class="font-semibold">{{ e.objet }}</p><span class="puce bg-decision-clair text-decision-fonce font-medium">{{ e.motif }}</span></div>
@@ -21,20 +22,17 @@
         <input class="champ champ-sm flex-1 min-w-40" name="commentaire" placeholder="commentaire (facultatif)">
         {{ champ_auteur() }}<button class="btn-principal btn-sm">Choisir et reprendre</button>
       </form>
-      {% elif e.etape in ("idref_personnes", "idref_organisations") %}
-      <form method="post" action="/dossiers/{{ d.id }}/ppn" class="mt-2 space-y-1.5">
-        <input type="hidden" name="exception" value="{{ i }}">
+      {% elif e.etape in ("idref_personnes", "idref_organisations") %}{% set ns_idref.n = ns_idref.n + 1 %}
+      {# Champs rattachés au formulaire commun « choix-idref » (attribut form) : un seul bouton pour tous. #}
+      <div class="mt-2 space-y-1.5" role="radiogroup" aria-label="{{ e.objet }}">
         {% for c in e.candidats[:5] %}
-        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" name="ppn" value="{{ c.ppn }}">
+        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" form="choix-idref" name="ppn_{{ i }}" value="{{ c.ppn }}">
           <a class="font-mono" href="{{ c.url or ('https://www.idref.fr/' ~ c.ppn) }}" target="_blank" rel="noopener">{{ c.ppn }}</a>
           {{ c.libelle or "" }} <span class="text-sourdine">({{ c.score }})</span></label>
         {% endfor %}
-        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" name="ppn" value="sans-lien"> sans lien (repli $a$b)</label>
-        <div class="flex flex-wrap items-center gap-2">
-          <input class="champ champ-sm w-40 font-mono" name="saisie" placeholder="ou saisir un PPN" pattern="[0-9]{8}[0-9Xx]">
-          {{ champ_auteur() }}<button class="btn-principal btn-sm">Valider</button>
-        </div>
-      </form>
+        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" form="choix-idref" name="ppn_{{ i }}" value="sans-lien"> sans lien (repli $a$b)</label>
+        <input class="champ champ-sm w-48 font-mono" form="choix-idref" name="saisie_{{ i }}" placeholder="ou saisir un PPN" pattern="[0-9]{8}[0-9Xx]" aria-label="PPN saisi pour {{ e.objet }}">
+      </div>
       {% elif e.etape == "dewey" %}
       <form method="post" action="/dossiers/{{ d.id }}/dewey" class="mt-2 space-y-1">
         <input type="hidden" name="exception" value="{{ i }}">
@@ -47,6 +45,14 @@
       {% endif %}
     </div>
   {% endif %}{% endfor %}
+
+  {% if ns_idref.n %}
+  <form id="choix-idref" method="post" action="/dossiers/{{ d.id }}/ppns" class="flex flex-wrap items-center justify-end gap-3 pt-1">
+    <span class="text-[13px] text-sourdine mr-auto">Une autorité sans choix reste à reprendre.</span>
+    {{ champ_auteur() }}
+    <button class="btn-principal">Valider les choix IdRef{% if ns_idref.n > 1 %} ({{ ns_idref.n }}){% endif %}</button>
+  </form>
+  {% endif %}
 
   {% if faux_alma %}
   <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">

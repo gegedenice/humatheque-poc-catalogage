@@ -465,6 +465,17 @@ class Application(Administration):
     def choisir_ppn(self, dossier_id: str, index: int, ppn: str | None, auteur: str) -> VueDossier:
         return self._resolution(dossier_id, lambda d: res.choisir_ppn(d, index, ppn, auteur), True)
 
+    def choisir_ppns(self, dossier_id: str, choix: dict[int, str | None], auteur: str) -> VueDossier:
+        """Plusieurs exceptions IdRef résolues d'un coup (index → PPN, None = sans lien) :
+        tout ou rien (un PPN invalide n'applique aucun choix), une seule relance."""
+        if not choix:
+            raise ActionImpossible("aucun choix de PPN")
+
+        def appliquer(d: Dossier) -> None:
+            for index, ppn in sorted(choix.items()):
+                res.choisir_ppn(d, index, ppn, auteur)
+        return self._resolution(dossier_id, appliquer, True)
+
     def choisir_dewey(self, dossier_id: str, index: int, code: str, auteur: str) -> VueDossier:
         return self._resolution(dossier_id, lambda d: res.choisir_dewey(d, index, code, auteur), True)
 

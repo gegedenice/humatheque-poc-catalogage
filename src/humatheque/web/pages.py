@@ -199,6 +199,25 @@ def ppn(request: Request, dossier_id: str, exception: Annotated[int, Form()], au
     return _rediriger(f"/dossiers/{dossier_id}", auteur)
 
 
+@routeur.post("/dossiers/{dossier_id}/ppns")
+async def ppns(request: Request, dossier_id: str):
+    """Validation groupée des choix IdRef : champs ppn_<index> (candidat ou « sans-lien »)
+    et saisie_<index> (PPN saisi, prioritaire) ; une exception sans choix reste ouverte."""
+    formulaire = await request.form()
+    auteur = str(formulaire.get("auteur", ""))
+    choix: dict[int, str | None] = {}
+    for cle in formulaire:
+        prefixe, _, index = cle.partition("_")
+        if prefixe not in ("ppn", "saisie") or not index.isdigit():
+            continue
+        i = int(index)
+        valeur = (str(formulaire.get(f"saisie_{i}", "")).strip() or str(formulaire.get(f"ppn_{i}", "")).strip())
+        if valeur:
+            choix[i] = None if valeur == "sans-lien" else valeur
+    _app(request).choisir_ppns(dossier_id, choix, _auteur(auteur))
+    return _rediriger(f"/dossiers/{dossier_id}", auteur)
+
+
 @routeur.post("/dossiers/{dossier_id}/dewey")
 def dewey(request: Request, dossier_id: str, exception: Annotated[int, Form()], code: Annotated[str, Form()],
           auteur: Annotated[str, Form()]):
