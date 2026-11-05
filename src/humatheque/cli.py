@@ -1,7 +1,7 @@
 """Ligne de commande `humatheque`.
 
 Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `scan-minio`,
-`spec-export`, `css`, `cache-reaccentue` (cache du dictionnaire, appelé au
+`spec-export`, `spec-import`, `css`, `cache-reaccentue` (cache du dictionnaire, appelé au
 build Docker).
 """
 
@@ -162,6 +162,31 @@ def spec_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def spec_import(args: argparse.Namespace) -> int:
+    """Construit le classeur Grist depuis spec/*.csv, puis le relit et le compare aux CSV."""
+    from humatheque.spec.grist import GristInjoignable
+    from humatheque.spec.import_grist import ImportImpossible, importer
+
+    try:
+        r = importer(reglages(), args.dossier, doc_id=args.doc, nouveau=args.nouveau, org=args.org,
+                     espace=args.espace, remplacer=args.remplacer)
+    except (GristInjoignable, ImportImpossible, SpecIntrouvable) as e:
+        print(f"ERREUR : {e}", file=sys.stderr)
+        return 2
+    for table, n in r["tables"].items():
+        print(f"  {table:<18} {n} ligne(s)")
+    print(f"Document Grist : {r['doc_id']}")
+    if r["ecarts"]:
+        print(f"{len(r['ecarts'])} écart(s) entre les CSV et Grist :")
+        for e in r["ecarts"][:30]:
+            print(f"  - {e}")
+        return 1
+    print(f"Relecture identique aux CSV (empreinte {r['empreinte_grist']}).")
+    if args.nouveau:
+        print(f"Dans .env : GRIST_DOC_ID={r['doc_id']} puis SPEC_SOURCE=grist")
+    return 0
+
+
 def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
@@ -184,6 +209,16 @@ def construire_parseur() -> argparse.ArgumentParser:
     c = sous.add_parser("spec-export", help="écrit un instantané des tables Grist dans spec/")
     c.add_argument("--dossier", type=Path, default=None, help="dossier cible (défaut : spec/)")
     c.set_defaults(fonction=spec_export)
+
+    c = sous.add_parser("spec-import", help="construit le classeur Grist depuis spec/*.csv (colonnes Texte)")
+    c.add_argument("--dossier", type=Path, default=None, help="dossier des CSV (défaut : spec/)")
+    cible = c.add_mutually_exclusive_group()
+    cible.add_argument("--nouveau", metavar="NOM", help="crée un nouveau document Grist portant ce nom")
+    cible.add_argument("--doc", metavar="ID", help="document existant (défaut : GRIST_DOC_ID)")
+    c.add_argument("--org", default="current", help="organisation Grist du nouveau document (défaut : current)")
+    c.add_argument("--espace", type=int, default=None, help="identifiant de l'espace de travail (défaut : le premier)")
+    c.add_argument("--remplacer", action="store_true", help="recrée les tables de spec déjà présentes")
+    c.set_defaults(fonction=spec_import)
 
     c = sous.add_parser("scan-minio", help="liste les dossiers du bucket S3 et leur dernier statut")
     c.add_argument("--lancer-nouveaux", action="store_true", help="traite les dossiers jamais traités")

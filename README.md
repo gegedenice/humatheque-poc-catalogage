@@ -33,6 +33,7 @@ l'avance.
 | `humatheque serve [--host --port]` | interface web, API JSON `/api/v1` (documentation : `/api/v1/docs`) et planificateur des déclencheurs |
 | `humatheque check-spec [--source csv\|grist] [--json]` | vérifie la spécification ; code retour 1 si erreur bloquante |
 | `humatheque spec-export [--dossier spec]` | instantané des tables Grist dans `spec/` + copie dans `spec/archives/<horodatage>/` |
+| `humatheque spec-import [--nouveau NOM \| --doc ID] [--remplacer]` | construit le classeur Grist depuis `spec/*.csv`, puis le relit et le compare aux CSV |
 | `humatheque run-url URL… [--un-document] [--type these\|memoire] [--notice]` | traite des URL d'images dans le terminal |
 | `humatheque run-batch fichier.txt [--type …] [--notice]` | traite un fichier d'URL (format `minio_urls.txt`, suffixe « FAIT » ignoré) |
 | `humatheque scan-minio [--lancer-nouveaux]` | liste les dossiers du bucket S3 et leur dernier statut |
@@ -92,17 +93,27 @@ docker compose up -d      # application : http://localhost:8000, Grist : http://
 - Derrière un proxy qui re-chiffre TLS, fournir son certificat au build :
   `docker build --secret id=ca,src=/chemin/ca.crt .`
 
-### Initialisation de Grist (une fois, manuelle)
+### Initialisation de Grist (une fois)
 
 1. Ouvrir http://localhost:8484/login : en l'absence de système
    d'authentification, Grist connecte l'utilisateur `GRIST_DEFAULT_EMAIL`.
-2. Importer le classeur de spécification dans l'organisation `humatheque`
-   (tables `Regles`, `Sources`, `Situations`, `Statuts_services`, `Profils`).
-3. Relever l'identifiant du document (dans l'URL : `/doc/<identifiant>`).
-4. Créer une clé d'API : menu du profil → *Profile settings* → *API Key*.
-5. Dans `.env` : `GRIST_DOC_ID=…`, `GRIST_API_KEY=…`, `SPEC_SOURCE=grist`,
+2. Créer une clé d'API : menu du profil → *Profile settings* → *API Key*, et
+   la reporter dans `.env` (`GRIST_API_KEY=…`), puis `docker compose up -d app`.
+3. Construire le classeur depuis `spec/*.csv` (pas d'import manuel : Grist
+   renomme la colonne réservée `id` et devine les types, `008` devenant `8`) :
+
+   ```bash
+   docker compose exec app uv run --no-sync humatheque spec-import --nouveau "Spécification humatheque"
+   ```
+
+   Chaque CSV devient une table aux colonnes Texte ; l'identifiant de colonne
+   est rendu sûr (`id` → `id_spec`, `cardinalité` → `cardinalite`) et le
+   libellé garde l'en-tête exact, que lit l'application. Les tables sont
+   relues et comparées aux CSV ; la commande affiche l'identifiant du document.
+   `--doc ID` complète un document existant, `--remplacer` recrée ses tables.
+4. Dans `.env` : `GRIST_DOC_ID=…` (affiché à l'étape 3), `SPEC_SOURCE=grist`,
    puis `docker compose up -d app`.
-6. Contrôle : `docker compose exec app uv run --no-sync humatheque check-spec`
+5. Contrôle : `docker compose exec app uv run --no-sync humatheque check-spec`
    doit donner le même résultat qu'en mode `csv` ; `spec-export` fige une
    version de la spec dans `spec/` (à versionner).
 
