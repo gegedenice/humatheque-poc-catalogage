@@ -4,16 +4,17 @@
 <div id="panneau-dossier" class="flex-[1_1_560px] min-w-0 flex flex-col gap-6"
      {% if vue.etat != "termine" %}hx-get="/dossiers/{{ d.id }}/fragment" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
 
-  {# ---------------------------------------------------------------- résolution #}
-  {% if vue.etat == "termine" %}{% include "_dossier_resolutions.html" %}{% endif %}
-
   {# ---------------------------------------------------------------- onglets #}
-  {% set onglets = [("notice", "Notice"), ("metadonnees", "Métadonnées"), ("services", "Alma · Sudoc · IdRef · Dewey"),
+  {# Reprise (résolutions, SPEC §9.3) : onglet discret, présent seulement s'il y a quelque chose à reprendre. #}
+  {% set a_reprendre = vue.etat == "termine" and ((d.exceptions | rejectattr("resolue") | list) or (d.routage not in (none, "auto") and not d.cloture)) %}
+  {% set onglets = [("notice", "Notice"), ("metadonnees", "Métadonnées"), ("services", "Services"),
                     ("reponses", "Réponses brutes"), ("journal", "Journal (" ~ (d.journal | length) ~ ")")] %}
+  {% if a_reprendre %}{% set onglets = onglets + [("reprise", "Reprise" ~ (" (" ~ vue.exceptions_ouvertes ~ ")" if vue.exceptions_ouvertes else ""))] %}{% endif %}
   <section class="bg-carte rounded-carte shadow-carte overflow-hidden" id="onglets-dossier" data-onglets>
     <div role="tablist" aria-label="Sections du dossier" class="onglets px-4">
       {% for cle, libelle in onglets %}
       <button type="button" role="tab" class="onglet" id="onglet-{{ cle }}" aria-controls="volet-{{ cle }}"
+              {% if cle == "services" %}title="Alma · Sudoc · IdRef · Dewey"{% endif %}
               aria-selected="{{ 'true' if loop.first else 'false' }}">{{ libelle }}</button>
       {% endfor %}
     </div>
@@ -165,6 +166,13 @@
       </details>
       {% else %}{{ vide("Aucun appel pour l'instant.") }}{% endfor %}
     </div>
+
+    {% if a_reprendre %}
+    {# ------------------------------------------------------------ reprise #}
+    <div role="tabpanel" id="volet-reprise" aria-labelledby="onglet-reprise" class="p-5" hidden>
+      {% include "_dossier_resolutions.html" %}
+    </div>
+    {% endif %}
 
     {# ------------------------------------------------------------ journal #}
     <div role="tabpanel" id="volet-journal" aria-labelledby="onglet-journal" class="p-5" hidden>
