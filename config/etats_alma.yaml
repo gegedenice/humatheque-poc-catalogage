@@ -1,0 +1,13 @@
+# Correspondance statut alma-checker → etat_alma (SPEC §6).
+# Au moins une notice trouvée arrête le pipeline (Situations S01).
+correspondance:
+  academic_record_found: présent
+  ambiguous_academic_candidate: présent
+  off_profile_match_only: présent
+  no_academic_record_found: absent
+
+# Motif affiché par statut.
+motifs:
+  academic_record_found: notice de thèse ou mémoire trouvée
+  ambiguous_academic_candidate: candidat incertain
+  off_profile_match_only: notice proche, pas de type TU

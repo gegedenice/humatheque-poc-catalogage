@@ -1,0 +1,40 @@
+{
+    "source": "embedding_classification",
+    "method": "local",
+    "model": "intfloat/multilingual-e5-large",
+    "classification_type": "multi-label",
+    "threshold": 0.0,
+    "count": 1,
+    "results": [
+        {
+            "text": "La question de l hygiène aux Indes-Néerlandaises Histoire et civilisations",
+            "classes": [
+                {
+                    "dewey": "900",
+                    "label": "Géographie et histoire",
+                    "score": 0.8194
+                },
+                {
+                    "dewey": "700",
+                    "label": "Arts. Beaux-arts et arts décoratifs",
+                    "score": 0.8172
+                },
+                {
+                    "dewey": "930",
+                    "label": "Histoire ancienne et préhistoire",
+                    "score": 0.8165
+                },
+                {
+                    "dewey": "310",
+                    "label": "Statistiques générales",
+                    "score": 0.8162
+                },
+                {
+                    "dewey": "950",
+                    "label": "Histoire générale de l'Asie, Orient, Extrême-Orient",
+                    "score": 0.8158
+                }
+            ]
+        }
+    ]
+}

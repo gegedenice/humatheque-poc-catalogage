@@ -1,0 +1,13 @@
+# Ingestion depuis un stockage S3 (MinIO ou autre) et téléversement de
+# dossiers (SPEC §3.1). Un dossier = un document ; le dossier parent donne
+# le type de document (ING-F-009).
+
+types_dossiers:
+  TH: these
+  MM: memoire
+  # Structure réelle du bucket smartbiblia (images/theses/<labo>/<doc>/, relevée le 04/11)
+  theses: these
+  memoires: memoire
+
+# Fichiers retenus comme images du document (extension, sans casse).
+extensions_images: [jpg, jpeg, png, tif, tiff, webp, gif, bmp]

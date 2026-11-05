@@ -1,0 +1,86 @@
+# Appels des services externes (SPEC §6). Les URL, clés et délais côté client
+# viennent de .env ; ici, les routes et les paramètres de requête.
+#
+# `parametres` : envoyés explicitement à chaque appel (journalisés dans le
+# dossier), avec les valeurs de l'environnement des services (03/11/2026).
+# Les paramètres internes aux services (points d'accès SRU / Qualinka,
+# modèles d'embedding, clés Albert…) restent dans leur propre environnement.
+#
+# `reglables` : sous-ensemble modifiable par lot dans « Paramètres avancés »
+# du formulaire (SPEC §3) ; les valeurs choisies s'appliquent à tous les
+# documents du lot.
+
+alma:
+  routes: {these: /check/thesis, memoire: /check/dissertation}
+  parametres:
+    match_threshold: 0.78        # ALMA_MATCH_THRESHOLD
+    ambiguous_threshold: 0.62    # ALMA_AMBIGUOUS_THRESHOLD
+    max_records_per_query: 10    # ALMA_MAX_RECORDS_PER_QUERY
+    max_candidates: 20           # ALMA_MAX_CANDIDATES
+
+sudoc:
+  routes: {these: /check/thesis, memoire: /check/dissertation}
+  # duplicate_threshold = SUDOC_DUPLICATE_THRESHOLD (.env) : le même seuil sert au
+  # statut du service et à l'agrégation des thesis_state (qualification/).
+  parametres:
+    ambiguous_threshold: 0.62    # SUDOC_AMBIGUOUS_THRESHOLD
+    max_records_per_query: 10    # SUDOC_MAX_RECORDS_PER_QUERY
+    max_candidates: 20           # SUDOC_MAX_CANDIDATES
+  # Notice UNIMARC d'un PPN (lecture de la notice source d'une conversion)
+  notice_xml: "https://www.sudoc.fr/{ppn}.xml"
+  lien_notice: "https://www.sudoc.fr/{ppn}"
+
+idref_personne:
+  route: /align/person
+  parametres:
+    accept_threshold: 0.65       # IDREF_ACCEPT_THRESHOLD
+    margin_threshold: 0.08       # IDREF_MARGIN_THRESHOLD
+    max_candidates: 5            # IDREF_MAX_CANDIDATES (05/11 : 20 → 5, temps de réponse)
+    max_docs_per_role: 5         # IDREF_MAX_DOCS_PER_ROLE (05/11 : 20 → 5)
+    reference_top_k: 3          # IDREF_REFERENCE_TOP_K
+    embedding_model: ""          # IDREF_EMBEDDING_MODEL
+    weight_name: 0.40            # DEFAULT_WEIGHT_NAME
+    weight_attrra_source: 0.15   # DEFAULT_WEIGHT_ATTRRA_SOURCE
+    weight_attrra_note: 0.15     # DEFAULT_WEIGHT_ATTRRA_NOTE
+    weight_references: 0.25      # DEFAULT_WEIGHT_REFERENCES
+    weight_institution_year: 0.05  # DEFAULT_WEIGHT_INSTITUTION_YEAR
+
+idref_organisations:
+  route: /align/thesis-organizations
+  parametres:
+    accept_threshold: 0.72       # IDREF_ORG_ACCEPT_THRESHOLD
+    margin_threshold: 0.08       # IDREF_ORG_MARGIN_THRESHOLD
+    low_threshold: 0.45          # IDREF_ORG_LOW_THRESHOLD
+    floor_threshold: 0.30        # IDREF_ORG_FLOOR_THRESHOLD
+    max_candidates: 5            # IDREF_ORG_MAX_CANDIDATES
+    allow_remote: false          # repli SPARQL data.idref.fr (30-95 s) : désactivé
+
+dewey:
+  route: /classify
+  parametres:
+    classification_type: multi-label  # CLASSIFICATION_TYPE
+    top_k: 5                          # CLASSIFICATION_TOP_K
+    threshold: 0.0                    # CLASSIFICATION_THRESHOLD
+    method: albert                    # CLASSIFICATION_METHOD (décision du 04/11)
+
+# Réglages par lot (SPEC §3, « Paramètres avancés »).
+reglables:
+  - service: idref_personne
+    parametre: accept_threshold
+    libelle: "IdRef personnes : seuil d'acceptation"
+    min: 0
+    max: 1
+  - service: idref_personne
+    parametre: margin_threshold
+    libelle: "IdRef personnes : marge avec le 2e candidat"
+    min: 0
+    max: 1
+  - service: idref_organisations
+    parametre: accept_threshold
+    libelle: "IdRef organismes : seuil d'acceptation"
+    min: 0
+    max: 1
+  - service: dewey
+    parametre: method
+    libelle: "Dewey : méthode de classification"
+    choix: [albert, local]

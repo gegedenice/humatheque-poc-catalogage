@@ -5,7 +5,7 @@ author,champ extrait,Extraction VLM,"Auteur, forme de la page de titre",1,oui
 degree_type,champ extrait,Extraction VLM,Type de diplôme (liste fermée selon type de doc),1,oui
 discipline,champ extrait,Extraction VLM,"Discipline, texte libre",1,oui
 volume,champ extrait,Extraction VLM,Numéro de volume mentionné (null si absent),1,oui
-volumaison,calcul,Générateur,"Volume normalisé pour zone 215(""1 volume"" si volume extrait est null ; ""? volumes"" si volume extrait n'est pas null",1,non — règle à écrire
+volumaison,calcul,Générateur,"Volume normalisé pour zone 215(""1 volume"" si volume extrait est null ; ""? volumes"" si volume extrait n'est pas null",1,oui
 granting_institution,champ extrait,Extraction VLM,Établissement de soutenance,1,oui
 co_tutelle_institutions,champ extrait,Extraction VLM,Établissements de cotutelle (liste),n,oui
 doctoral_school,champ extrait,Extraction VLM,École doctorale,1,oui
@@ -27,6 +27,6 @@ ppn_ecole_doctorale,sortie service,idref-linker /align/thesis-organizations,PPN 
 ppn_cotutelle,sortie service,idref-linker /align/thesis-organizations,PPN des établissements de cotutelle,1,à vérifier
 dewey_code,sortie service,dewey-classifier,Code Dewey TEF retenu,1,oui
 notice_originale_328,sortie service,sudoc-checker,Zone 328 de la thèse originale (pour les reproductions),1,à vérifier
-nom_prenom,calcul,Générateur,Découpage nom / prénom d'une personne sans PPN,1,non — règle à écrire
-titre_classement,calcul,Générateur,Titre avec @ après l'article initial,1,non — règle à écrire
+nom_prenom,calcul,Générateur,Découpage nom / prénom d'une personne sans PPN,1,oui
+titre_classement,calcul,Générateur,Titre avec @ après l'article initial,1,oui
 numero_nnt,référentiel,Fichier des numéros disponibles,Numéro incrémental du NNT,1,non — fichier à définir

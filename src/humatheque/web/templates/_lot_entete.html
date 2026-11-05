@@ -1,0 +1,25 @@
+{% from "_composants.html" import kpi, en_cours %}
+{# Bandeau et indicateurs du lot ; avec oob=True, remplacés hors bande lors du rafraîchissement. #}
+<div id="bandeau-lot" class="flex flex-wrap items-center justify-between gap-3 my-3" {% if oob %}hx-swap-oob="true"{% endif %}>
+  <span class="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-sourdine min-w-0">
+    {% if vue.en_cours %}{{ en_cours("lot en cours") }}{% else %}<span class="w-2.5 h-2.5 rounded-full bg-auto"></span>{% endif %}
+    lot <span class="font-mono break-all">{{ vue.lot.id }}</span>
+    · créé le {{ vue.lot.cree_le | date }}
+    {% if vue.lot.termine_le %}· terminé à {{ vue.lot.termine_le | date("%H:%M") }}{% endif %}
+    · {{ vue.lot.nb_documents }} document(s)
+    · {{ "thèses" if vue.lot.parametres.type_document == "these" else "mémoires" }}
+    · fournisseur {{ vue.lot.parametres.fournisseur }}
+    {% for service, params in (vue.lot.parametres.services or {}).items() %}{% for p, v in params.items() %}
+    · <span class="font-mono">{{ service }}.{{ p }}={{ v }}</span>{% endfor %}{% endfor %}
+  </span>
+  <span class="flex gap-2">
+    <a class="btn-discret btn-sm" href="/lots/{{ vue.lot.id }}/rapport.csv" hx-boost="false">Rapport CSV</a>
+    <a class="btn-discret btn-sm" href="/lots/{{ vue.lot.id }}/notices.txt" hx-boost="false">Notices produites</a>
+  </span>
+</div>
+<div id="kpis-lot" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" {% if oob %}hx-swap-oob="true"{% endif %}>
+  {{ kpi(vue.indicateurs.documents, "documents dans le lot", "principal") }}
+  {{ kpi(vue.indicateurs.passes_seuls, "passés seuls · notice prête", "ok") }}
+  {{ kpi(vue.indicateurs.en_attente, "en attente de reprise", "attente") }}
+  {{ kpi(vue.indicateurs.repris, "repris par un catalogueur") }}
+</div>

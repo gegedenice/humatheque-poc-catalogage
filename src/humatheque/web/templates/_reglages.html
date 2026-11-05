@@ -1,0 +1,18 @@
+{# « Paramètres avancés » du lot (SPEC §3) : générés depuis config/services.yaml (reglables). #}
+{% macro parametres_avances(reglables) -%}
+<details class="sous-carte">
+  <summary class="cursor-pointer text-sm font-semibold">Paramètres avancés</summary>
+  <p class="text-xs text-sourdine mt-1">Appliqués à tous les documents du lot ; valeurs par défaut lues dans <span class="font-mono">config/services.yaml</span>.</p>
+  <div class="grid gap-3 sm:grid-cols-2 mt-2">
+  {% for r in reglables %}
+    <label class="block"><span class="etiquette">{{ r.libelle }}</span>
+    {% if r.choix %}
+      <select class="champ" name="{{ r.nom }}">{% for c in r.choix %}<option value="{{ c }}" {% if c == r.defaut %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+    {% else %}
+      <input class="champ font-mono" type="number" step="0.01" min="{{ r.min }}" max="{{ r.max }}" name="{{ r.nom }}" value="{{ r.defaut }}">
+    {% endif %}
+    </label>
+  {% endfor %}
+  </div>
+</details>
+{%- endmacro %}

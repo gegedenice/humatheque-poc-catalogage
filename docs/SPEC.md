@@ -70,6 +70,12 @@ Formulaire unique (mode 1 et mode 2) :
 - **Provenance** : n'est **pas saisie**. Elle est déduite de
   `granting_institution` pour les thèses (§6, étape 2).
 - **Fournisseur VLM** : choix repris du POC, par défaut celui de `.env`.
+- **Paramètres avancés** (décision du 04/11), repliés par défaut : quelques
+  paramètres des services modifiables pour le lot (seuils d'acceptation et
+  marge IdRef des personnes, seuil d'acceptation IdRef des organismes,
+  méthode Dewey). La liste, les bornes et les valeurs par défaut sont dans
+  `config/services.yaml` (`reglables`) ; les valeurs retenues sont
+  enregistrées dans le lot et visibles dans son bandeau.
 
 Un envoi crée un **Lot** : un seul document donne un lot d'un document, en
 mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
@@ -97,8 +103,9 @@ mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
   Ordre des images : ordre lexicographique des noms de fichiers. L'identifiant
   du document est son chemin (`TH/TH-01`).
 - **Document incomplet ou invalide** (ING-F-008) : dossier sans image, image
-  illisible, ou extraction ne renvoyant aucune métadonnée du schéma (page ne
-  correspondant à rien). Le document est signalé avec l'alerte
+  illisible, extraction ne renvoyant aucune métadonnée du schéma (page ne
+  correspondant à rien) ou sans titre (décision du 05/11 : les vérifications
+  Alma et Sudoc exigent un titre). Le document est signalé avec l'alerte
   `document_invalide` et le motif, routage `décision`.
 - **Sélection manuelle** (ING-F-005) : la page `/` liste les dossiers du bucket
   (déjà traités ou non, avec leur dernier statut) et permet d'en lancer une
@@ -188,9 +195,15 @@ qu'imprimés** : casse d'origine, civilités comprises.
    forme d'accès française (`$aLa Roche$bMarie-France de`). Ajouter l'alerte
    `particule_a_verifier` tant que les catalogueurs n'ont pas validé ce traitement.
 4. Casse finale : chaque élément de nom ou de prénom commence par une majuscule,
-   y compris après un trait d'union (`Jean-Daniel`). Pas de réaccentuation
-   automatique des noms de personnes : un nom sans accent sur la page reste
-   sans accent, et une alerte est ajoutée seulement s'il était en capitales.
+   y compris après un trait d'union (`Jean-Daniel`). Accent (décision du
+   05/11) : un mot imprimé en capitales sans accent reçoit l'accent si le
+   dictionnaire ne connaît qu'une forme de ce nom propre, accentuée
+   (`HELENE` → `Hélène`, alerte `accent_restitue`) ; sinon il reste sans
+   accent, avec l'alerte `accent_possible` s'il existe une forme accentuée.
+5. Forme retraitée (décision du 05/11) : `forme` = « Prénom Nom » après ces
+   traitements (`Monsieur le Professeur André GODIN` → `André Godin`) ; c'est
+   elle qu'utilisent 200$f et 200$g. La forme imprimée (civilités retirées)
+   est conservée pour la trace.
 
 | Entrée | `nom` | `prenom` | Alertes |
 |---|---|---|---|
@@ -310,7 +323,9 @@ dans le dossier :
    document (`qualification/`, fonction pure) :
 
    - candidats retenus : ceux de `candidates` dont `score.final` atteint
-     `SUDOC_SEUIL_CORRESPONDANCE` (`.env`, aligné sur le seuil du service) ;
+     `SUDOC_DUPLICATE_THRESHOLD` (`.env`), envoyé au service comme
+     `duplicate_threshold` : le statut du service et l'agrégation utilisent
+     le même seuil ;
    - correspondance `thesis_state` → `etat_sudoc` dans `config/etats_sudoc.yaml` :
 
      | `thesis_state` | `etat_sudoc` |
@@ -330,8 +345,9 @@ dans le dossier :
      l'état reste `originale imprimée` ;
    - aucun candidat retenu : `ambigu` si le statut du service est
      `ambiguous_print_candidate`, sinon `rien` ;
-   - statut `error`, ou `thesis_state` absent de la réponse (version du service
-     antérieure) : routage `incident`, sans repli.
+   - erreur du service (réponse HTTP 4xx/5xx ou service injoignable ; le
+     service n'a pas de statut `error`), ou `thesis_state` absent de la
+     réponse (version du service antérieure) : routage `incident`, sans repli.
 
    Le dossier affiche le tableau de tous les candidats (PPN, score, `carrier`,
    `thesis_state`, retenu oui/non) et l'état agrégé avec sa justification.
@@ -342,8 +358,16 @@ dans le dossier :
    personne, puis **idref-linker organisations** (`/align/thesis-organizations` ;
    lire l'OpenAPI) pour l'établissement de soutenance, l'école doctorale et les
    cotutelles.
-7. **dewey-classifier** (`/classify`, payload repris du POC). La première classe
-   donne `dewey_code`.
+7. **dewey-classifier** (`/classify`, payload repris du POC, méthode `albert`
+   par défaut, décision du 04/11). La première classe donne `dewey_code`.
+
+**Paramètres de requête des services** (décision du 04/11) : les paramètres
+qu'une requête peut porter (seuils, nombres de candidats, poids IdRef,
+méthode Dewey…) sont envoyés explicitement à chaque appel, avec les valeurs
+de l'environnement des services reprises dans `config/services.yaml` ; ils
+sont donc journalisés avec la requête. Les paramètres internes aux services
+(points d'accès SRU et Qualinka, modèles, clés Albert) restent dans leur
+propre environnement.
 8. **Générateur** (§8), puis rapport.
 
 Le dossier mémorise les résultats de chaque étape. **Relancer un dossier**
@@ -410,10 +434,12 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 - **Statuts de service** : `Statuts_services.csv` associe `(service, statut)` à
   un routage `auto | décision | sortie | incident`. **Pour alma-checker et
   sudoc-checker**, le routage ne vient pas de cette table mais des
-  correspondances du §6 (états) et de `Situations`. Seul leur statut `error`
-  y est lu (`incident`). Les lignes actuelles de ces deux services dans Grist
-  (`present_avec_ppn`, `reproduction_found`…) ne correspondent pas aux statuts
-  réels des API : elles sont à remplacer par les statuts du §6. Pour IdRef et Dewey, un
+  correspondances du §6 (états) et de `Situations`. Seule leur ligne `error`
+  y est lue (`incident`) : ce n'est pas un statut des API, elle désigne une
+  réponse HTTP 4xx/5xx ou un service injoignable (`service_indisponible`).
+  Les autres lignes de ces deux services documentent les statuts réels des
+  API (README dans `docs/services/`) ; les anciennes lignes fictives
+  (`present`, `absent`, `reproduction_found`) ont été retirées. Pour IdRef et Dewey, un
   statut `décision` **n'arrête pas** la génération : on utilise le repli
   (`$a{nom}$b{prenom}` ou zone omise) et une exception est créée. `not_found`
   côté IdRef ajoute l'alerte « proto-notice d'autorité à créer ».
@@ -604,7 +630,7 @@ défaut sur la version générée.
   - `ALMA_CHECKER_API_URL`, `ALMA_API_KEY` ;
   - `SPEC_SOURCE=csv`, `GRIST_URL=http://grist:8484`, `GRIST_DOC_ID`,
     `GRIST_API_KEY`, `GRIST_SESSION_SECRET`, `GRIST_DEFAULT_EMAIL` ;
-  - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_SEUIL_CORRESPONDANCE` ;
+  - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_DUPLICATE_THRESHOLD` ;
   - `VLM_MODEL=google/gemma-4-26B-A4B-it`, `VLM_STRATEGIE=requete_unique`,
     `VLM_TIMEOUT`, `HTTP_TIMEOUT`, `RELANCES_AUTO=2` ;
   - `PROVENANCE_CONFIRMATION_LLM=false` ;

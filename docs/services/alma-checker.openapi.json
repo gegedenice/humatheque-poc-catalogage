@@ -1,0 +1,1154 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Humatheque Alma Check API",
+        "description": "Search an institutional Alma SRU endpoint for academic records from VLM-extracted metadata, deduce from UNIMARC 328/608 whether each hit is a thesis or a dissertation, expose the holdings found in 930/995/AVA, and keep the Sudoc PPN as first-class information for the cataloguing decision. Document-kind specifics are encapsulated in `DocumentProfile` strategies so the same pipeline can serve theses, mémoires, and further profiles.",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "summary": "Root",
+                "operationId": "root__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Root  Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health",
+                "operationId": "health_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Health Health Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sru/search": {
+            "get": {
+                "summary": "Sru Search Endpoint",
+                "operationId": "sru_search_endpoint_sru_search_get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Raw Alma CQL query, for example alma.title all \"hygiene indes\".",
+                            "title": "Query"
+                        },
+                        "description": "Raw Alma CQL query, for example alma.title all \"hygiene indes\"."
+                    },
+                    {
+                        "name": "max_records",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "default": 10,
+                            "title": "Max Records"
+                        }
+                    },
+                    {
+                        "name": "timeout",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 120.0,
+                            "exclusiveMinimum": 0.0,
+                            "default": 30.0,
+                            "title": "Timeout"
+                        }
+                    },
+                    {
+                        "name": "retries",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10,
+                            "minimum": 0,
+                            "default": 2,
+                            "title": "Retries"
+                        }
+                    },
+                    {
+                        "name": "backoff",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 30.0,
+                            "minimum": 0.0,
+                            "default": 1.0,
+                            "title": "Backoff"
+                        }
+                    },
+                    {
+                        "name": "include_unimarc_xml",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "Include Unimarc Xml"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "title": "Response Sru Search Endpoint Sru Search Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/profiles": {
+            "get": {
+                "summary": "List Profiles",
+                "operationId": "list_profiles_profiles_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response List Profiles Profiles Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/check/thesis": {
+            "post": {
+                "summary": "Check Thesis Endpoint",
+                "operationId": "check_thesis_endpoint_check_thesis_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ThesisCheckRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Check Thesis Endpoint Check Thesis Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/check/dissertation": {
+            "post": {
+                "summary": "Check Dissertation Endpoint",
+                "operationId": "check_dissertation_endpoint_check_dissertation_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DissertationCheckRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Check Dissertation Endpoint Check Dissertation Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/check/academic": {
+            "post": {
+                "summary": "Check Academic Endpoint",
+                "operationId": "check_academic_endpoint_check_academic_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlmaCheckRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Check Academic Endpoint Check Academic Post"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AlmaCheckRequest": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "description": "Extracted main title."
+                    },
+                    "subtitle": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Subtitle",
+                        "description": "Extracted subtitle.",
+                        "default": ""
+                    },
+                    "author": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Author",
+                        "description": "Extracted author name.",
+                        "default": ""
+                    },
+                    "degree_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Degree Type",
+                        "description": "Extracted degree or document type.",
+                        "default": ""
+                    },
+                    "discipline": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Discipline",
+                        "description": "Extracted discipline.",
+                        "default": ""
+                    },
+                    "volume": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Volume",
+                        "description": "Volume number as an Arabic numeral; echoed, not matched.",
+                        "default": ""
+                    },
+                    "granting_institution": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Granting Institution",
+                        "description": "Extracted granting institution.",
+                        "default": ""
+                    },
+                    "co_tutelle_institutions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Co Tutelle Institutions"
+                    },
+                    "doctoral_school": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Doctoral School",
+                        "description": "Extracted doctoral school.",
+                        "default": ""
+                    },
+                    "defense_year": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Defense Year",
+                        "description": "Extracted defense year, yyyy."
+                    },
+                    "advisor": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Advisor",
+                        "description": "Extracted advisor names."
+                    },
+                    "jury_president": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Jury President",
+                        "description": "Extracted jury president.",
+                        "default": ""
+                    },
+                    "reviewers": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Reviewers",
+                        "description": "Extracted reviewer names."
+                    },
+                    "committee_members": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Committee Members",
+                        "description": "Extracted committee member names."
+                    },
+                    "language": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Language",
+                        "description": "ISO 639 three-letter language code.",
+                        "default": ""
+                    },
+                    "confidence": {
+                        "anyOf": [
+                            {
+                                "type": "number",
+                                "maximum": 1.0,
+                                "minimum": 0.0
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Confidence"
+                    },
+                    "profile": {
+                        "type": "string",
+                        "title": "Profile",
+                        "description": "Document profile key. Selects which deduced academic kinds count as a match. The `/check/thesis`, `/check/dissertation` and `/check/academic` routes force the matching profile regardless of this field.",
+                        "default": "academic"
+                    },
+                    "max_records_per_query": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Records Per Query",
+                        "default": 10
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 20
+                    },
+                    "match_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Match Threshold",
+                        "default": 0.78
+                    },
+                    "ambiguous_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Ambiguous Threshold",
+                        "default": 0.62
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 30.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "include_unimarc_xml": {
+                        "type": "boolean",
+                        "title": "Include Unimarc Xml",
+                        "description": "Include raw record XML in candidate output.",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title"
+                ],
+                "title": "AlmaCheckRequest"
+            },
+            "DissertationCheckRequest": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "description": "Main title as it appears on the title page"
+                    },
+                    "subtitle": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Subtitle",
+                        "description": "Subtitle or remainder of the title, usually following a colon.",
+                        "default": ""
+                    },
+                    "author": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Author",
+                        "description": "Full name of the author (student) who wrote the graduate dissertation",
+                        "default": ""
+                    },
+                    "degree_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Degree Type",
+                        "description": "Academic degree sought by the author. Possible values are Habilitation à diriger des recherches | Mémoire de DEA | Mémoire de DES | Mémoire de DESS | Mémoire de DU | Mémoire de DIU | Mémoire de DUT | Mémoire de maîtrise | Mémoire de master professionnel 1re année | Mémoire de master professionnel 2e année | Mémoire de master recherche 1re année | Mémoire de master recherche 2e année",
+                        "default": "",
+                        "examples": [
+                            "Habilitation à diriger des recherches",
+                            "Mémoire de DEA",
+                            "Mémoire de DES",
+                            "Mémoire de DESS",
+                            "Mémoire de DU",
+                            "Mémoire de DIU",
+                            "Mémoire de DUT",
+                            "Mémoire de maîtrise",
+                            "Mémoire de master professionnel 1re année",
+                            "Mémoire de master professionnel 2e année",
+                            "Mémoire de master recherche 1re année",
+                            "Mémoire de master recherche 2e année"
+                        ]
+                    },
+                    "discipline": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Discipline",
+                        "description": "Academic field or discipline of the graduate dissertation as explicitly mentioned. If not explicitly mentioned, infer it from the title and any other visible contextual elements (this is the only field where inference is allowed). Always return the discipline label in French (e.g. Histoire, Droit public, Sciences de l'éducation).",
+                        "default": ""
+                    },
+                    "volume": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Volume",
+                        "description": "Volume number if the title page explicitly mentions a volume, returned as the Arabic numeral only (e.g. \"1\" when the page prints Tome 1, TOME PREMIER or vol. I). Null if not explicitly mentioned.",
+                        "default": ""
+                    },
+                    "granting_institution": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Granting Institution",
+                        "description": "Institution where the graduate dissertation was submitted and the degree is granted",
+                        "default": ""
+                    },
+                    "co_tutelle_institutions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Co Tutelle Institutions",
+                        "description": "List of institutions involved in a joint supervision or co-tutelle agreement."
+                    },
+                    "doctoral_school": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Doctoral School",
+                        "description": "Doctoral school or graduate program, if explicitly mentioned",
+                        "default": ""
+                    },
+                    "defense_year": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Defense Year",
+                        "description": "Year the graduate dissertation was defended. Format yyyy"
+                    },
+                    "advisor": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Advisor",
+                        "description": "List of ONLY persons explicitly identified as graduate dissertation advisor/supervisor/director."
+                    },
+                    "jury_president": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Jury President",
+                        "description": "ONLY the person explicitly identified as president/chair of the jury. Null if not explicitly stated.",
+                        "default": ""
+                    },
+                    "reviewers": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Reviewers",
+                        "description": "List of ONLY official reviewers/rapporteurs explicitly identified as such."
+                    },
+                    "committee_members": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Committee Members",
+                        "description": "List of persons explicitly listed as jury or committee members whose role is not explicitly identified as president/chair or reviewer/rapporteur. Include unlabeled persons here."
+                    },
+                    "language": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Language",
+                        "description": "Language in ISO 639-3 codes. Example: fre, eng, ita...",
+                        "default": ""
+                    },
+                    "confidence": {
+                        "anyOf": [
+                            {
+                                "type": "number",
+                                "maximum": 1.0,
+                                "minimum": 0.0
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Confidence",
+                        "description": "Confidence score between 0.0 and 1.0 reflecting certainty based only on explicitly visible evidence on the page"
+                    },
+                    "profile": {
+                        "type": "string",
+                        "title": "Profile",
+                        "description": "Document profile key. Selects which deduced academic kinds count as a match. The `/check/thesis`, `/check/dissertation` and `/check/academic` routes force the matching profile regardless of this field.",
+                        "default": "academic"
+                    },
+                    "max_records_per_query": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Records Per Query",
+                        "default": 10
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 20
+                    },
+                    "match_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Match Threshold",
+                        "default": 0.78
+                    },
+                    "ambiguous_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Ambiguous Threshold",
+                        "default": 0.62
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 30.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "include_unimarc_xml": {
+                        "type": "boolean",
+                        "title": "Include Unimarc Xml",
+                        "description": "Include raw record XML in candidate output.",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title"
+                ],
+                "title": "DissertationCheckRequest"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "ThesisCheckRequest": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "description": "Main title as it appears on the title page"
+                    },
+                    "subtitle": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Subtitle",
+                        "description": "Subtitle or remainder of the title, usually following a colon.",
+                        "default": ""
+                    },
+                    "author": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Author",
+                        "description": "Full name of the author (student) who wrote the graduate thesis",
+                        "default": ""
+                    },
+                    "degree_type": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Degree Type",
+                        "description": "Academic degree sought by the author. Possible values are Thèse d'État | Thèse de doctorat | Thèse de 3e cycle | Thèse d'université | Thèse de docteur-ingénieur | Thèse d'exercice",
+                        "default": "",
+                        "examples": [
+                            "Thèse d'État",
+                            "Thèse de doctorat",
+                            "Thèse de 3e cycle",
+                            "Thèse d'université",
+                            "Thèse de docteur-ingénieur",
+                            "Thèse d'exercice"
+                        ]
+                    },
+                    "discipline": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Discipline",
+                        "description": "Academic field or discipline of the graduate thesis as explicitly mentioned. If not explicitly mentioned, infer it from the title and any other visible contextual elements (this is the only field where inference is allowed). Always return the discipline label in French (e.g. Histoire, Droit public, Sciences de l'éducation).",
+                        "default": ""
+                    },
+                    "volume": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Volume",
+                        "description": "Volume number if the title page explicitly mentions a volume, returned as the Arabic numeral only (e.g. \"1\" when the page prints Tome 1, TOME PREMIER or vol. I). Null if not explicitly mentioned.",
+                        "default": ""
+                    },
+                    "granting_institution": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Granting Institution",
+                        "description": "Institution where the graduate thesis was submitted and the degree is granted",
+                        "default": ""
+                    },
+                    "co_tutelle_institutions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Co Tutelle Institutions",
+                        "description": "List of institutions involved in a joint supervision or co-tutelle agreement."
+                    },
+                    "doctoral_school": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Doctoral School",
+                        "description": "Doctoral school or graduate program, if explicitly mentioned",
+                        "default": ""
+                    },
+                    "defense_year": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Defense Year",
+                        "description": "Year the graduate thesis was defended. Format yyyy"
+                    },
+                    "advisor": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Advisor",
+                        "description": "List of ONLY persons explicitly identified as graduate thesis advisor/supervisor/director."
+                    },
+                    "jury_president": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Jury President",
+                        "description": "ONLY the person explicitly identified as president/chair of the jury. Null if not explicitly stated.",
+                        "default": ""
+                    },
+                    "reviewers": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Reviewers",
+                        "description": "List of ONLY official reviewers/rapporteurs explicitly identified as such."
+                    },
+                    "committee_members": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Committee Members",
+                        "description": "List of persons explicitly listed as jury or committee members whose role is not explicitly identified as president/chair or reviewer/rapporteur. Include unlabeled persons here."
+                    },
+                    "language": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Language",
+                        "description": "Language in ISO 639-3 codes. Example: fre, eng, ita...",
+                        "default": ""
+                    },
+                    "confidence": {
+                        "anyOf": [
+                            {
+                                "type": "number",
+                                "maximum": 1.0,
+                                "minimum": 0.0
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Confidence",
+                        "description": "Confidence score between 0.0 and 1.0 reflecting certainty based only on explicitly visible evidence on the page"
+                    },
+                    "profile": {
+                        "type": "string",
+                        "title": "Profile",
+                        "description": "Document profile key. Selects which deduced academic kinds count as a match. The `/check/thesis`, `/check/dissertation` and `/check/academic` routes force the matching profile regardless of this field.",
+                        "default": "academic"
+                    },
+                    "max_records_per_query": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Records Per Query",
+                        "default": 10
+                    },
+                    "max_candidates": {
+                        "type": "integer",
+                        "maximum": 100.0,
+                        "minimum": 1.0,
+                        "title": "Max Candidates",
+                        "default": 20
+                    },
+                    "match_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Match Threshold",
+                        "default": 0.78
+                    },
+                    "ambiguous_threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": 0.0,
+                        "title": "Ambiguous Threshold",
+                        "default": 0.62
+                    },
+                    "timeout": {
+                        "type": "number",
+                        "maximum": 120.0,
+                        "exclusiveMinimum": 0.0,
+                        "title": "Timeout",
+                        "default": 30.0
+                    },
+                    "retries": {
+                        "type": "integer",
+                        "maximum": 10.0,
+                        "minimum": 0.0,
+                        "title": "Retries",
+                        "default": 2
+                    },
+                    "backoff": {
+                        "type": "number",
+                        "maximum": 30.0,
+                        "minimum": 0.0,
+                        "title": "Backoff",
+                        "default": 1.0
+                    },
+                    "include_unimarc_xml": {
+                        "type": "boolean",
+                        "title": "Include Unimarc Xml",
+                        "description": "Include raw record XML in candidate output.",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title"
+                ],
+                "title": "ThesisCheckRequest"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        },
+        "securitySchemes": {
+            "APIKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        }
+    }
+}

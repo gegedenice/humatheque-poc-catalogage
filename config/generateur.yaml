@@ -1,0 +1,18 @@
+# Paramètres du générateur (SPEC §8). Aucune zone ni valeur UNIMARC ici :
+# seulement la façon d'appliquer les règles de Regles.
+
+# Valeur d'une variable considérée comme absente.
+valeurs_absentes: [null, "", []]
+
+# Une règle dont une source est de cardinalité n (ou une personne / un
+# organisme) produit une occurrence par élément. Exceptions : la règle listée
+# ici produit une seule occurrence, les formes des éléments étant jointes
+# (décision du 03/11 : un seul 200$g pour plusieurs directeurs).
+jonctions:
+  - regle: R026
+    source: advisor
+    separateur: ", "
+
+# Indicateurs par défaut d'une zone ouverte par un fragment `$x…` lorsque
+# aucune règle de la zone (tous profils confondus) n'en déclare.
+indicateurs_par_defaut: "##"

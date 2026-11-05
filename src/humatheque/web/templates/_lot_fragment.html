@@ -1,0 +1,60 @@
+{% from "_composants.html" import badge, vide, en_cours %}
+{% set filtres = [("tous", "Tous"), ("decisions", "Décisions"), ("sorties", "Sorties"), ("conversions", "Conversions"), ("incidents", "Incidents")] %}
+<div id="lot-dyn" class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_330px] items-start"
+     {% if vue.en_cours %}hx-get="/lots/{{ vue.lot.id }}/fragment?filtre={{ vue.filtre }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <section class="carte min-w-0">
+    <h2>File d'exceptions à reprendre</h2>
+    <nav class="flex flex-wrap gap-2 mb-3" aria-label="Filtres">
+      {% for code, libelle in filtres %}
+      <a class="filtre {% if vue.filtre == code %}filtre-actif{% endif %}" href="/lots/{{ vue.lot.id }}?filtre={{ code }}"
+         hx-get="/lots/{{ vue.lot.id }}/fragment?filtre={{ code }}" hx-target="#lot-dyn" hx-swap="outerHTML"
+         hx-push-url="/lots/{{ vue.lot.id }}?filtre={{ code }}" aria-pressed="{{ 'true' if vue.filtre == code else 'false' }}">{{ libelle }}</a>
+      {% endfor %}
+    </nav>
+    {% if vue.file %}
+    <div class="defilant"><table class="tableau">
+      <thead><tr><th>Document</th><th>Étape</th><th>Motif</th><th></th></tr></thead>
+      <tbody>
+      {% for l in vue.file %}
+        <tr class="{% if l.traite %}text-sourdine{% endif %}">
+          <td><span class="font-mono text-xs">{{ l.document_id }}</span>
+            {% if l.titre %}<br><span class="text-xs">{{ l.titre | truncate(70) }}</span>{% endif %}</td>
+          <td class="text-xs">{{ l.etape_libelle or "—" }}</td>
+          <td class="text-xs">{{ badge(l.routage) }}
+            {% if l.nb_exceptions %}<span class="pastille text-decision">{{ l.nb_exceptions }} exception(s)</span>{% endif %}
+            <br>{{ l.motif or "" }}</td>
+          <td class="whitespace-nowrap">
+            {% if l.traite %}<span class="font-mono text-xs text-auto">✓ traité hors outil</span>
+            {% else %}<a class="btn btn-sm" href="/dossiers/{{ l.dossier_id }}">Reprendre</a>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% elif vue.en_cours %}
+      <p class="vide">{{ en_cours("Traitement en cours : les exceptions apparaîtront ici.") }}</p>
+    {% elif vue.filtre == "tous" %}
+      <p class="text-auto font-semibold text-sm py-4">File vide : aucun document à reprendre. Les {{ vue.indicateurs.passes_seuls }} notice(s) passées seules sont prêtes.</p>
+    {% else %}{{ vide("Aucun document dans cette catégorie.") }}{% endif %}
+  </section>
+
+  <aside class="carte min-w-0 lg:sticky lg:top-3">
+    <h2 class="mb-1">Journal du traitement</h2>
+    <div>
+      {% for l in vue.journal %}
+      <div class="ligne-journal"><span class="text-encre">{{ l.horodatage | date("%H:%M:%S") }}</span><span>{{ l.texte }}</span></div>
+      {% endfor %}
+    </div>
+    <h3 class="text-xs font-semibold mt-4 mb-1">Avancement par étape</h3>
+    {% for e in vue.etapes %}
+    <div class="flex items-center gap-2 my-1 text-[11.5px]">
+      <span class="w-32 text-sourdine">{{ e.libelle }}</span>
+      <span class="flex-1 h-2 bg-papier rounded overflow-hidden">
+        <span class="block h-full {{ 'bg-decision' if e.en_echec else 'bg-auto' }}" style="width: {{ (100 * e.faits / e.total) if e.total else 0 }}%"></span>
+      </span>
+      <span class="font-mono">{{ e.faits }}/{{ e.total }}</span>
+    </div>
+    {% endfor %}
+  </aside>
+</div>
+{% if oob %}{% include "_lot_entete.html" %}{% endif %}

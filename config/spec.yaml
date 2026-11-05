@@ -1,0 +1,35 @@
+# Vocabulaires utilisés par le chargement et le vérificateur de la spécification
+# (SPEC §8). Aucune règle UNIMARC ici : seulement les conventions de lecture
+# des tables Grist.
+
+# Tables attendues (fichier spec/<table>.csv ou table Grist du même nom).
+tables: [Regles, Sources, Situations, Statuts_services, Profils]
+
+# Valeurs admises de la colonne `cardinalité` de Sources.
+cardinalites: ["1", "n"]
+
+# Sources dont chaque élément est une personne ou un organisme : leurs
+# variables d'élément sont disponibles dans les gabarits (SPEC §8).
+sources_personnes: [author, advisor, jury_president, reviewers, committee_members]
+sources_organismes: [granting_institution, co_tutelle_institutions, doctoral_school, partner_institutions]
+variables_element: [ppn, nom, prenom, forme]
+
+# Valeur de `mode_production` pour une règle ignorée par le générateur.
+mode_non_genere: "Non généré"
+
+# Type de source calculée (une source calculée doit être utilisée par une règle).
+type_source_calcul: calcul
+
+# Séparateurs de cellules.
+separateur_liste: ","          # profils, sources
+separateur_alternatives: "|"   # Situations : « a | b » = a ou b
+separateur_plage: "->"         # Regles.zone : « 600->607 » = étiquettes 600 à 607
+
+# Routages admis (Situations, Statuts_services).
+routages: [auto, décision, sortie, incident]
+
+# Services dont le routage ne vient pas de Statuts_services (SPEC §7) :
+# seuls les statuts listés ici y sont lus.
+services_routage_par_etats:
+  alma-checker: [error]
+  sudoc-checker: [error]

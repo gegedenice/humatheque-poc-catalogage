@@ -1,0 +1,50 @@
+# Moteur de décision (SPEC §7). Les situations et les routages sont dans
+# Situations et Statuts_services ; ce fichier dit seulement comment les lire.
+
+# Lecture de la colonne `action` de Situations.
+actions:
+  creer: [Créer]            # on continue vers IdRef, Dewey, générateur
+  arreter: [Arrêt]          # arrêt sans conversion, routage de la table
+  prefixe_conversion: Dériver   # conversion de la notice Sudoc puis arrêt
+
+# Routage imposé à une action de conversion, quel que soit celui de la table.
+routage_conversion: conversion
+
+# Situation sans ligne correspondante.
+non_prevue:
+  routage: décision
+  motif: situation non prévue
+
+# Sévérité décroissante : routage final du dossier = le plus sévère de ses étapes.
+ordre_routages: [incident, sortie, conversion, décision, auto]
+
+# Routage d'un statut de service absent de Statuts_services.
+statut_inconnu:
+  routage: incident
+  motif: statut de service inconnu
+
+# Services dont un routage « décision » n'arrête pas la génération : on
+# utilise le repli et une exception est créée (SPEC §7).
+decision_non_bloquante:
+  - idref-linker /align/person
+  - idref-linker /align/thesis-organizations
+  - dewey-classifier
+
+# Alertes ajoutées pour un (service, statut).
+alertes_statut:
+  idref-linker /align/person:
+    not_found: proto-notice d'autorité à créer
+  idref-linker /align/thesis-organizations:
+    not_found: proto-notice d'autorité à créer
+
+# Valeur d'etat_sudoc quand sudoc-checker n'est pas appelé (notice trouvée
+# dans Alma : arrêt, S01 correspond par son joker).
+etat_sudoc_non_verifie: non vérifié
+
+# Motifs d'arrêt du workflow (SPEC §3.1, §6).
+motifs:
+  provenance: provenance à confirmer
+  sudoc_indetermine: nature de la notice Sudoc non qualifiable
+  document_invalide: document invalide
+  titre_absent: titre non extrait
+  seuil_sudoc: SUDOC_DUPLICATE_THRESHOLD non configuré

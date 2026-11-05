@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titre %}Erreur{% endblock %}
+{% block contenu %}
+<div class="carte max-w-xl border-l-4 border-l-sortie">
+  <h1 class="mb-2">Action impossible</h1>
+  <p class="text-sm">{{ message }}</p>
+  <p class="mt-4"><a class="btn-discret btn-sm" href="javascript:history.back()">← Revenir</a></p>
+</div>
+{% endblock %}

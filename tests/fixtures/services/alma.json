@@ -1,0 +1,616 @@
+{
+    "source": "alma_sru_academic_check",
+    "profile": {
+        "name": "thesis",
+        "description": "Doctoral thesis records: UNIMARC 328 mentions a thesis or doctorate, or the record only carries the 608 'Thèses et écrits académiques' subject.",
+        "accepted_kinds": [
+            "thesis",
+            "academic_subject_only"
+        ]
+    },
+    "query": {
+        "title": "La question de l'hygiène aux Indes-Néerlandaises",
+        "subtitle": "Les enjeux médicaux, culturels et sociaux",
+        "author": "Gani Achmad JAE LANI",
+        "degree_type": "Thèse de doctorat",
+        "discipline": "Histoire et civilisations",
+        "granting_institution": "École des Hautes Études en Sciences Sociales",
+        "doctoral_school": "École doctorale de l'EHESS",
+        "defense_year": 2017,
+        "volume": "",
+        "advisor": [
+            "Gérard JORLAND"
+        ],
+        "language": "fre"
+    },
+    "sru": {
+        "endpoint": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST",
+        "version": "1.2",
+        "record_schema": "unimarcxml",
+        "indexes": [
+            "alma.title",
+            "alma.creator",
+            "alma.all_for_ui"
+        ],
+        "queries": [
+            {
+                "query": "alma.title all \"hygiene indes neerlandaises enjeux medicaux culturels sociaux\" and alma.creator all \"gani lani\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.title+all+%22hygiene+indes+neerlandaises+enjeux+medicaux+culturels+sociaux%22+and+alma.creator+all+%22gani+lani%22",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "alma.title all \"hygiene indes neerlandaises\" and alma.creator all \"gani lani\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.title+all+%22hygiene+indes+neerlandaises%22+and+alma.creator+all+%22gani+lani%22",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "alma.title all \"hygiene indes neerlandaises enjeux medicaux culturels sociaux\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.title+all+%22hygiene+indes+neerlandaises+enjeux+medicaux+culturels+sociaux%22",
+                "total_found": 1,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "alma.title all \"enjeux medicaux culturels sociaux\" and alma.creator all \"gani lani\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.title+all+%22enjeux+medicaux+culturels+sociaux%22+and+alma.creator+all+%22gani+lani%22",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "alma.title all \"hygiene indes neerlandaises\" and alma.all_for_ui all \"histoire civilisations ecole hautes etudes sciences\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.title+all+%22hygiene+indes+neerlandaises%22+and+alma.all_for_ui+all+%22histoire+civilisations+ecole+hautes+etudes+sciences%22",
+                "total_found": 1,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "alma.creator all \"gani lani\" and alma.all_for_ui all \"hygiene indes neerlandaises\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.creator+all+%22gani+lani%22+and+alma.all_for_ui+all+%22hygiene+indes+neerlandaises%22",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            },
+            {
+                "query": "alma.all_for_ui all \"hygiene indes neerlandaises gani lani\"",
+                "url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=10&query=alma.all_for_ui+all+%22hygiene+indes+neerlandaises+gani+lani%22",
+                "total_found": 0,
+                "error": null,
+                "diagnostics": []
+            }
+        ],
+        "off_profile_candidates": 0
+    },
+    "score_weights": {
+        "title": 0.4,
+        "author": 0.24,
+        "academic": 0.22,
+        "year": 0.06,
+        "language": 0.04,
+        "context_or_advisor": 0.04
+    },
+    "status": "academic_record_found",
+    "match_score": 0.9486,
+    "decision_support": {
+        "best_candidate_ppn": "229969437",
+        "best_candidate_has_ppn": true,
+        "academic_candidates_with_ppn": 1,
+        "academic_candidates_without_ppn": 0,
+        "ppns": [
+            {
+                "ppn": "229969437",
+                "mms_id": "991008823604905786",
+                "sudoc_url": "https://www.sudoc.fr/229969437",
+                "ppn_source": "035$a (PPN) prefix",
+                "score": 0.9486,
+                "academic_kind": "thesis",
+                "items_count": 2
+            }
+        ]
+    },
+    "best_academic_candidate": {
+        "source": "alma",
+        "mms_id": "991008823604905786",
+        "ppn": "229969437",
+        "ppn_source": "035$a (PPN) prefix",
+        "has_ppn": true,
+        "sudoc_url": "https://www.sudoc.fr/229969437",
+        "alma_url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=1&query=rec.id%3D991008823604905786",
+        "title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+        "authors": [
+            "Gani Jaelani"
+        ],
+        "contributors": [
+            {
+                "name": "Gérard Jorland",
+                "role": "727"
+            },
+            {
+                "name": "Patrice Bourdelais",
+                "role": "956"
+            },
+            {
+                "name": "Romain Bertrand",
+                "role": "555"
+            },
+            {
+                "name": "Charles Illouz",
+                "role": "555"
+            },
+            {
+                "name": "Annick Opinel",
+                "role": "555"
+            },
+            {
+                "name": "Patrick Zylberman",
+                "role": "555"
+            },
+            {
+                "name": "Gérard Jorland",
+                "role": "727"
+            },
+            {
+                "name": "Patrice Bourdelais",
+                "role": "956"
+            },
+            {
+                "name": "Romain Bertrand",
+                "role": "555"
+            },
+            {
+                "name": "Charles Illouz",
+                "role": "555"
+            },
+            {
+                "name": "Annick Opinel",
+                "role": "555"
+            },
+            {
+                "name": "Patrick Zylberman",
+                "role": "555"
+            }
+        ],
+        "institutions": [
+            "École des hautes études en sciences sociales",
+            "École doctorale de l'École des hautes études en sciences sociales",
+            "École des hautes études en sciences sociales",
+            "École doctorale de l'École des hautes études en sciences sociales"
+        ],
+        "year": "2017",
+        "language": "fre",
+        "thesis": {
+            "type": "Thèse de doctorat",
+            "discipline": "Histoire et civilisations",
+            "institution": "Paris, EHESS",
+            "year": "2017",
+            "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+        },
+        "subjects": [
+            "Santé publique",
+            "Santé publique",
+            "Anthropologie médicale",
+            "Anthropologie médicale",
+            "Colonies",
+            "Thèses et écrits académiques"
+        ],
+        "academic": {
+            "is_academic": true,
+            "kind": "thesis",
+            "confidence": 1.0,
+            "evidence": [
+                "328$b: Thèse de doctorat",
+                "608$a: Thèses et écrits académiques"
+            ],
+            "has_thesis_note": true,
+            "has_academic_subject": true
+        },
+        "counts_for_profile": true,
+        "items": [
+            {
+                "field": "930",
+                "library": "751132310",
+                "call_number": null,
+                "location": null,
+                "status": "g",
+                "item_id": "751132310:880966823",
+                "raw": {
+                    "5": "751132310:880966823",
+                    "b": "751132310",
+                    "j": "g"
+                }
+            },
+            {
+                "field": "995",
+                "library": "EHESS-TH",
+                "institution": "EHESS",
+                "location": null,
+                "call_number": null,
+                "barcode": "EHESS-TH_00115344",
+                "document_type": "THESE",
+                "note": null,
+                "raw": {
+                    "1": "0",
+                    "2": "0",
+                    "3": "0",
+                    "5": "2019-03-22",
+                    "9": "128200",
+                    "B": "EHESS",
+                    "C": "EHESS-TH",
+                    "F": "EHESS-TH_00115344",
+                    "R": "THESE",
+                    "W": "exemplaire créé automatiquement par STAR",
+                    "b": "CONDORCET",
+                    "c": "EHESS-TH",
+                    "e": "LA",
+                    "f": "EHESS-TH_00115344",
+                    "k": "A11 616 469",
+                    "o": "0",
+                    "r": "TU",
+                    "s": "A_11_616000000000000_469",
+                    "y": "2019-03-22"
+                }
+            }
+        ],
+        "items_count": 2,
+        "has_items": true,
+        "item_fields_present": [
+            "930",
+            "995"
+        ],
+        "urls": [
+            "http://www.theses.fr/2017EHES0033/document",
+            "http://www.theses.fr/2017EHES0033/abes"
+        ],
+        "identifiers": [
+            "10.70675/e9536598z8b3cz4519z80d7z9452ab6ffe0b",
+            "(PPN)229969437",
+            "STAR89372",
+            "(http://www.sudoc.fr/229969437)229969437"
+        ],
+        "score": {
+            "final": 0.9486,
+            "bibliographic": 0.9341,
+            "title": 1.0,
+            "author": 0.7857,
+            "academic": 1.0,
+            "year": 1.0,
+            "language": 1.0,
+            "context": 0.277,
+            "advisor": 1.0
+        },
+        "evidence": {
+            "record_title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+            "authors": [
+                "Gani Jaelani"
+            ],
+            "contributors": [
+                {
+                    "name": "Gérard Jorland",
+                    "role": "727"
+                },
+                {
+                    "name": "Patrice Bourdelais",
+                    "role": "956"
+                },
+                {
+                    "name": "Romain Bertrand",
+                    "role": "555"
+                },
+                {
+                    "name": "Charles Illouz",
+                    "role": "555"
+                },
+                {
+                    "name": "Annick Opinel",
+                    "role": "555"
+                },
+                {
+                    "name": "Patrick Zylberman",
+                    "role": "555"
+                },
+                {
+                    "name": "Gérard Jorland",
+                    "role": "727"
+                },
+                {
+                    "name": "Patrice Bourdelais",
+                    "role": "956"
+                },
+                {
+                    "name": "Romain Bertrand",
+                    "role": "555"
+                },
+                {
+                    "name": "Charles Illouz",
+                    "role": "555"
+                },
+                {
+                    "name": "Annick Opinel",
+                    "role": "555"
+                },
+                {
+                    "name": "Patrick Zylberman",
+                    "role": "555"
+                }
+            ],
+            "institutions": [
+                "École des hautes études en sciences sociales",
+                "École doctorale de l'École des hautes études en sciences sociales",
+                "École des hautes études en sciences sociales",
+                "École doctorale de l'École des hautes études en sciences sociales"
+            ],
+            "thesis": {
+                "type": "Thèse de doctorat",
+                "discipline": "Histoire et civilisations",
+                "institution": "Paris, EHESS",
+                "year": "2017",
+                "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+            },
+            "academic_evidence": [
+                "328$b: Thèse de doctorat",
+                "608$a: Thèses et écrits académiques"
+            ],
+            "ppn_source": "035$a (PPN) prefix",
+            "matched_queries": [
+                "alma.title all \"hygiene indes neerlandaises enjeux medicaux culturels sociaux\"",
+                "alma.title all \"hygiene indes neerlandaises\" and alma.all_for_ui all \"histoire civilisations ecole hautes etudes sciences\""
+            ]
+        }
+    },
+    "best_off_profile_candidate": null,
+    "candidates": [
+        {
+            "source": "alma",
+            "mms_id": "991008823604905786",
+            "ppn": "229969437",
+            "ppn_source": "035$a (PPN) prefix",
+            "has_ppn": true,
+            "sudoc_url": "https://www.sudoc.fr/229969437",
+            "alma_url": "https://eu.alma.exlibrisgroup.com/view/sru/33CCP_INST?version=1.2&operation=searchRetrieve&recordSchema=unimarcxml&startRecord=1&maximumRecords=1&query=rec.id%3D991008823604905786",
+            "title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+            "authors": [
+                "Gani Jaelani"
+            ],
+            "contributors": [
+                {
+                    "name": "Gérard Jorland",
+                    "role": "727"
+                },
+                {
+                    "name": "Patrice Bourdelais",
+                    "role": "956"
+                },
+                {
+                    "name": "Romain Bertrand",
+                    "role": "555"
+                },
+                {
+                    "name": "Charles Illouz",
+                    "role": "555"
+                },
+                {
+                    "name": "Annick Opinel",
+                    "role": "555"
+                },
+                {
+                    "name": "Patrick Zylberman",
+                    "role": "555"
+                },
+                {
+                    "name": "Gérard Jorland",
+                    "role": "727"
+                },
+                {
+                    "name": "Patrice Bourdelais",
+                    "role": "956"
+                },
+                {
+                    "name": "Romain Bertrand",
+                    "role": "555"
+                },
+                {
+                    "name": "Charles Illouz",
+                    "role": "555"
+                },
+                {
+                    "name": "Annick Opinel",
+                    "role": "555"
+                },
+                {
+                    "name": "Patrick Zylberman",
+                    "role": "555"
+                }
+            ],
+            "institutions": [
+                "École des hautes études en sciences sociales",
+                "École doctorale de l'École des hautes études en sciences sociales",
+                "École des hautes études en sciences sociales",
+                "École doctorale de l'École des hautes études en sciences sociales"
+            ],
+            "year": "2017",
+            "language": "fre",
+            "thesis": {
+                "type": "Thèse de doctorat",
+                "discipline": "Histoire et civilisations",
+                "institution": "Paris, EHESS",
+                "year": "2017",
+                "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+            },
+            "subjects": [
+                "Santé publique",
+                "Santé publique",
+                "Anthropologie médicale",
+                "Anthropologie médicale",
+                "Colonies",
+                "Thèses et écrits académiques"
+            ],
+            "academic": {
+                "is_academic": true,
+                "kind": "thesis",
+                "confidence": 1.0,
+                "evidence": [
+                    "328$b: Thèse de doctorat",
+                    "608$a: Thèses et écrits académiques"
+                ],
+                "has_thesis_note": true,
+                "has_academic_subject": true
+            },
+            "counts_for_profile": true,
+            "items": [
+                {
+                    "field": "930",
+                    "library": "751132310",
+                    "call_number": null,
+                    "location": null,
+                    "status": "g",
+                    "item_id": "751132310:880966823",
+                    "raw": {
+                        "5": "751132310:880966823",
+                        "b": "751132310",
+                        "j": "g"
+                    }
+                },
+                {
+                    "field": "995",
+                    "library": "EHESS-TH",
+                    "institution": "EHESS",
+                    "location": null,
+                    "call_number": null,
+                    "barcode": "EHESS-TH_00115344",
+                    "document_type": "THESE",
+                    "note": null,
+                    "raw": {
+                        "1": "0",
+                        "2": "0",
+                        "3": "0",
+                        "5": "2019-03-22",
+                        "9": "128200",
+                        "B": "EHESS",
+                        "C": "EHESS-TH",
+                        "F": "EHESS-TH_00115344",
+                        "R": "THESE",
+                        "W": "exemplaire créé automatiquement par STAR",
+                        "b": "CONDORCET",
+                        "c": "EHESS-TH",
+                        "e": "LA",
+                        "f": "EHESS-TH_00115344",
+                        "k": "A11 616 469",
+                        "o": "0",
+                        "r": "TU",
+                        "s": "A_11_616000000000000_469",
+                        "y": "2019-03-22"
+                    }
+                }
+            ],
+            "items_count": 2,
+            "has_items": true,
+            "item_fields_present": [
+                "930",
+                "995"
+            ],
+            "urls": [
+                "http://www.theses.fr/2017EHES0033/document",
+                "http://www.theses.fr/2017EHES0033/abes"
+            ],
+            "identifiers": [
+                "10.70675/e9536598z8b3cz4519z80d7z9452ab6ffe0b",
+                "(PPN)229969437",
+                "STAR89372",
+                "(http://www.sudoc.fr/229969437)229969437"
+            ],
+            "score": {
+                "final": 0.9486,
+                "bibliographic": 0.9341,
+                "title": 1.0,
+                "author": 0.7857,
+                "academic": 1.0,
+                "year": 1.0,
+                "language": 1.0,
+                "context": 0.277,
+                "advisor": 1.0
+            },
+            "evidence": {
+                "record_title": "La question de l'hygiène aux Indes-Néerlandaises : les enjeux médicaux,culturels et sociaux",
+                "authors": [
+                    "Gani Jaelani"
+                ],
+                "contributors": [
+                    {
+                        "name": "Gérard Jorland",
+                        "role": "727"
+                    },
+                    {
+                        "name": "Patrice Bourdelais",
+                        "role": "956"
+                    },
+                    {
+                        "name": "Romain Bertrand",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Charles Illouz",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Annick Opinel",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Patrick Zylberman",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Gérard Jorland",
+                        "role": "727"
+                    },
+                    {
+                        "name": "Patrice Bourdelais",
+                        "role": "956"
+                    },
+                    {
+                        "name": "Romain Bertrand",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Charles Illouz",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Annick Opinel",
+                        "role": "555"
+                    },
+                    {
+                        "name": "Patrick Zylberman",
+                        "role": "555"
+                    }
+                ],
+                "institutions": [
+                    "École des hautes études en sciences sociales",
+                    "École doctorale de l'École des hautes études en sciences sociales",
+                    "École des hautes études en sciences sociales",
+                    "École doctorale de l'École des hautes études en sciences sociales"
+                ],
+                "thesis": {
+                    "type": "Thèse de doctorat",
+                    "discipline": "Histoire et civilisations",
+                    "institution": "Paris, EHESS",
+                    "year": "2017",
+                    "raw": "Thèse de doctorat ; Histoire et civilisations ; Paris, EHESS ; 2017"
+                },
+                "academic_evidence": [
+                    "328$b: Thèse de doctorat",
+                    "608$a: Thèses et écrits académiques"
+                ],
+                "ppn_source": "035$a (PPN) prefix",
+                "matched_queries": [
+                    "alma.title all \"hygiene indes neerlandaises enjeux medicaux culturels sociaux\"",
+                    "alma.title all \"hygiene indes neerlandaises\" and alma.all_for_ui all \"histoire civilisations ecole hautes etudes sciences\""
+                ]
+            }
+        }
+    ]
+}

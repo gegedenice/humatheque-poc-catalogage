@@ -1,0 +1,191 @@
+{% from "_composants.html" import badge, vide, en_cours, statut_etape, lien_ppn, json %}
+{% set d = vue.dossier %}
+<div id="panneau-dossier" class="space-y-4 min-w-0"
+     {% if vue.etat != "termine" %}hx-get="/dossiers/{{ d.id }}/fragment" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+
+  {# ---------------------------------------------------------------- en-tête #}
+  <section class="carte {% if d.routage and d.routage != 'auto' %}border-l-4 border-l-{{ classe_routage(d.routage) }}{% endif %}">
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <div class="min-w-0">
+        <h1 class="break-words">{{ vue.titre or d.document.id }}</h1>
+        <p class="text-xs text-sourdine mt-1 font-mono break-all">{{ d.document.id }} · {{ "thèse" if d.document.type_document == "these" else "mémoire" }}</p>
+      </div>
+      <div class="text-right">
+        {% if vue.etat != "termine" %}{{ en_cours("traitement en cours") }}{% else %}{{ badge(d.routage or "auto") }}{% endif %}
+      </div>
+    </div>
+    <dl class="text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 mt-3">
+      <dt class="text-sourdine">Traité le</dt><dd>{{ d.cree_le | date("%d/%m/%Y %H:%M") }}</dd>
+      <dt class="text-sourdine">Modèle</dt><dd class="font-mono">{{ d.fournisseur_vlm or "—" }}</dd>
+      <dt class="text-sourdine">Spécification</dt><dd class="font-mono">{{ d.version_spec or "—" }}</dd>
+      {% if d.extraction %}<dt class="text-sourdine">Prompt</dt><dd class="font-mono">{{ d.extraction.prompt.nom }} · {{ d.extraction.prompt.empreinte }} · {{ d.extraction.strategie }}</dd>{% endif %}
+    </dl>
+    {% if d.motif_arret %}
+    <p class="mt-3 text-sm sous-carte"><span class="font-semibold">Arrêt</span>
+      {% if d.etape_arret %}<span class="text-sourdine">({{ d.etape_arret }})</span>{% endif %} : {{ d.motif_arret }}</p>
+    {% endif %}
+    {% if d.cloture %}
+    <p class="mt-3 text-sm text-auto">✓ Traité hors outil par {{ d.cloture.par }} le {{ d.cloture.le | date }} : {{ d.cloture.commentaire }}</p>
+    {% endif %}
+    <div class="flex flex-wrap gap-2 mt-3">
+      <a class="btn-discret btn-sm" href="/lots/{{ vue.lot_id }}">← Lot</a>
+      {% if vue.etat == "termine" %}
+      <form method="post" action="/dossiers/{{ d.id }}/relancer"><button class="btn btn-sm">Relancer</button></form>
+      <form method="post" action="/dossiers/{{ d.id }}/relancer"><input type="hidden" name="depuis" value="extraction">
+        <button class="btn-discret btn-sm" title="Rappelle le VLM puis toutes les étapes">Relancer l'extraction</button></form>
+      {% endif %}
+      {% for libelle, fichier in vue.telechargements.items() %}
+      <a class="btn-discret btn-sm" hx-boost="false" href="/dossiers/{{ d.id }}/telecharger/{{ fichier }}">{{ libelle }}</a>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ---------------------------------------------------------------- résolution #}
+  {% if vue.etat == "termine" %}{% include "_dossier_resolutions.html" %}{% endif %}
+
+  {# ---------------------------------------------------------------- frise #}
+  <section class="carte">
+    <h2>Étapes</h2>
+    <ol class="grid gap-1.5 sm:grid-cols-2">
+      {% for e in vue.etapes %}
+      <li class="flex items-start gap-2 text-xs">
+        <span class="mt-0.5">{{ statut_etape(e.statut) }}</span>
+        <span><span class="font-semibold">{{ e.libelle }}</span>
+          <span class="text-sourdine">· {{ e.statut }}{% if e.duree is not none %} · {{ "%.1f" | format(e.duree) }} s{% endif %}{% if e.tentatives > 1 %} · {{ e.tentatives }} tentatives{% endif %}</span>
+          {% if e.motif and e.statut not in ("ok",) %}<br><span class="text-sourdine">{{ e.motif }}</span>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {# ---------------------------------------------------------------- notice #}
+  {% if d.notice %}
+  <section class="carte">
+    <h2>Notice générée, annotée par règle <span class="text-xs font-normal text-sourdine">profil {{ d.notice.profil }}</span></h2>
+    <div class="defilant"><table class="tableau">
+      <tbody>
+      {% for z in d.notice.zones_triees() %}
+        <tr>
+          <td class="font-mono text-xs break-words min-w-[14rem]">{{ z.texte() }}</td>
+          <td class="text-[11px] text-sourdine w-36">
+            {% for r in z.regles %}<span title="statut {{ r.statut }}">{{ r.id }}{% if r.statut != "seed" %}·{{ r.statut }}{% endif %}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+            {% if z.libelle %}<br>{{ z.libelle }}{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if d.notice.non_couvertes %}
+    <p class="text-xs text-sourdine mt-2">Non couvertes (« Non généré ») : {{ d.notice.non_couvertes | map(attribute="regle") | join(", ") }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if d.notice_convertie %}
+  <section class="carte">
+    <h2>Conversion de la notice Sudoc {{ lien_ppn(d.ppn_source) }}</h2>
+    <p class="text-xs text-sourdine mb-2">Profil cible {{ d.notice_convertie.profil_cible }} · v1 : la notice convertie est une copie de la source.</p>
+    <h3 class="text-xs font-semibold mb-1">Notice source</h3>
+    <pre class="code max-h-72">{{ d.notice_source }}</pre>
+    <h3 class="text-xs font-semibold mt-3 mb-1">Notice produite par la conversion</h3>
+    <pre class="code max-h-72">{{ d.notice_convertie.texte }}</pre>
+  </section>
+  {% endif %}
+
+  {# ---------------------------------------------------------------- métadonnées #}
+  <section class="carte">
+    <h2>Métadonnées</h2>
+    {% if vue.champs %}
+    <div class="defilant"><table class="tableau">
+      <thead><tr><th>Champ</th><th>Extrait (brut)</th><th>Contexte (normalisé)</th></tr></thead>
+      <tbody>
+      {% for c in vue.champs %}
+        {% if c.brut not in (none, "", []) or c.normalise not in (none, "", []) %}
+        <tr>
+          <td class="font-mono text-xs">{{ c.champ }}</td>
+          <td class="text-xs break-words">{{ c.brut if c.brut is string else (c.brut | tojson) }}</td>
+          <td class="text-xs break-words">
+            {% if c.normalise is string %}{{ c.normalise }}
+            {% elif c.normalise is mapping %}{{ c.normalise.forme }}{% if c.normalise.ppn %} · {{ lien_ppn(c.normalise.ppn, "https://www.idref.fr/") }}{% endif %}
+            {% elif c.normalise is iterable %}{% for e in c.normalise %}{% if e is mapping %}{{ e.nom or e.forme }}{% if e.prenom %}, {{ e.prenom }}{% endif %}{% if e.ppn %} · {{ lien_ppn(e.ppn, "https://www.idref.fr/") }}{% endif %}{% else %}{{ e }}{% endif %}{% if not loop.last %} ; {% endif %}{% endfor %}
+            {% else %}{{ c.normalise if c.normalise is not none else "" }}{% endif %}
+          </td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}{{ vide("Pas encore de métadonnées.") }}{% endif %}
+    {% if d.extraction %}
+    <details class="mt-3"><summary class="cursor-pointer text-sm text-sourdine">Sortie brute du modèle</summary>
+      {% for b in d.extraction.bruts %}<pre class="code mt-2 max-h-72">{{ b }}</pre>{% endfor %}</details>
+    {% endif %}
+    {% if d.contexte %}
+    <details class="mt-2"><summary class="cursor-pointer text-sm text-sourdine">Transformations du module NOR ({{ d.contexte.transformations | length }})</summary>
+      <div class="defilant"><table class="tableau mt-2"><tbody>
+      {% for t in d.contexte.transformations %}{% if t.avant != t.apres %}
+        <tr><td class="font-mono text-[11px]">{{ t.champ }}<br><span class="text-sourdine">{{ t.fonction }}</span></td>
+            <td class="text-xs"><del class="text-sourdine">{{ t.avant }}</del><br>{{ t.apres if t.apres is string else (t.apres | tojson) }}
+              {% if t.alertes %}<br><span class="text-decision">{{ t.alertes | join(", ") }}</span>{% endif %}</td></tr>
+      {% endif %}{% endfor %}
+      </tbody></table></div>
+      <details class="mt-2"><summary class="cursor-pointer text-xs text-sourdine">Contexte complet</summary>{{ json(d.contexte.valeurs) }}</details>
+    </details>
+    {% endif %}
+  </section>
+
+  {# ---------------------------------------------------------------- décision #}
+  {% if d.provenance or d.decision %}
+  <section class="carte">
+    <h2>Provenance et situation</h2>
+    {% if d.provenance %}
+    <p class="text-sm">Provenance <span class="font-semibold">{{ d.provenance.valeur }}</span>
+      <span class="text-xs text-sourdine">— règle {{ d.provenance.regle }}, forme comparée « {{ d.provenance.forme_comparee }} »{% if d.provenance.forme_reconnue %}, forme reconnue « {{ d.provenance.forme_reconnue }} »{% endif %}</span></p>
+    {% endif %}
+    {% if d.decision %}
+    <p class="text-sm mt-2">Clé <span class="font-mono text-xs">({{ d.decision.cle.etat_alma }}, {{ d.decision.cle.etat_sudoc }}, {{ d.decision.cle.provenance }})</span>
+      → <span class="font-semibold">{{ d.decision.situation or "situation non prévue" }}</span> {{ badge(d.decision.routage) }}</p>
+    {% if d.decision.ligne %}
+    <div class="defilant"><table class="tableau mt-2"><thead><tr>{% for k in d.decision.ligne %}<th>{{ k }}</th>{% endfor %}</tr></thead>
+      <tbody><tr>{% for v in d.decision.ligne.values() %}<td class="text-xs">{{ v }}</td>{% endfor %}</tr></tbody></table></div>
+    {% endif %}
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {# ---------------------------------------------------------------- candidats #}
+  {% include "_dossier_candidats.html" %}
+
+  {# ---------------------------------------------------------------- alertes, réponses brutes, journal #}
+  <section class="carte">
+    <h2>Alertes</h2>
+    {% if d.alertes %}
+    <ul class="flex flex-wrap gap-1.5">{% for a in d.alertes %}<li class="pastille text-decision">{{ a }}</li>{% endfor %}</ul>
+    {% else %}{{ vide("Aucune alerte.") }}{% endif %}
+  </section>
+
+  <section class="carte">
+    <h2>Réponses brutes des services</h2>
+    {% set avec_appels = d.etapes.values() | selectattr("appels") | list %}
+    {% for e in avec_appels %}
+    <details class="mt-1"><summary class="cursor-pointer text-sm">{{ e.nom }} <span class="text-xs text-sourdine">· {{ e.appels | length }} appel(s)</span></summary>
+      {% for a in e.appels %}
+      <p class="text-xs font-mono mt-2 break-all">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "—" }} · {{ a.duree }} s{% if a.erreur %} · <span class="text-sortie">{{ a.erreur }}</span>{% endif %}</p>
+      <details><summary class="cursor-pointer text-xs text-sourdine">requête</summary>{{ json(a.requete) }}</details>
+      <details><summary class="cursor-pointer text-xs text-sourdine">réponse</summary>{{ json(a.reponse) }}</details>
+      {% endfor %}
+    </details>
+    {% else %}{{ vide("Aucun appel pour l'instant.") }}{% endfor %}
+  </section>
+
+  <section class="carte">
+    <details><summary class="cursor-pointer font-semibold text-[15px]">Journal du dossier ({{ d.journal | length }})</summary>
+      <div class="mt-2">
+      {% for e in d.journal %}
+        <div class="ligne-journal"><span class="text-encre">{{ e.horodatage | date("%H:%M:%S") }}</span>
+          <span><span class="text-encre">{{ e.etape }} · {{ e.type }}</span>{% if e.auteur != "système" %} · {{ e.auteur }}{% endif %} — {{ e.detail if e.detail is string else (e.detail | tojson) }}</span></div>
+      {% endfor %}
+      </div>
+    </details>
+  </section>
+</div>

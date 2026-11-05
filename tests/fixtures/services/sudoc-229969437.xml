@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record>
+<controlfield tag="005">20260402140924.000</controlfield>
+<leader>     clm0 22        450 </leader>
+<controlfield tag="001">229969437</controlfield>
+<controlfield tag="003">http://www.sudoc.fr/229969437</controlfield>
+<datafield tag="035" ind1=" " ind2=" "><subfield code="a">(OCoLC)1582502304</subfield></datafield>
+<datafield tag="017" ind1="7" ind2="0"><subfield code="a">10.70675/e9536598z8b3cz4519z80d7z9452ab6ffe0b</subfield>
+<subfield code="2">DOI</subfield></datafield>
+<datafield tag="029" ind1=" " ind2=" "><subfield code="a">FR</subfield>
+<subfield code="b">2017EHES0033</subfield></datafield>
+<datafield tag="035" ind1=" " ind2=" "><subfield code="a">STAR89372</subfield></datafield>
+<datafield tag="856" ind1="4" ind2=" "><subfield code="q">PDF</subfield>
+<subfield code="s">3274070</subfield>
+<subfield code="u">http://www.theses.fr/2017EHES0033/document</subfield>
+<subfield code="z">Accès au texte intégral</subfield></datafield>
+<datafield tag="856" ind1="4" ind2=" "><subfield code="u">http://www.theses.fr/2017EHES0033/abes</subfield></datafield>
+<datafield tag="033" ind1=" " ind2=" "><subfield code="a">http://www.theses.fr/2017EHES0033</subfield></datafield>
+<datafield tag="100" ind1=" " ind2=" "><subfield code="a">20180907d2017    k  y0frey50      ba</subfield></datafield>
+<datafield tag="101" ind1="0" ind2=" "><subfield code="a">fre</subfield>
+<subfield code="d">fre</subfield>
+<subfield code="d">eng</subfield>
+<subfield code="d">ind</subfield>
+<subfield code="2">639-2</subfield></datafield>
+<datafield tag="105" ind1=" " ind2=" "><subfield code="a">y   ma  00|yy</subfield></datafield>
+<datafield tag="135" ind1=" " ind2=" "><subfield code="a">dr|||||||||||</subfield></datafield>
+<datafield tag="181" ind1=" " ind2=" "><subfield code="6">z01</subfield>
+<subfield code="c">txt</subfield>
+<subfield code="2">rdacontent</subfield></datafield>
+<datafield tag="181" ind1=" " ind2="1"><subfield code="6">z01</subfield>
+<subfield code="a">i#</subfield>
+<subfield code="b">xxxe##</subfield></datafield>
+<datafield tag="182" ind1=" " ind2=" "><subfield code="6">z01</subfield>
+<subfield code="c">c</subfield>
+<subfield code="2">rdamedia</subfield></datafield>
+<datafield tag="182" ind1=" " ind2="1"><subfield code="6">z01</subfield>
+<subfield code="a">b</subfield></datafield>
+<datafield tag="183" ind1=" " ind2="1"><subfield code="6">z01</subfield>
+<subfield code="a">ceb</subfield>
+<subfield code="2">RDAfrCarrier</subfield></datafield>
+<datafield tag="102" ind1=" " ind2=" "><subfield code="a">FR</subfield></datafield>
+<datafield tag="328" ind1=" " ind2="0"><subfield code="b">Thèse de doctorat</subfield>
+<subfield code="c">Histoire et civilisations</subfield>
+<subfield code="e">Paris, EHESS</subfield>
+<subfield code="d">2017</subfield></datafield>
+<datafield tag="200" ind1="1" ind2=" "><subfield code="a">La question de l'hygiène aux Indes-Néerlandaises</subfield>
+<subfield code="e">les enjeux médicaux,culturels et sociaux.</subfield>
+<subfield code="f">Gani Jaelani</subfield>
+<subfield code="g">sous la direction de Gérard Jorland</subfield></datafield>
+<datafield tag="541" ind1="|" ind2=" "><subfield code="a">The question of hygiene in the Dutch Indies</subfield>
+<subfield code="z">eng</subfield></datafield>
+<datafield tag="541" ind1="|" ind2=" "><subfield code="a">Persoalan higienitas di HIndia-Belanda ditinjau dari aspek medis, kebudayaan dan sosial</subfield>
+<subfield code="z">ind</subfield></datafield>
+<datafield tag="700" ind1=" " ind2="1"><subfield code="3">229967639</subfield>
+<subfield code="a">Jaelani</subfield>
+<subfield code="b">Gani</subfield>
+<subfield code="f">1983-....</subfield>
+<subfield code="4">070</subfield></datafield>
+<datafield tag="701" ind1=" " ind2="1"><subfield code="3">026940345</subfield>
+<subfield code="a">Jorland</subfield>
+<subfield code="b">Gérard</subfield>
+<subfield code="f">1946-2018</subfield>
+<subfield code="c">philosophe</subfield>
+<subfield code="4">727</subfield></datafield>
+<datafield tag="701" ind1=" " ind2="1"><subfield code="3">029291542</subfield>
+<subfield code="a">Bourdelais</subfield>
+<subfield code="b">Patrice</subfield>
+<subfield code="f">1949-....</subfield>
+<subfield code="4">956</subfield></datafield>
+<datafield tag="701" ind1=" " ind2="1"><subfield code="3">06993455X</subfield>
+<subfield code="a">Bertrand</subfield>
+<subfield code="b">Romain</subfield>
+<subfield code="f">1974-....</subfield>
+<subfield code="c">historien</subfield>
+<subfield code="4">555</subfield></datafield>
+<datafield tag="701" ind1=" " ind2="1"><subfield code="3">050352423</subfield>
+<subfield code="a">Illouz</subfield>
+<subfield code="b">Charles</subfield>
+<subfield code="f">1952-....</subfield>
+<subfield code="c">anthropologue</subfield>
+<subfield code="4">555</subfield></datafield>
+<datafield tag="701" ind1=" " ind2="1"><subfield code="3">084721251</subfield>
+<subfield code="a">Opinel</subfield>
+<subfield code="b">Annick</subfield>
+<subfield code="f">19..-....</subfield>
+<subfield code="c">historienne</subfield>
+<subfield code="4">555</subfield></datafield>
+<datafield tag="701" ind1=" " ind2="1"><subfield code="3">032482426</subfield>
+<subfield code="a">Zylberman</subfield>
+<subfield code="b">Patrick</subfield>
+<subfield code="f">1948-....</subfield>
+<subfield code="4">555</subfield></datafield>
+<datafield tag="711" ind1="0" ind2="2"><subfield code="3">026374889</subfield>
+<subfield code="a">École des hautes études en sciences sociales</subfield>
+<subfield code="c">Paris</subfield>
+<subfield code="c">1975-....</subfield>
+<subfield code="4">295</subfield></datafield>
+<datafield tag="711" ind1="0" ind2="2"><subfield code="3">167023047</subfield>
+<subfield code="a">École doctorale de l'École des hautes études en sciences sociales</subfield>
+<subfield code="4">996</subfield></datafield>
+<datafield tag="801" ind1=" " ind2="3"><subfield code="a">FR</subfield>
+<subfield code="b">Abes</subfield>
+<subfield code="c">20260402</subfield>
+<subfield code="g">AFNOR</subfield></datafield>
+<datafield tag="214" ind1=" " ind2="1"><subfield code="d">2017</subfield></datafield>
+<datafield tag="230" ind1=" " ind2=" "><subfield code="a">Données textuelles</subfield></datafield>
+<datafield tag="606" ind1=" " ind2=" "><subfield code="3">027248135</subfield>
+<subfield code="a">Santé publique</subfield>
+<subfield code="3">027358305</subfield>
+<subfield code="y">Indonésie</subfield>
+<subfield code="3">027794059</subfield>
+<subfield code="z">XIXe siècle 1801 1900</subfield>
+<subfield code="2">rameau</subfield></datafield>
+<datafield tag="606" ind1=" " ind2=" "><subfield code="3">027248135</subfield>
+<subfield code="a">Santé publique</subfield>
+<subfield code="3">027358305</subfield>
+<subfield code="y">Indonésie</subfield>
+<subfield code="3">086305646</subfield>
+<subfield code="z">XXe siècle 1901 2000</subfield>
+<subfield code="2">rameau</subfield></datafield>
+<datafield tag="606" ind1=" " ind2=" "><subfield code="3">027219372</subfield>
+<subfield code="a">Anthropologie médicale</subfield>
+<subfield code="3">027358305</subfield>
+<subfield code="y">Indonésie</subfield>
+<subfield code="3">086305646</subfield>
+<subfield code="z">XXe siècle 1901 2000</subfield>
+<subfield code="2">rameau</subfield></datafield>
+<datafield tag="606" ind1=" " ind2=" "><subfield code="3">027219372</subfield>
+<subfield code="a">Anthropologie médicale</subfield>
+<subfield code="3">027358305</subfield>
+<subfield code="y">Indonésie</subfield>
+<subfield code="3">027794059</subfield>
+<subfield code="z">XIXe siècle 1801 1900</subfield>
+<subfield code="2">rameau</subfield></datafield>
+<datafield tag="606" ind1=" " ind2=" "><subfield code="3">027493458</subfield>
+<subfield code="a">Colonies</subfield>
+<subfield code="3">027358305</subfield>
+<subfield code="y">Indonésie</subfield>
+<subfield code="2">rameau</subfield></datafield>
+<datafield tag="608" ind1=" " ind2=" "><subfield code="3">027253139</subfield>
+<subfield code="a">Thèses et écrits académiques</subfield>
+<subfield code="2">rameau</subfield></datafield>
+<datafield tag="610" ind1="0" ind2=" "><subfield code="a">Indes-Néerlandaises</subfield></datafield>
+<datafield tag="610" ind1="0" ind2=" "><subfield code="a">Colonialisme</subfield></datafield>
+<datafield tag="610" ind1="0" ind2=" "><subfield code="a">Tropiques</subfield></datafield>
+<datafield tag="610" ind1="0" ind2=" "><subfield code="a">Hygiène</subfield></datafield>
+<datafield tag="610" ind1="0" ind2=" "><subfield code="a">Médecin</subfield></datafield>
+<datafield tag="686" ind1=" " ind2=" "><subfield code="a">900</subfield>
+<subfield code="2">TEF</subfield></datafield>
+<datafield tag="304" ind1=" " ind2=" "><subfield code="a">Titre provenant de l'écran-titre</subfield></datafield>
+<datafield tag="314" ind1=" " ind2=" "><subfield code="a">Ecole(s) Doctorale(s) : École doctorale de l'École des hautes études en sciences sociales</subfield></datafield>
+<datafield tag="314" ind1=" " ind2=" "><subfield code="a">Autre(s) contribution(s) : Patrice Bourdelais (Président du jury) ; Romain Bertrand, Charles Illouz, Annick Opinel, Patrick Zylberman (Membre(s) du jury)</subfield></datafield>
+<datafield tag="337" ind1=" " ind2=" "><subfield code="a">Configuration requise : un logiciel capable de lire un fichier au format : PDF</subfield></datafield>
+<datafield tag="330" ind1=" " ind2=" "><subfield code="a">Cette étude est destinée à la question de l’hygiène aux Indes-Néerlandaises, (Indonésie après l’époque coloniale). Aux périodes étudiées (XIXe-milieu du XXe siècle) ce pays étant administré par les Pays-Bas, cette question sera donc examinée dans son rapport avec le colonialisme. L’hygiène était en effet liée à la politique coloniale qui mettait en avant l’exploitation des ressources naturelles pour l’intérêt économique des colonisateurs. Le médecin joue un rôle important dans la construction de l’impérialisme. D’abord, il assure la santé des Européens – des soldats, des planteurs et des administrateurs coloniaux – sous les tropiques. La santé des Indigènes – qui constituent la main-d’œuvre, et au sein desquels parfois éclate une épidémie qui menace le territoire – attire également son attention. Enfin, en élargissant le sens du mot « santé » à la santé mentale et sociale, le médecin ne traite plus seulement de l’hygiène médicale, voire de l’hygiène corporelle, mais aussi de l’hygiène sociale et culturelle ; il ne s’occupe plus seulement de préserver et d’améliorer la santé du corps, mais aussi de préserver et de protéger la moralité de la société. La lutte contre des facteurs destructeurs sociaux comme l’abus d’alcool, la criminalité, la prostitution, la pornographie et l’homosexualité est menée, car ces fléaux sociaux sont considérés comme un obstacle pour une société qui est en train de construire sa modernité.</subfield></datafield>
+<datafield tag="330" ind1=" " ind2=" "><subfield code="a">This research seeks to elaborate the question of hygiene in the Dutch Indies, former name of Indonesia. The fact that during the period studied this country was a colony of the Netherlands, the subject will be investigated in its relation to colonialism. In the colonial world, hygiene is inevitably related to the colonial politic which emphasizes on the exploitation of natural resources for the economic interest of the colonizer. The well-being of the population and the good health of the workers must then be assured, hence public health programs become significant. Questioning the health issue, this activity could not be dissociated from medicines. The role of physicians as the main actors became important in the construction of colonial state. This is due to several reasons. First, they assured the health of the Europeans – the military members, the planters, and the colonial administrators – in the Tropics. The health of Indigenous people – regarded as the manpower – also drew physicians’ attention, especially when there was an epidemic that threatened the population. Finally, by extending the sense of the word “health” to mental and social health, physicians no longer dealt only with the hygiene of the body, but also the social and cultural hygiene; they do not only engage in the improvement of health, but they also had to preserve and protect the morality of the society. The struggle against the unfavorable elements in the social life like alcohol abuse, criminality, prostitution, pornography and homosexuality was deployed because these elements are considered as a major barrier against the process to construct a modernity society.</subfield></datafield>
+<datafield tag="330" ind1=" " ind2=" "><subfield code="a">Penelitian ini bertujuan untuk mengkaji persoalan higienitas di Hindia-Belanda, negara yang kini bernama Indonesia. Mengingat penelitian ini membahas periode kolonial Belanda, maka persoalan higienitas akan dianalisis dalam hubungannya dengan kolonialisme. Dalam sebuah negara kolonial, persoalan ini tentu saja erat terkait dengan politik kolonial yang selalu mengedepankan praktik eksploitasi sumber alam untuk kepentingan ekonomi penjajah. Itu sebabnya kesehatan penduduk dan tenaga kerja harus dijamin, dan dari situlah program kesehatan masyarakat kemudian muncul. Pembahasan mengenai hal ini tentu saja tidak bisa dilepaskan dari dunia kedokteran, dan oleh karena itu peran dokter menjadi sangat penting dalam pembentukan imperialisme. Terdapat beberapa alasan untuk ini. Pertama, para dokter ini berperan dalam memberi jaminan kesehatan untuk orang-orang Eropa seperti tentara, tuan kebun dan pegawai administrasi kolonial selama mereka tinggal di daerah tropis. Kondisi kesehatan penduduk pribumi juga kemudian menarik perhatian mereka, terutama ketika wabah epidemi menyerang. Ini karena, bagaimana pun, orang pribumi dianggap sebagai sumber tenaga kerja yang sangat penting. Terakhir, dengan memperluas makna “kesehatan” ke ranah kesehatan mental dan sosial, para dokter ini tidak lagi hanya mengurusi soal kesehatan tubuh, tetapi juga sibuk dalam urusan higienitas sosial dan budaya; artinya mereka tidak hanya sibuk mengurusi orang sakit dan meningkatkan kualitas kesehatan masyarakat, tetapi juga memberi perhatian serius terhadap persoalan moral di dalam masyarakat. Perang terhadap penyalahgunaan alkohol, kriminalitas, pelacuran, pornografi, dan homoseksualitas dicanangkan, sebab “penyakit-penyakit” sosial ini dianggap sebagai penghambat sebuah masyarakat modern.</subfield></datafield>
+<datafield tag="930" ind1=" " ind2=" "><subfield code="5">751132310:880966823</subfield>
+<subfield code="b">751132310</subfield>
+<subfield code="j">g</subfield></datafield>
+<datafield tag="991" ind1=" " ind2=" "><subfield code="5">751132310:880966823</subfield>
+<subfield code="a">exemplaire créé automatiquement par STAR</subfield></datafield></record>

@@ -1,0 +1,37 @@
+{# Composants communs à tous les écrans : mêmes badges, cartes et états. #}
+
+{% macro badge(routage) -%}
+  <span class="pastille text-{{ classe_routage(routage) }}">{{ libelle_routage(routage) }}</span>
+{%- endmacro %}
+
+{% macro kpi(valeur, libelle, ton="") -%}
+  <div class="kpi {% if ton == 'principal' %}border-t-4 border-t-decision{% endif %}">
+    <div class="kpi-valeur {% if ton == 'ok' %}text-auto{% elif ton == 'attente' %}text-decision{% endif %}">{{ valeur }}</div>
+    <div class="kpi-libelle">{{ libelle }}</div>
+  </div>
+{%- endmacro %}
+
+{% macro statut_etape(statut) -%}
+  {%- set couleurs = {"ok": "bg-auto", "ignoree": "bg-filet", "a_faire": "bg-white border border-filet",
+                      "arret": "bg-decision"} -%}
+  <span class="inline-block w-2.5 h-2.5 rounded-full {{ couleurs.get(statut, 'bg-incident') }}"
+        title="{{ statut }}"></span>
+{%- endmacro %}
+
+{% macro vide(texte) -%}
+  <p class="vide">{{ texte }}</p>
+{%- endmacro %}
+
+{% macro en_cours(texte) -%}
+  <span class="inline-flex items-center gap-2 text-xs text-sourdine">
+    <span class="w-2.5 h-2.5 rounded-full bg-decision animate-pulse"></span>{{ texte }}
+  </span>
+{%- endmacro %}
+
+{% macro lien_ppn(ppn, base="https://www.sudoc.fr/") -%}
+  {%- if ppn %}<a class="font-mono text-xs" href="{{ base }}{{ ppn }}" target="_blank" rel="noopener">{{ ppn }}</a>{% else %}<span class="text-sourdine">—</span>{% endif -%}
+{%- endmacro %}
+
+{% macro json(valeur) -%}
+  <pre class="code max-h-96">{{ valeur | tojson(indent=2) }}</pre>
+{%- endmacro %}

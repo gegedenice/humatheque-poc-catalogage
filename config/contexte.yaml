@@ -1,0 +1,19 @@
+# Construction du contexte (SPEC §5). Le contexte est un dict dont les clés
+# sont les id de spec/Sources.csv.
+
+# Schéma d'extraction v2 (+ abstract), repris de config.py du POC.
+champs_extraction: [title, subtitle, author, degree_type, discipline, volume, granting_institution,
+                    co_tutelle_institutions, doctoral_school, defense_year, advisor, jury_president,
+                    reviewers, committee_members, language, abstract, confidence]
+multivalues: [co_tutelle_institutions, advisor, reviewers, committee_members]
+personnes: [author, advisor, jury_president, reviewers, committee_members]
+organismes: [granting_institution, co_tutelle_institutions, doctoral_school]
+
+# Statuts idref-linker qui donnent un PPN au contexte (+ validation manuelle).
+statuts_idref_ppn: [accepted, validé manuellement]
+
+# Valeurs calculées
+volumaison:
+  sans_volume: "1 volume"     # volume extrait null
+  avec_volume: "? volumes"    # volume extrait non null
+numero_nnt_bouchon: "XXXX"    # numéros NNT réels hors v1

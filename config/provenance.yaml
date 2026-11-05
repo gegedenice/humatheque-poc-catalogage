@@ -1,0 +1,32 @@
+# Provenance d'une thèse (SPEC §6, étape 2), déduite de granting_institution.
+# Comparaison après normalisation : minuscules, sans accents, points retirés
+# (E.P.H.E. → ephe), autre ponctuation remplacée par une espace.
+# Une forme est reconnue si elle apparaît comme suite de mots entiers.
+
+# Valeurs admises dans Situations.provenance (en plus du joker `*`).
+valeurs_situation: [EPHE, hors EPHE, mémoire]
+
+valeurs:
+  ephe: EPHE
+  hors_ephe: hors EPHE
+  absent: absent
+  ambigu: ambigu
+  memoire: mémoire
+
+# Formes connues de l'EPHE (normalisées). Les formes anciennes avec section
+# (« E.P.H.E. Ve section », « École pratique des hautes études, IVe section »)
+# sont reconnues car elles contiennent l'une de ces formes.
+formes_ephe:
+  - ecole pratique des hautes etudes
+  - ephe
+
+# Établissements connus, distincts de l'EPHE, que les indices partiels
+# ci-dessous rendraient sinon ambigus.
+formes_hors_ephe:
+  - ecole des hautes etudes en sciences sociales
+  - ehess
+
+# Correspondance partielle → provenance ambiguë.
+indices_partiels:
+  - hautes etudes
+  - ecole pratique

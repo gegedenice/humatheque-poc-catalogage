@@ -1,0 +1,10 @@
+.git
+.venv
+.cache
+.env
+data
+grist-data
+tests
+reference
+**/__pycache__
+*.pyc

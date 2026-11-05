@@ -1,0 +1,214 @@
+{
+    "source": "idref_org_referential",
+    "query": {
+        "granting_institution": "École pratique des hautes études",
+        "co_tutelle_institutions": [
+            "Université de Genève"
+        ],
+        "doctoral_school": "École doctorale de l EPHE",
+        "year": "2015"
+    },
+    "granting_institution": {
+        "source": "idref_org_referential",
+        "query": {
+            "label": "École pratique des hautes études",
+            "kind": "institution",
+            "year": "2015",
+            "parent_ppn": null
+        },
+        "candidate_scope": "global",
+        "pool_size": 274,
+        "status": "accepted",
+        "ppn": "026375478",
+        "label_officiel": "École pratique des hautes études",
+        "score": 1.0,
+        "margin": 0.4218,
+        "redirect": null,
+        "candidates": [
+            {
+                "ppn": "026375478",
+                "label_officiel": "École pratique des hautes études",
+                "type": "etablissement",
+                "codes": [
+                    "EPHE"
+                ],
+                "score": 1.0,
+                "valid_for_year": true,
+                "date_debut": "1868",
+                "date_fin": null,
+                "url": "https://www.idref.fr/026375478"
+            },
+            {
+                "ppn": "027321118",
+                "label_officiel": "École des hautes études commerciales",
+                "type": "etablissement",
+                "codes": [
+                    "EHEC"
+                ],
+                "score": 0.5782,
+                "valid_for_year": true,
+                "date_debut": "1881",
+                "date_fin": null,
+                "url": "https://www.idref.fr/027321118"
+            },
+            {
+                "ppn": "161356915",
+                "label_officiel": "École des hautes études en santé publique",
+                "type": "etablissement",
+                "codes": [
+                    "HESP"
+                ],
+                "score": 0.5151,
+                "valid_for_year": true,
+                "date_debut": "2008",
+                "date_fin": null,
+                "url": "https://www.idref.fr/161356915"
+            },
+            {
+                "ppn": "026374889",
+                "label_officiel": "École des hautes études en sciences sociales",
+                "type": "etablissement",
+                "codes": [
+                    "EHES"
+                ],
+                "score": 0.5026,
+                "valid_for_year": true,
+                "date_debut": "1975",
+                "date_fin": null,
+                "url": "https://www.idref.fr/026374889"
+            },
+            {
+                "ppn": "026375052",
+                "label_officiel": "École nationale des chartes",
+                "type": "etablissement",
+                "codes": [
+                    "ENCP"
+                ],
+                "score": 0.406,
+                "valid_for_year": true,
+                "date_debut": "1821",
+                "date_fin": null,
+                "url": "https://www.idref.fr/026375052"
+            }
+        ],
+        "error": null
+    },
+    "co_tutelle_institutions": [
+        {
+            "source": "idref_org_referential",
+            "query": {
+                "label": "Université de Genève",
+                "kind": "institution",
+                "year": "2015",
+                "parent_ppn": null
+            },
+            "candidate_scope": "global",
+            "pool_size": 274,
+            "status": "low_confidence",
+            "ppn": null,
+            "label_officiel": null,
+            "score": 0.5692,
+            "margin": 0.0109,
+            "redirect": null,
+            "candidates": [
+                {
+                    "ppn": "26693823X",
+                    "label_officiel": "Université de Rennes",
+                    "type": "etablissement",
+                    "codes": [
+                        "UREN"
+                    ],
+                    "score": 0.5692,
+                    "valid_for_year": true,
+                    "date_debut": null,
+                    "date_fin": null,
+                    "url": "https://www.idref.fr/26693823X"
+                },
+                {
+                    "ppn": "188204024",
+                    "label_officiel": "Université de Guyane",
+                    "type": "etablissement",
+                    "codes": [
+                        "YANE"
+                    ],
+                    "score": 0.5583,
+                    "valid_for_year": true,
+                    "date_debut": "2015",
+                    "date_fin": null,
+                    "url": "https://www.idref.fr/188204024"
+                },
+                {
+                    "ppn": "026403064",
+                    "label_officiel": "Université de Caen Normandie",
+                    "type": "etablissement",
+                    "codes": [
+                        "CAEN"
+                    ],
+                    "score": 0.5544,
+                    "valid_for_year": true,
+                    "date_debut": "1971",
+                    "date_fin": null,
+                    "url": "https://www.idref.fr/026403064"
+                },
+                {
+                    "ppn": "026403919",
+                    "label_officiel": "Université de Rouen Normandie",
+                    "type": "etablissement",
+                    "codes": [
+                        "ROUE"
+                    ],
+                    "score": 0.5436,
+                    "valid_for_year": true,
+                    "date_debut": "1966",
+                    "date_fin": null,
+                    "url": "https://www.idref.fr/026403919"
+                },
+                {
+                    "ppn": "027548392",
+                    "label_officiel": "Université Bordeaux Montaigne",
+                    "type": "etablissement",
+                    "codes": [
+                        "BOR3"
+                    ],
+                    "score": 0.5381,
+                    "valid_for_year": true,
+                    "date_debut": "1971",
+                    "date_fin": null,
+                    "url": "https://www.idref.fr/027548392"
+                }
+            ],
+            "error": null
+        }
+    ],
+    "doctoral_school": {
+        "source": "idref_org_referential",
+        "query": {
+            "label": "École doctorale de l EPHE",
+            "kind": "doctoral_school",
+            "year": "2015",
+            "parent_ppn": "026375478"
+        },
+        "candidate_scope": "parent",
+        "pool_size": 1,
+        "status": "accepted",
+        "ppn": "169661717",
+        "label_officiel": "École doctorale de l'École pratique des hautes études",
+        "score": 1.0,
+        "margin": 1.0,
+        "redirect": null,
+        "candidates": [
+            {
+                "ppn": "169661717",
+                "label_officiel": "École doctorale de l'École pratique des hautes études",
+                "type": "ecole_doctorale",
+                "codes": [],
+                "score": 1.0,
+                "valid_for_year": true,
+                "date_debut": null,
+                "date_fin": null,
+                "url": "https://www.idref.fr/169661717"
+            }
+        ],
+        "error": null
+    }
+}

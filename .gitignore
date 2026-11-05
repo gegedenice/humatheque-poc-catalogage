@@ -1,0 +1,13 @@
+# Environnement et secrets
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Données d'exécution
+data/
+grist-data/
+
+# Exécutable Tailwind téléchargé par `humatheque css`
+.cache/

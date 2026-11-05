@@ -1,0 +1,328 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Humatheque Classification API",
+        "description": "Local Dewey classification of academic text by semantic similarity. The text is embedded with a multilingual sentence-embedding model and ranked against the Dewey taxonomy, where each class is described by its authoritative label plus curated keywords. Returns the matching classes as `dewey` + `label` + `score` (cosine similarity).",
+        "version": "0.2.0"
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "summary": "Root",
+                "operationId": "root__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Root  Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health",
+                "operationId": "health_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Health Health Get"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/classify": {
+            "post": {
+                "summary": "Classify Endpoint",
+                "operationId": "classify_endpoint_classify_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClassifyRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClassifyResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ClassifyRequest": {
+                "properties": {
+                    "text": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        ],
+                        "title": "Text",
+                        "description": "Text to classify, or a list of texts for batch classification."
+                    },
+                    "codes": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Codes",
+                        "description": "Optional subset of Dewey codes to restrict the candidate classes to (e.g. ['004', '510']). Defaults to the full taxonomy. Unknown codes are ignored."
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "maximum": 1.0,
+                        "minimum": -1.0,
+                        "title": "Threshold",
+                        "description": "Minimum cosine similarity for a class to be returned.",
+                        "default": 0.0
+                    },
+                    "classification_type": {
+                        "type": "string",
+                        "title": "Classification Type",
+                        "description": "`multi-label` returns up to top_k classes; `single-label` returns the best one.",
+                        "default": "multi-label"
+                    },
+                    "top_k": {
+                        "anyOf": [
+                            {
+                                "type": "integer",
+                                "minimum": 1.0
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Top K",
+                        "description": "Cap on the number of returned classes per text (default from env)."
+                    },
+                    "method": {
+                        "type": "string",
+                        "title": "Method",
+                        "description": "Classification strategy. `local`: local bi-encoder embeddings (multilingual-e5-large) only. `albert`: Albert API bge-m3 retrieval + bge-reranker-v2-m3 cross-encoder rerank (requires ALBERT_API_KEY).",
+                        "default": "local"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "text"
+                ],
+                "title": "ClassifyRequest"
+            },
+            "ClassifyResponse": {
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "title": "Source"
+                    },
+                    "method": {
+                        "type": "string",
+                        "title": "Method"
+                    },
+                    "model": {
+                        "type": "string",
+                        "title": "Model"
+                    },
+                    "classification_type": {
+                        "type": "string",
+                        "title": "Classification Type"
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "title": "Threshold"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "title": "Count"
+                    },
+                    "results": {
+                        "items": {
+                            "$ref": "#/components/schemas/TextClassification"
+                        },
+                        "type": "array",
+                        "title": "Results"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "source",
+                    "method",
+                    "model",
+                    "classification_type",
+                    "threshold",
+                    "count",
+                    "results"
+                ],
+                "title": "ClassifyResponse"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "LabelScore": {
+                "properties": {
+                    "dewey": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Dewey",
+                        "description": "Dewey code of the matched class."
+                    },
+                    "label": {
+                        "type": "string",
+                        "title": "Label",
+                        "description": "Authoritative Dewey discipline label."
+                    },
+                    "score": {
+                        "type": "number",
+                        "title": "Score",
+                        "description": "Cosine similarity of the text to the class."
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "label",
+                    "score"
+                ],
+                "title": "LabelScore"
+            },
+            "TextClassification": {
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "title": "Text"
+                    },
+                    "classes": {
+                        "items": {
+                            "$ref": "#/components/schemas/LabelScore"
+                        },
+                        "type": "array",
+                        "title": "Classes"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "text",
+                    "classes"
+                ],
+                "title": "TextClassification"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        },
+        "securitySchemes": {
+            "APIKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        }
+    }
+}

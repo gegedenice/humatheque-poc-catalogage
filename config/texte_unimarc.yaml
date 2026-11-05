@@ -1,0 +1,28 @@
+# Normalisation des chaînes (module NOR, SPEC §4). Listes relisibles et
+# modifiables par les catalogueurs ; aucune règle de zone UNIMARC ici.
+
+# Formes élidées reconnues devant une apostrophe (en majuscules, sans accent).
+elisions: [L, D, J, M, N, S, T, C, QU, JUSQU, LORSQU, PUISQU, QUOIQU, PRESQU, QUELQU]
+
+# Séparateurs de segments pour la réaccentuation : un segment n'est traité que
+# s'il est entièrement en capitales (SPEC §4.1).
+separateurs_segments: ":;.!?()[]«»\"/"
+
+# Personnes (SPEC §4.3)
+# Mots de liaison entre civilités (« Monsieur le Professeur ») : retirés avec elles.
+liaisons_civilites: [le, la, l']
+civilites: [Monsieur, Madame, Mademoiselle, M., Mr, Mr., Mrs, Mrs., Ms, Ms., Mme, Mme., Mlle, Mlle., Professeur, Professeure, Pr, Pr., Prof., Dr, Dr., Docteur, Docteure, Me, Me., Maître, Mgr, Monseigneur]
+particules:
+  # rejetées après le prénom dans la forme d'accès française (La Roche, Marie-France de)
+  rejetees: [de, "d'", von]
+  # conservées en tête du nom (La Fontaine, Du Bellay)
+  conservees: [le, la, les, du, des, van, der, den, ter, ten]
+
+# Titre de classement (SPEC §4.4) : articles initiaux par langue (codes ISO 639-2/B).
+# Une forme terminée par une apostrophe est une élision (pas d'espace avant @).
+articles:
+  fre: [le, la, les, "l'", un, une]
+  eng: [the, a, an]
+  ger: [der, die, das, des, dem, den, ein, eine, einer, eines, einem, einen]
+  ita: [il, lo, la, i, gli, le, "l'", un, uno, una, "un'"]
+  spa: [el, la, los, las, un, una, unos, unas]
