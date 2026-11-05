@@ -99,6 +99,12 @@ async def creer_lot(
     return _rediriger(f"/lots/{lot.id}")
 
 
+# ---------------------------------------------------------------- lots
+@routeur.get("/lots")
+def lots(request: Request, etat: str = "", declencheur: str = "", type_document: str = ""):
+    return _rendre(request, "lots.html", vue=_app(request).vue_lots(etat, declencheur, type_document))
+
+
 # ---------------------------------------------------------------- lot (mode 2)
 @routeur.get("/lots/{lot_id}")
 def lot(request: Request, lot_id: str, filtre: str = "tous"):
@@ -135,7 +141,7 @@ def dossier_fragment(request: Request, dossier_id: str):
     """Panneau droit du dossier, rafraîchi tant que le traitement est en cours ; à la fin,
     rechargement complet pour monter l'éditeur (îlot hors fragment rafraîchi)."""
     vue = _app(request).vue_dossier(dossier_id)
-    reponse = _rendre(request, "_dossier_panneau.html", vue=vue)
+    reponse = _rendre(request, "_dossier_panneau.html", vue=vue, oob=True)
     if vue.etat == "termine":
         reponse.headers["HX-Refresh"] = "true"
     return reponse

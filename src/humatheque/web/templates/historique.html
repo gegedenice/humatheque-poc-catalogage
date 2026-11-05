@@ -1,34 +1,74 @@
 {% extends "base.html" %}
 {% from "_composants.html" import badge, vide %}
 {% block titre %}Historique{% endblock %}
+{% block fil %}Accueil{% endblock %}
+{% block entete %}<h1>Historique</h1>{% endblock %}
 {% block contenu %}
-<h1>Historique</h1>
-<p class="text-sm text-sourdine mt-1">Balayages du bucket et traitements : date, déclencheur, documents, routages.</p>
-<section class="carte mt-4">
-  {% if vue.ingestions %}
-  <div class="defilant"><table class="tableau">
-    <thead><tr><th>Date</th><th>Type</th><th>Déclencheur</th><th>Documents</th><th>Résultat</th><th></th></tr></thead>
-    <tbody>
-    {% set lots = {} %}{% for r in vue.lots %}{% set _ = lots.update({r.lot.id: r}) %}{% endfor %}
-    {% for i in vue.ingestions %}{% set r = lots.get(i.lot_id) %}
-      <tr>
-        <td class="font-mono text-xs">{{ i.le | date("%d/%m/%Y %H:%M") }}</td>
-        <td class="text-xs">{{ i.type }}</td>
-        <td class="text-xs">{{ i.declencheur }}</td>
-        <td class="text-xs">{{ i.documents | length }}{% if i.documents | length <= 3 %} <span class="font-mono text-sourdine">{{ i.documents | join(", ") }}</span>{% endif %}</td>
-        <td class="space-x-1 text-xs">
-          {% if r %}{% if r.en_cours %}<span class="text-decision">en cours</span>{% endif %}
-            {% for routage, n in r.indicateurs.par_routage.items() %}{{ badge(routage) }}&nbsp;{{ n }}{% endfor %}
-          {% elif i.type == "balayage" %}
-            {% if i.resultat.erreur %}<span class="text-sortie">{{ i.resultat.erreur }}</span>
-            {% else %}{{ i.resultat.nouveaux or 0 }} nouveau(x){% endif %}
-          {% endif %}
-        </td>
-        <td>{% if i.lot_id %}<a class="btn-discret btn-sm" href="/lots/{{ i.lot_id }}">Lot</a>{% endif %}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table></div>
-  {% else %}{{ vide("Aucun balayage ni traitement enregistré.") }}{% endif %}
+{% set f_type = request.query_params.get("type", "") %}
+{% set f_decl = request.query_params.get("declencheur", "") %}
+{% set lots = {} %}{% for r in vue.lots %}{% set _ = lots.update({r.lot.id: r}) %}{% endfor %}
+{% set declencheurs = vue.ingestions | map(attribute="declencheur") | unique | list %}
+{% macro lien_filtre(libelle, type, decl) -%}
+  {%- set actif = type == f_type and decl == f_decl -%}
+  {%- set qs = [] -%}{%- if type %}{% set _ = qs.append("type=" ~ type) %}{% endif %}{% if decl %}{% set _ = qs.append("declencheur=" ~ decl) %}{% endif -%}
+  <a class="filtre {% if actif %}filtre-actif{% endif %}" href="/historique{% if qs %}?{{ qs | join('&') }}{% endif %}" aria-pressed="{{ 'true' if actif else 'false' }}">{% if actif %}✓ {% endif %}{{ libelle }}</a>
+{%- endmacro %}
+
+<nav aria-label="Filtres" class="flex flex-wrap items-center gap-2 mb-6">
+  {{ lien_filtre("Tout", "", f_decl) }}{{ lien_filtre("Traitements", "traitement", f_decl) }}{{ lien_filtre("Balayages", "balayage", f_decl) }}
+  {% if declencheurs | length > 1 %}
+  <span class="w-px h-6 bg-[#c4c6d0] mx-1.5" aria-hidden="true"></span>
+  {{ lien_filtre("tous déclencheurs", f_type, "") }}
+  {% for dcl in declencheurs %}{{ lien_filtre(dcl, f_type, dcl) }}{% endfor %}
+  {% endif %}
+</nav>
+
+{% set traitements = vue.ingestions | selectattr("type", "equalto", "traitement") | list %}
+{% set balayages = vue.ingestions | selectattr("type", "equalto", "balayage") | list %}
+<section aria-label="Synthèse" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(200px,1fr))] mb-6">
+  <div class="kpi"><span class="kpi-libelle">Lots</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | length }}</span>
+    <span class="text-[13px] text-sourdine">{{ vue.lots | selectattr("lot.declencheur", "equalto", "manuel") | list | length }} manuel(s)</span></div>
+  <div class="kpi"><span class="kpi-libelle">Documents traités</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="lot.nb_documents") | sum }}</span>
+    <span class="text-[13px] text-sourdine">thèses et mémoires</span></div>
+  <div class="kpi"><span class="kpi-libelle">Passés seuls</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
+    <span class="text-[13px] text-sourdine">notice prête sans reprise</span></div>
+  <div class="kpi"><span class="kpi-libelle">Balayages du bucket</span><span class="text-4xl font-semibold leading-none">{{ balayages | length }}</span>
+    <span class="text-[13px] text-sourdine">{{ balayages | selectattr("resultat.erreur") | list | length }} en échec</span></div>
+</section>
+
+<section class="carte">
+  {% set ns = namespace(jour="", n=0) %}
+  {% for i in vue.ingestions %}
+    {% if (not f_type or i.type == f_type) and (not f_decl or i.declencheur == f_decl) %}{% set ns.n = ns.n + 1 %}
+    {% set r = lots.get(i.lot_id) %}
+    {% set jour = i.le | date("%d/%m/%Y") %}
+    {% if jour != ns.jour %}{% set ns.jour = jour %}
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-sourdine mt-4 first:mt-0 mb-1">{{ jour }}</h2>
+    {% endif %}
+    <div class="flex flex-wrap items-center gap-4 py-3.5 px-2 border-t border-filet/70">
+      <span class="font-mono text-[13px] text-sourdine w-12">{{ i.le | date("%H:%M") }}</span>
+      {% if i.type == "traitement" %}
+      <span aria-hidden="true" class="w-10 h-10 rounded-xl bg-primaire-clair text-primaire-fonce flex items-center justify-center font-bold">L</span>
+      {% else %}
+      <span aria-hidden="true" class="w-10 h-10 rounded-xl bg-rail text-sourdine flex items-center justify-center font-bold">B</span>
+      {% endif %}
+      <div class="flex-[1_1_260px] min-w-0 flex flex-col gap-0.5">
+        <span class="font-semibold">{% if i.type == "traitement" %}<span class="font-mono text-sm">{{ i.lot_id }}</span> · {{ i.documents | length }} document(s){% else %}Balayage du bucket{% endif %}</span>
+        <span class="text-[13px] text-sourdine break-all">
+          {% if i.type == "balayage" %}{% if i.resultat.erreur %}<span class="text-sortie">échec : {{ i.resultat.erreur }}</span>{% else %}{{ i.resultat.nouveaux or 0 }} nouveau(x) dossier(s){% endif %}
+          {% elif i.documents | length <= 3 %}<span class="font-mono">{{ i.documents | join(", ") }}</span>
+          {% else %}<span class="font-mono">{{ i.documents[:2] | join(", ") }}</span>…{% endif %}</span>
+      </div>
+      <span class="puce-contour h-6 text-xs">{{ i.declencheur }}</span>
+      <div class="flex-[0_1_280px] flex flex-wrap justify-end gap-1.5">
+        {% if r %}{% if r.en_cours %}<span class="puce bg-primaire-clair text-primaire-fonce">en cours</span>{% endif %}
+          {% for routage, n in r.indicateurs.par_routage.items() %}<span class="puce bg-{{ classe_routage(routage) }}-clair text-{{ classe_routage(routage) }}-fonce">{{ libelle_routage(routage) }} {{ n }}</span>{% endfor %}
+        {% endif %}
+      </div>
+      {% if i.lot_id %}<a class="btn-discret btn-sm" href="/lots/{{ i.lot_id }}">Ouvrir</a>{% else %}<span class="w-[76px]"></span>{% endif %}
+    </div>
+    {% endif %}
+  {% endfor %}
+  {% if not ns.n %}{{ vide("Aucun balayage ni traitement enregistré." if not vue.ingestions else "Aucune entrée pour ce filtre.") }}{% endif %}
 </section>
 {% endblock %}

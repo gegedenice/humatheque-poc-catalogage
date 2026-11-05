@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "_composants.html" import badge, vide, en_cours, repartition %}
+{% block titre %}Lots{% endblock %}
+{% block fil %}Accueil{% endblock %}
+{% block entete %}<h1>Lots</h1>{% endblock %}
+{% block entete_droite %}
+<a class="btn-principal" href="/"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nouveau traitement</a>
+{% endblock %}
+{% block contenu %}
+{% set filtres = {"etat": vue.etat, "declencheur": vue.declencheur, "type_document": vue.type_document} %}
+{% macro lien_filtre(libelle, cle, valeur) -%}
+  {%- set f = dict(filtres) -%}{%- set _ = f.update({cle: valeur}) -%}
+  {%- set qs = [] -%}{%- for k, v in f.items() if v %}{% set _ = qs.append(k ~ "=" ~ (v | urlencode)) %}{% endfor -%}
+  {%- set actif = filtres[cle] == valeur -%}
+  <a class="filtre {% if actif %}filtre-actif{% endif %}" href="/lots{% if qs %}?{{ qs | join('&') }}{% endif %}" aria-pressed="{{ 'true' if actif else 'false' }}">{% if actif %}✓ {% endif %}{{ libelle }}</a>
+{%- endmacro %}
+{% set url_page = "/lots" ~ ("?" ~ request.url.query if request.url.query else "") %}
+
+<div id="liste-lots" class="flex flex-col gap-6"
+     {% if vue.lots | selectattr("en_cours") | list %}hx-get="{{ url_page }}" hx-select="#liste-lots" hx-target="this" hx-swap="outerHTML" hx-trigger="every 5s"{% endif %}>
+
+  <section aria-label="Synthèse" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+    <div class="kpi"><span class="kpi-libelle">Lots affichés</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | length }}</span>
+      <span class="text-[13px] text-sourdine">sur {{ vue.total }} au total</span></div>
+    <div class="kpi"><span class="kpi-libelle">En cours</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | selectattr("en_cours") | list | length }}</span>
+      <span class="text-[13px] text-sourdine">traitement en tâche de fond</span></div>
+    <div class="kpi"><span class="kpi-libelle">Documents à reprendre</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.en_attente") | sum }}</span>
+      <span class="text-[13px] text-sourdine">dans {{ vue.a_reprendre | length }} lot(s)</span></div>
+    <div class="kpi"><span class="kpi-libelle">Passés seuls</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
+      <span class="text-[13px] text-sourdine">notice prête sans reprise</span></div>
+  </section>
+
+  {% if vue.a_reprendre and vue.etat != "en_cours" %}
+  <section class="carte-alerte" aria-label="À reprendre en priorité">
+    <h2 class="flex items-center gap-2.5 text-[#4a3000]"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8a5a00" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17v.5"/></svg>À reprendre en priorité</h2>
+    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+      {% for r in vue.a_reprendre[:6] %}
+      <a href="/lots/{{ r.lot.id }}" class="bg-carte rounded-tuile p-4 flex flex-col gap-2 no-underline text-encre hover:text-encre hover:shadow-carte">
+        <span class="flex items-baseline justify-between gap-2">
+          <span class="font-semibold">{{ r.indicateurs.en_attente }} document(s) à reprendre</span>
+          <span class="text-xs text-sourdine whitespace-nowrap">{{ r.lot.cree_le | date }}</span></span>
+        <span class="font-mono text-xs text-contour break-all">{{ r.lot.id }}</span>
+        {{ repartition(r.indicateurs.par_routage) }}
+      </a>
+      {% endfor %}
+    </div>
+    {% if vue.a_reprendre | length > 6 %}<p class="text-[13px] text-sourdine mt-3">et {{ vue.a_reprendre | length - 6 }} autre(s) lot(s) ci-dessous.</p>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="carte flex flex-col gap-4">
+    <nav aria-label="Filtres" class="flex flex-wrap items-center gap-2">
+      {{ lien_filtre("Tous", "etat", "") }}{{ lien_filtre("En cours", "etat", "en_cours") }}{{ lien_filtre("Terminés", "etat", "termines") }}
+      <span class="w-px h-6 bg-[#c4c6d0] mx-1.5" aria-hidden="true"></span>
+      {{ lien_filtre("Thèses et mémoires", "type_document", "") }}{{ lien_filtre("Thèses", "type_document", "these") }}{{ lien_filtre("Mémoires", "type_document", "memoire") }}
+      {% if vue.declencheurs | length > 1 %}
+      <span class="w-px h-6 bg-[#c4c6d0] mx-1.5" aria-hidden="true"></span>
+      {{ lien_filtre("tous déclencheurs", "declencheur", "") }}
+      {% for dcl in vue.declencheurs %}{{ lien_filtre(dcl, "declencheur", dcl) }}{% endfor %}
+      {% endif %}
+    </nav>
+
+    {% if vue.lots %}
+    <div class="defilant"><table class="tableau min-w-[760px]">
+      <thead><tr><th>Lot</th><th>Documents</th><th>VLM</th><th>Déclencheur</th><th class="w-[30%]">Routages</th><th>À reprendre</th><th><span class="sr-only">Action</span></th></tr></thead>
+      <tbody>
+      {% for r in vue.lots %}{% set ind = r.indicateurs %}
+        <tr>
+          <td><span class="block font-mono text-[13px]">{{ r.lot.id }}</span>
+            <span class="text-xs text-sourdine">créé le {{ r.lot.cree_le | date("%d/%m/%Y %H:%M") }}</span></td>
+          <td class="whitespace-nowrap">{{ ind.documents }} {{ "thèse(s)" if r.lot.parametres.type_document == "these" else "mémoire(s)" }}</td>
+          <td class="font-mono text-xs">{{ r.lot.parametres.fournisseur or "—" }}</td>
+          <td><span class="puce-contour h-6 text-xs">{{ r.lot.declencheur }}</span></td>
+          <td>
+            {% if r.en_cours %}
+              {{ en_cours("en cours · " ~ ind.en_cours ~ " / " ~ ind.documents ~ " restant(s)") }}
+            {% else %}
+              <div class="flex flex-col gap-2">{{ repartition(ind.par_routage) }}
+                <span class="flex flex-wrap gap-1.5">{% for routage, n in ind.par_routage.items() %}<span class="puce bg-{{ classe_routage(routage) }}-clair text-{{ classe_routage(routage) }}-fonce">{{ libelle_routage(routage) }} {{ n }}</span>{% endfor %}</span></div>
+            {% endif %}
+          </td>
+          <td class="whitespace-nowrap">
+            {% if ind.en_attente %}<span class="puce bg-decision-clair text-decision-fonce">{{ ind.en_attente }}</span>
+            {% elif not r.en_cours %}<span class="text-xs text-auto font-medium">✓ rien</span>{% endif %}
+            {% if ind.repris %}<span class="block text-xs text-sourdine mt-1">{{ ind.repris }} repris</span>{% endif %}
+          </td>
+          <td class="text-right"><a class="btn-discret btn-sm" href="/lots/{{ r.lot.id }}">Ouvrir</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% elif vue.total %}{{ vide("Aucun lot pour ces filtres.") }}
+    {% else %}{{ vide("Aucun lot pour l'instant. Lancez un traitement depuis l'accueil ou balayez le bucket.") }}{% endif %}
+  </section>
+</div>
+{% endblock %}

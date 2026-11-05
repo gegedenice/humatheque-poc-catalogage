@@ -1,17 +1,17 @@
 {# Versions de la notice et régénération en attente (SPEC §9.2). #}
 {% if notice.proposition %}{% set p = notice.proposition %}
-<div class="sous-carte border-l-4 border-l-decision mt-3">
+<div class="carte-alerte p-4">
   <p class="text-sm font-semibold">Régénération proposée (version {{ p.numero }})</p>
   <p class="text-xs text-sourdine">Une résolution a régénéré la notice alors qu'une version éditée existe : l'édition n'a pas été écrasée. Différences avec la version courante :</p>
   <pre class="code mt-2 max-h-60">{{ p.diff }}</pre>
   <form method="post" action="/dossiers/{{ dossier_id }}/propositions/{{ p.numero }}" class="flex flex-wrap items-center gap-2 mt-2">
-    <label class="text-xs text-sourdine">Catalogueur <input class="champ inline-block w-36 ml-1" name="auteur" value="{{ auteur }}" required></label>
-    <button class="btn btn-sm" name="choix" value="reporter">Reporter (nouvelle version)</button>
+    <label class="text-xs text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-36" name="auteur" value="{{ auteur }}" required></label>
+    <button class="btn-principal btn-sm" name="choix" value="reporter">Reporter (nouvelle version)</button>
     <button class="btn-discret btn-sm" name="choix" value="ignorer">Ignorer</button>
   </form>
 </div>
 {% endif %}
-<details class="mt-3">
+<details class="mt-1">
   <summary class="cursor-pointer text-sm text-sourdine">Versions ({{ notice.versions | length }})</summary>
   <ol class="mt-2 space-y-2">
   {% for v in notice.versions %}

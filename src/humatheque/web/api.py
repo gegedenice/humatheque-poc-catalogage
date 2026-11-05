@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from humatheque.application import Application
 from humatheque.application.vues import (
-    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueBucket, VueDossier, VueLot, VueNotice,
+    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueBucket, VueDossier, VueLot, VueLots, VueNotice,
 )
 from humatheque.notice.validation import Marqueur
 from humatheque.store import Lot
@@ -35,6 +35,11 @@ def recharger_spec(request: Request) -> EtatSpec:
 @routeur.post("/lots", response_model=Lot, status_code=201)
 def creer_lot(request: Request, entree: EntreeLot) -> Lot:
     return _app(request).creer_lot(entree)
+
+
+@routeur.get("/lots", response_model=VueLots)
+def lister_lots(request: Request, etat: str = "", declencheur: str = "", type_document: str = "") -> VueLots:
+    return _app(request).vue_lots(etat, declencheur, type_document)
 
 
 @routeur.get("/lots/{lot_id}", response_model=VueLot)

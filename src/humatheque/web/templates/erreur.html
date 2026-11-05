@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block titre %}Erreur{% endblock %}
 {% block contenu %}
-<div class="carte max-w-xl border-l-4 border-l-sortie">
-  <h1 class="mb-2">Action impossible</h1>
+<div class="carte max-w-xl flex flex-col gap-4">
+  <div class="flex items-center gap-3"><span aria-hidden="true" class="w-11 h-11 rounded-[14px] bg-sortie-clair text-sortie-fonce flex items-center justify-center font-bold text-lg">!</span>
+    <h1 class="text-2xl">Action impossible</h1></div>
   <p class="text-sm">{{ message }}</p>
-  <p class="mt-4"><a class="btn-discret btn-sm" href="javascript:history.back()">← Revenir</a></p>
+  <p><a class="btn-tonal btn-sm" href="javascript:history.back()">← Revenir</a></p>
 </div>
 {% endblock %}

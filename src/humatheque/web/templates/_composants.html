@@ -1,30 +1,41 @@
-{# Composants communs à tous les écrans : mêmes badges, cartes et états. #}
+{# Composants communs à tous les écrans (Material 3) : mêmes puces, cartes et états. #}
 
 {% macro badge(routage) -%}
-  <span class="pastille text-{{ classe_routage(routage) }}">{{ libelle_routage(routage) }}</span>
+  {%- set c = classe_routage(routage) -%}
+  <span class="puce bg-{{ c }}-clair text-{{ c }}-fonce">{{ libelle_routage(routage) }}</span>
 {%- endmacro %}
 
-{% macro kpi(valeur, libelle, ton="") -%}
-  <div class="kpi {% if ton == 'principal' %}border-t-4 border-t-decision{% endif %}">
-    <div class="kpi-valeur {% if ton == 'ok' %}text-auto{% elif ton == 'attente' %}text-decision{% endif %}">{{ valeur }}</div>
-    <div class="kpi-libelle">{{ libelle }}</div>
+{% macro kpi(valeur, libelle, detail="", ton="") -%}
+  {%- set tons = {"principal": "primaire", "ok": "auto", "attente": "decision", "repris": "conversion"} -%}
+  {%- set c = tons.get(ton, "primaire") -%}
+  <div class="kpi">
+    <div class="flex items-center justify-between gap-2">
+      <span class="kpi-libelle">{{ libelle }}</span>
+      <span aria-hidden="true" class="w-10 h-10 rounded-xl bg-{{ c }}-clair flex items-center justify-center"><span class="w-3 h-3 rounded-full bg-{{ c }}"></span></span>
+    </div>
+    <span class="kpi-valeur">{{ valeur }}</span>
+    {% if detail %}<span class="text-[13px] text-sourdine">{{ detail }}</span>{% endif %}
   </div>
 {%- endmacro %}
 
 {% macro statut_etape(statut) -%}
-  {%- set couleurs = {"ok": "bg-auto", "ignoree": "bg-filet", "a_faire": "bg-white border border-filet",
-                      "arret": "bg-decision"} -%}
-  <span class="inline-block w-2.5 h-2.5 rounded-full {{ couleurs.get(statut, 'bg-incident') }}"
-        title="{{ statut }}"></span>
+  {%- set styles = {"ok": ("bg-auto-clair text-auto-fonce", "✓"), "ignoree": ("bg-filet text-sourdine", "–"),
+                    "a_faire": ("bg-white border-2 border-filet text-sourdine", ""), "en_cours": ("bg-primaire-clair text-primaire-fonce animate-pulse", "…"),
+                    "arret": ("bg-decision-clair text-decision-fonce", "!")} -%}
+  {%- set s = styles.get(statut, ("bg-incident-clair text-incident-fonce", "!")) -%}
+  <span class="inline-flex w-7 h-7 rounded-full items-center justify-center text-[13px] font-bold {{ s[0] }}" title="{{ statut }}">{{ s[1] }}</span>
 {%- endmacro %}
 
-{% macro vide(texte) -%}
-  <p class="vide">{{ texte }}</p>
+{% macro vide(texte, icone=True) -%}
+  <div class="vide flex flex-col items-center gap-3">
+    {% if icone %}<span aria-hidden="true" class="w-14 h-14 rounded-[18px] bg-rail flex items-center justify-center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#44474f" stroke-width="1.6" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10H3z"/></svg></span>{% endif %}
+    <p>{{ texte }}</p>
+  </div>
 {%- endmacro %}
 
 {% macro en_cours(texte) -%}
-  <span class="inline-flex items-center gap-2 text-xs text-sourdine">
-    <span class="w-2.5 h-2.5 rounded-full bg-decision animate-pulse"></span>{{ texte }}
+  <span class="inline-flex items-center gap-2 text-[13px] text-sourdine">
+    <span aria-hidden="true" class="w-4 h-4 rounded-full border-[3px] border-primaire-clair border-t-primaire animate-spin"></span>{{ texte }}
   </span>
 {%- endmacro %}
 
@@ -34,4 +45,15 @@
 
 {% macro json(valeur) -%}
   <pre class="code max-h-96">{{ valeur | tojson(indent=2) }}</pre>
+{%- endmacro %}
+
+{% macro repartition(par_routage, total=None) -%}
+  {# Barre de répartition des routages (lot, historique). #}
+  {%- set n = total or (par_routage.values() | sum) -%}
+  {% if n %}
+  <div class="flex h-2 rounded-full overflow-hidden gap-0.5" role="img"
+       aria-label="{% for r, v in par_routage.items() %}{{ libelle_routage(r) }} {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}">
+    {% for r, v in par_routage.items() %}<span class="bg-{{ classe_routage(r) }}" style="flex: {{ v }} 1 0"></span>{% endfor %}
+  </div>
+  {% endif %}
 {%- endmacro %}
