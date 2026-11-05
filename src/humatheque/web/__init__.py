@@ -4,7 +4,10 @@ et API JSON `/api/v1`. Les deux appellent les mêmes fonctions de
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+
+from markupsafe import Markup, escape
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -26,6 +29,21 @@ def _classe_routage(routage: str | None) -> str:
     return COULEURS_ROUTAGE.get(routage or "", "sourdine")
 
 
+def _colorer_notice(texte: str | None) -> Markup:
+    """Notice WinIBW → lignes HTML colorées (zone, indicateurs, sous-zones), en lecture seule."""
+    lignes = []
+    for brute in (texte or "").splitlines():
+        zone, reste = brute[:3], brute[4:] if len(brute) > 3 else ""
+        ind = ""
+        if len(reste) > 2 and reste[2] == "$":
+            ind, reste = reste[:2], reste[2:]
+        corps = re.sub(r"(\$.)", r'<span class="text-[#b3261e] font-semibold">\1</span>', str(escape(reste)))
+        lignes.append(f'<span class="text-primaire font-semibold">{escape(zone)}</span> '
+                      f'<span class="text-decision">{escape(ind)}</span>{corps}')
+    return Markup("\n".join(lignes))
+
+
+gabarits.env.filters["colorer_notice"] = _colorer_notice
 gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=lambda r: LIBELLES_ROUTAGE.get(r or "", r or "—"))
 gabarits.env.filters["date"] = lambda d, f="%d/%m %H:%M": d.astimezone().strftime(f) if d else ""
 

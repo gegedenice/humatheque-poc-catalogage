@@ -165,6 +165,28 @@ def test_resolutions_idref_et_dewey(app, image):
 
 
 @respx.mock
+def test_resolutions_idref_groupees_tout_ou_rien(app, image):
+    """Validation groupée des choix IdRef : un PPN invalide n'applique rien ; sinon une seule relance."""
+    simuler(idref_statut="low_confidence")
+    lot = app.creer_lot(EntreeLot(documents=[[image]]))
+    (ligne,) = app.store.lignes_du_lot(lot.id)
+    v = app.vue_dossier(ligne.id)
+    idref = [i for i, e in enumerate(v.dossier.exceptions) if e.etape.startswith("idref")]
+    auteur_i = next(i for i in idref if v.dossier.exceptions[i].objet.startswith("author"))
+    autres = [i for i in idref if i != auteur_i]
+    with pytest.raises(ActionImpossible, match="mal formé"):
+        app.choisir_ppns(ligne.id, {auteur_i: "026940345", autres[0]: "123"}, auteur="cat")
+    assert app.vue_dossier(ligne.id).exceptions_ouvertes == v.exceptions_ouvertes  # rien appliqué
+    with pytest.raises(ActionImpossible, match="aucun choix"):
+        app.choisir_ppns(ligne.id, {}, auteur="cat")
+    v = app.choisir_ppns(ligne.id, {auteur_i: "026940345", **{j: None for j in autres}}, auteur="cat")
+    assert v.exceptions_ouvertes == 0 and v.dossier.routage == "auto"
+    assert "700 #1$3026940345$4070" in v.dossier.notice_texte.splitlines()
+    resolutions = [e for e in v.dossier.journal if e.type == "resolution"]
+    assert len(resolutions) == len(idref) and {e.auteur for e in resolutions} == {"cat"}
+
+
+@respx.mock
 def test_resolution_dewey(app, image):
     simuler()
     d = app.vue_dossier(app.store.lignes_du_lot(app.creer_lot(EntreeLot(documents=[[image]])).id)[0].id).dossier

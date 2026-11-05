@@ -111,6 +111,7 @@ class VueLot(BaseModel):
     file: list[LigneException]
     journal: list[LigneJournal]
     etapes: list[dict[str, Any]] = Field(default_factory=list, description="avancement par étape")
+    passes: list[LigneException] = Field(default_factory=list, description="documents terminés en routage auto")
 
 
 class EtapeVue(BaseModel):
@@ -155,6 +156,24 @@ class VueLots(BaseModel):
     type_document: str = ""
     declencheurs: list[str] = Field(default_factory=list, description="déclencheurs présents (choix du filtre)")
     total: int = Field(0, description="nombre de lots avant filtrage")
+
+
+class VueApercu(BaseModel):
+    """Consultation en lecture seule d'un dossier : images et notice finale."""
+    dossier_id: str
+    lot_id: str
+    document_id: str
+    type_document: str
+    titre: str | None
+    routage: str
+    situation: str | None = None
+    motif_arret: str | None = None
+    images: list[ImageVue]
+    notice: str | None = Field(None, description="texte WinIBW de la notice finale")
+    origine: str | None = Field(None, description="version validée / éditée / générée, ou notice convertie")
+    profil: str | None = None
+    alertes: list[str] = Field(default_factory=list)
+    telechargements: dict[str, str] = Field(default_factory=dict)
 
 
 class Historique(BaseModel):

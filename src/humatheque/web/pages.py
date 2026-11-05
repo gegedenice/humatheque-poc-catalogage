@@ -136,6 +136,12 @@ def dossier(request: Request, dossier_id: str):
     return _rendre(request, "dossier.html", vue=a.vue_dossier(dossier_id), notice=a.vue_notice(dossier_id))
 
 
+@routeur.get("/dossiers/{dossier_id}/apercu")
+def apercu(request: Request, dossier_id: str):
+    """Consultation en lecture seule : images et notice finale."""
+    return _rendre(request, "apercu.html", vue=_app(request).vue_apercu(dossier_id))
+
+
 @routeur.get("/dossiers/{dossier_id}/fragment")
 def dossier_fragment(request: Request, dossier_id: str):
     """Panneau droit du dossier, rafraîchi tant que le traitement est en cours ; à la fin,
@@ -196,6 +202,25 @@ def ppn(request: Request, dossier_id: str, exception: Annotated[int, Form()], au
         ppn: Annotated[str, Form()] = "", saisie: Annotated[str, Form()] = ""):
     choix = (saisie or ppn).strip()
     _app(request).choisir_ppn(dossier_id, exception, None if choix in ("", "sans-lien") else choix, _auteur(auteur))
+    return _rediriger(f"/dossiers/{dossier_id}", auteur)
+
+
+@routeur.post("/dossiers/{dossier_id}/ppns")
+async def ppns(request: Request, dossier_id: str):
+    """Validation groupée des choix IdRef : champs ppn_<index> (candidat ou « sans-lien »)
+    et saisie_<index> (PPN saisi, prioritaire) ; une exception sans choix reste ouverte."""
+    formulaire = await request.form()
+    auteur = str(formulaire.get("auteur", ""))
+    choix: dict[int, str | None] = {}
+    for cle in formulaire:
+        prefixe, _, index = cle.partition("_")
+        if prefixe not in ("ppn", "saisie") or not index.isdigit():
+            continue
+        i = int(index)
+        valeur = (str(formulaire.get(f"saisie_{i}", "")).strip() or str(formulaire.get(f"ppn_{i}", "")).strip())
+        if valeur:
+            choix[i] = None if valeur == "sans-lien" else valeur
+    _app(request).choisir_ppns(dossier_id, choix, _auteur(auteur))
     return _rediriger(f"/dossiers/{dossier_id}", auteur)
 
 

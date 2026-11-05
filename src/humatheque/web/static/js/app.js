@@ -46,6 +46,14 @@
   document.addEventListener("click", function (e) {
     var onglet = e.target.closest('[data-onglets] [role="tab"]');
     if (onglet) activer(onglet);
+    // lien vers un onglet (ex. pastille « exceptions à reprendre » de l'en-tête du dossier)
+    var lien = e.target.closest("[data-ouvrir-onglet]");
+    var cible = lien && document.getElementById(lien.getAttribute("data-ouvrir-onglet"));
+    if (cible) {
+      activer(cible);
+      cible.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      cible.focus({ preventScroll: true });
+    }
   });
   document.addEventListener("keydown", function (e) {
     var onglet = e.target.closest('[data-onglets] [role="tab"]');

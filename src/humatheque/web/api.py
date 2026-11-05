@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from humatheque.application import Application
 from humatheque.application.vues import (
-    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueBucket, VueDossier, VueLot, VueLots, VueNotice,
+    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice,
 )
 from humatheque.notice.validation import Marqueur
 from humatheque.store import Lot
@@ -66,6 +66,11 @@ class Relance(BaseModel):
     depuis: str | None = None
 
 
+@routeur.get("/dossiers/{dossier_id}/apercu", response_model=VueApercu)
+def apercu(request: Request, dossier_id: str) -> VueApercu:
+    return _app(request).vue_apercu(dossier_id)
+
+
 @routeur.post("/dossiers/{dossier_id}/relancer", response_model=VueDossier)
 def relancer(request: Request, dossier_id: str, corps: Relance | None = None) -> VueDossier:
     return _app(request).relancer(dossier_id, corps.depuis if corps else None)
@@ -79,6 +84,17 @@ class Resolution(BaseModel):
     exception: int | None = None
     ppn: str | None = None
     code: str | None = None
+
+
+class ChoixPpn(BaseModel):
+    auteur: str
+    choix: dict[int, str | None] = Field(description="index de l'exception → PPN (null : sans lien)")
+
+
+@routeur.post("/dossiers/{dossier_id}/resolutions/ppns", response_model=VueDossier)
+def resoudre_ppns(request: Request, dossier_id: str, r: ChoixPpn) -> VueDossier:
+    """Plusieurs exceptions IdRef d'un coup (tout ou rien, une seule relance)."""
+    return _app(request).choisir_ppns(dossier_id, r.choix, r.auteur)
 
 
 @routeur.post("/dossiers/{dossier_id}/resolutions/{type_}", response_model=VueDossier)

@@ -7,7 +7,7 @@
       <div class="flex flex-wrap items-center gap-3">
         <h1 class="break-words">{{ vue.titre or d.document.id }}</h1>
         {% if vue.etat != "termine" %}<span class="puce bg-primaire-clair text-primaire-fonce">{{ en_cours("traitement en cours") }}</span>
-        {% else %}{{ badge(d.routage or "auto") }}{% if vue.exceptions_ouvertes %}<span class="puce bg-decision-clair text-decision-fonce">{{ vue.exceptions_ouvertes }} exception(s)</span>{% endif %}{% endif %}
+        {% else %}{{ badge(d.routage or "auto") }}{% if vue.exceptions_ouvertes %}<button type="button" data-ouvrir-onglet="onglet-reprise" class="puce bg-decision-clair text-decision-fonce cursor-pointer hover:underline" title="Ouvrir l'onglet Reprise">{{ vue.exceptions_ouvertes }} exception(s) à reprendre</button>{% endif %}{% endif %}
       </div>
       <p class="text-[13px] text-sourdine break-words">
         <span class="font-mono">{{ d.document.id }}</span> · {{ "thèse" if d.document.type_document == "these" else "mémoire" }}
@@ -19,6 +19,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-2">
       {% if vue.etat == "termine" %}
+      <a class="btn-tonal btn-sm" href="/dossiers/{{ d.id }}/apercu" title="Image et notice finale, sans édition">Aperçu</a>
       <form method="post" action="/dossiers/{{ d.id }}/relancer"><button class="btn btn-sm">Relancer</button></form>
       <form method="post" action="/dossiers/{{ d.id }}/relancer"><input type="hidden" name="depuis" value="extraction">
         <button class="btn btn-sm" title="Rappelle le VLM puis toutes les étapes">Relancer l'extraction</button></form>
