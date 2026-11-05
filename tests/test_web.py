@@ -138,6 +138,28 @@ def test_historique(client):
     assert r.status_code == 200 and "traitement" in r.text and "manuel" in r.text
 
 
+def test_page_lots_vide(client):
+    r = client.get("/lots")
+    assert r.status_code == 200 and "Aucun lot pour l'instant" in html.unescape(r.text)
+    assert 'href="/lots" class="rail-lien" aria-current="page"' in r.text
+
+
+@respx.mock
+def test_page_lots_filtres(client):
+    """Liste des lots (mode 2) : filtres état / type, lots à reprendre, API JSON."""
+    simuler()
+    _televerser(client, n=2)
+    page = client.get("/lots")
+    assert page.status_code == 200 and "Ouvrir</a>" in page.text and "2 thèse(s)" in html.unescape(page.text)
+    assert "Aucun lot pour ces filtres." in html.unescape(client.get("/lots?type_document=memoire").text)
+    assert "Aucun lot pour ces filtres." in html.unescape(client.get("/lots?etat=en_cours").text)
+    vue = client.get("/api/v1/lots", params={"etat": "termines"}).json()
+    assert vue["total"] == 1 and len(vue["lots"]) == 1 and vue["declencheurs"] == ["manuel"]
+    lot = vue["lots"][0]
+    assert ([r["lot"]["id"] for r in vue["a_reprendre"]] == [lot["lot"]["id"]]) == (lot["indicateurs"]["en_attente"] > 0)
+    assert client.get("/api/v1/lots", params={"etat": "inconnu"}).status_code == 422
+
+
 # ---------------------------------------------------------------- API JSON
 def test_api_spec(client):
     r = client.get("/api/v1/spec")

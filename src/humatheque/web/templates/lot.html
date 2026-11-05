@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titre %}Lot {{ vue.lot.id }}{% endblock %}
-{% block fil %}<a class="text-sourdine" href="/historique">Historique</a> › <span class="font-mono">{{ vue.lot.id }}</span>{% endblock %}
+{% block fil %}<a class="text-sourdine" href="/lots">Lots</a> › <span class="font-mono">{{ vue.lot.id }}</span>{% endblock %}
 {% block entete %}<h1>Lot de {{ vue.lot.nb_documents }} {{ "thèse(s)" if vue.lot.parametres.type_document == "these" else "mémoire(s)" }}</h1>{% endblock %}
 {% block contenu %}
 <p class="sr-only">Reporting du lot : documents passés seuls et file d'exceptions à reprendre.</p>
