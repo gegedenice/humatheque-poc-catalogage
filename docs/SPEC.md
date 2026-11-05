@@ -32,7 +32,7 @@ humatheque-catalogage/
   reference/                POC, maquette, mindmap, générateur de départ (lecture seule)
   src/humatheque/
     config.py               settings pydantic (env), chemins, seuils
-    cli.py                  serve | check-spec | run-url | run-batch | scan-minio | spec-export
+    cli.py                  serve | check-spec | run-url | run-batch | scan-minio | spec-export | spec-import
     ingestion/              lecture du bucket MinIO, constitution des documents (§3)
     texte_unimarc/          normalisation de chaînes, « module NOR » du wiki (§4)
       _vendor/reaccentue/   reaccentue vendorisé (+ dico/)
@@ -479,6 +479,9 @@ affiche la source active (CSV ou Grist) et l'état de Grist (joignable ou non).
 au même format que les exports manuels, plus une copie horodatée dans
 `spec/archives/` : c'est le moyen de figer une version de la spec. La version
 chargée (horodatage + empreinte) est enregistrée dans chaque dossier.
+**`humatheque spec-import`** fait le chemin inverse : il construit le classeur
+Grist depuis `spec/*.csv` par l'API (colonnes Texte, identifiants de colonne
+sûrs, libellés = en-têtes CSV), puis relit les tables et les compare aux CSV.
 
 **Tables attendues dans `spec/`** : `Regles`, `Sources`, `Situations`,
 `Statuts_services` et `Profils`. Les deux dernières sont à exporter depuis
