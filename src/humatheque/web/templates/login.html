@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 {% block titre %}Connexion{% endblock %}
+{% block rail %}{% endblock %}
 {% block contenu %}
-<form class="carte max-w-sm mx-auto mt-10 space-y-3" method="post" action="/login" hx-boost="false">
-  <h1>Connexion</h1>
-  {% if erreur %}<p class="text-sm text-sortie">{{ erreur }}</p>{% endif %}
-  <input type="hidden" name="suite" value="{{ suite }}">
-  <label class="block"><span class="etiquette">Mot de passe</span>
-    <input class="champ" type="password" name="mot_de_passe" autofocus required></label>
-  <button class="btn-principal">Se connecter</button>
-</form>
+<div class="min-h-[70vh] flex items-center justify-center rounded-carte bg-gradient-to-br from-primaire-clair to-papier px-4 py-12">
+  <form class="carte w-full max-w-sm p-8 flex flex-col gap-5" method="post" action="/login" hx-boost="false">
+    <span aria-hidden="true" class="w-14 h-14 rounded-2xl bg-primaire text-white flex items-center justify-center text-2xl font-bold">h</span>
+    <div><h1 class="text-2xl">Connexion</h1><p class="text-sm text-sourdine">humatheque · catalogage assisté</p></div>
+    <input type="hidden" name="suite" value="{{ suite }}">
+    <label class="block"><span class="etiquette">Mot de passe</span>
+      <input class="champ {% if erreur %}border-2 border-sortie{% endif %}" type="password" name="mot_de_passe" autofocus required
+             {% if erreur %}aria-invalid="true" aria-describedby="erreur-connexion"{% endif %}>
+      {% if erreur %}<span id="erreur-connexion" class="block text-xs text-sortie mt-1.5">{{ erreur }}</span>{% endif %}</label>
+    <button class="btn-principal btn-grand">Se connecter</button>
+  </form>
+</div>
 {% endblock %}

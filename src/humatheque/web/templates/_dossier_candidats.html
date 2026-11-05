@@ -1,10 +1,10 @@
 {% from "_composants.html" import vide, lien_ppn %}
 {% set d = vue.dossier %}
 {% if d.alma %}
-<section class="carte">
-  <h2>Alma <span class="text-xs font-normal text-sourdine">statut {{ d.alma.statut }} · état {{ d.etat_alma }}{% if d.alma.ppn %} · PPN {{ d.alma.ppn }}{% endif %}</span></h2>
+<section class="sous-carte">
+  <h3 class="mb-2">Alma <span class="text-xs font-normal text-sourdine">statut {{ d.alma.statut }} · état {{ d.etat_alma }}{% if d.alma.ppn %} · PPN {{ d.alma.ppn }}{% endif %}</span></h3>
   {% if d.alma.candidats %}
-  <div class="defilant"><table class="tableau"><thead><tr><th>PPN</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Type</th><th>Score</th></tr></thead><tbody>
+  <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>PPN</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Type</th><th>Score</th></tr></thead><tbody>
   {% for c in d.alma.candidats[:10] %}
     <tr><td>{{ lien_ppn(c.ppn) }}</td><td class="text-xs">{{ c.titre }}</td><td class="text-xs">{{ c.auteurs | join(", ") }}</td>
       <td class="text-xs">{{ c.annee or "" }}</td><td class="text-xs">{{ c.type or "" }}{% if c.dans_le_profil == false %} <span class="text-sourdine">(hors profil)</span>{% endif %}</td>
@@ -15,11 +15,11 @@
 {% endif %}
 
 {% if d.sudoc %}
-<section class="carte">
-  <h2>Sudoc <span class="text-xs font-normal text-sourdine">statut {{ d.sudoc.statut_service }} · état agrégé {{ d.etat_sudoc }} · seuil {{ d.sudoc.seuil }}</span></h2>
+<section class="sous-carte">
+  <h3 class="mb-2">Sudoc <span class="text-xs font-normal text-sourdine">statut {{ d.sudoc.statut_service }} · état agrégé {{ d.etat_sudoc }} · seuil {{ d.sudoc.seuil }}</span></h3>
   <p class="text-xs text-sourdine mb-2">{{ d.sudoc.justification }}</p>
   {% if d.sudoc.candidats %}
-  <div class="defilant"><table class="tableau"><thead><tr><th>PPN</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Score</th><th>Support</th><th>thesis_state</th><th>Retenu</th></tr></thead><tbody>
+  <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>PPN</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Score</th><th>Support</th><th>thesis_state</th><th>Retenu</th></tr></thead><tbody>
   {% for c in d.sudoc.candidats %}
     <tr class="{% if not c.retenu %}text-sourdine{% endif %}"><td>{{ lien_ppn(c.ppn) }}</td><td class="text-xs">{{ c.titre }}</td>
       <td class="text-xs">{{ c.auteurs | join(", ") }}</td><td class="text-xs">{{ c.annee or "" }}</td>
@@ -29,13 +29,13 @@
   {% else %}{{ vide("Aucun candidat Sudoc.") }}{% endif %}
 </section>
 {% elif d.etapes.sudoc.statut == "ignoree" %}
-<section class="carte"><h2>Sudoc</h2>{{ vide("Non interrogé : " ~ (d.etapes.sudoc.motif or "étape ignorée") ~ ".") }}</section>
+<section class="sous-carte"><h3 class="mb-2">Sudoc</h3>{{ vide("Non interrogé : " ~ (d.etapes.sudoc.motif or "étape ignorée") ~ ".") }}</section>
 {% endif %}
 
 {% if d.idref_personnes or d.idref_organisations %}
-<section class="carte">
-  <h2>IdRef</h2>
-  <div class="defilant"><table class="tableau"><thead><tr><th>Personne / organisme</th><th>Statut</th><th>PPN retenu</th><th>Meilleurs candidats</th></tr></thead><tbody>
+<section class="sous-carte">
+  <h3 class="mb-2">IdRef</h3>
+  <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>Personne / organisme</th><th>Statut</th><th>PPN retenu</th><th>Meilleurs candidats</th></tr></thead><tbody>
   {% for champ, alignements in d.idref_personnes.items() %}{% for a in alignements %}{% if a %}
     <tr><td class="text-xs">{{ champ }}[{{ loop.index }}] {{ (d.metadonnees[champ] if d.metadonnees[champ] is string else d.metadonnees[champ][loop.index0]) }}</td>
       <td class="text-xs">{{ a.statut }}</td><td>{{ lien_ppn(a.ppn, "https://www.idref.fr/") }}</td>
@@ -56,8 +56,8 @@
 {% endif %}
 
 {% if d.dewey %}
-<section class="carte">
-  <h2>Dewey <span class="text-xs font-normal text-sourdine">{{ d.dewey.statut }}{% if d.dewey.code %} · retenu {{ d.dewey.code }} {{ d.dewey.libelle }}{% endif %}</span></h2>
+<section class="sous-carte">
+  <h3 class="mb-2">Dewey <span class="text-xs font-normal text-sourdine">{{ d.dewey.statut }}{% if d.dewey.code %} · retenu {{ d.dewey.code }} {{ d.dewey.libelle }}{% endif %}</span></h3>
   <ul class="text-xs space-y-0.5">{% for c in d.dewey.classes %}<li><span class="font-mono">{{ c.code }}</span> {{ c.libelle }} <span class="text-sourdine">({{ c.score }})</span></li>{% endfor %}</ul>
 </section>
 {% endif %}

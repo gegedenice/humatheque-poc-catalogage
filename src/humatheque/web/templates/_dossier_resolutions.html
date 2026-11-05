@@ -1,74 +1,73 @@
 {# Résolution d'exception (SPEC §9.3) : chaque action est journalisée (qui / quand / quoi). #}
 {% set d = vue.dossier %}
 {% macro champ_auteur() -%}
-  <label class="text-xs text-sourdine">Catalogueur <input class="champ inline-block w-40 ml-1" name="auteur" value="{{ auteur }}" required></label>
+  <label class="text-xs text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40" name="auteur" value="{{ auteur }}" required></label>
 {%- endmacro %}
 {% set ouvertes = d.exceptions | rejectattr("resolue") | list %}
 {% set faux_alma = d.alma and d.etat_alma not in (none, "absent") and not d.cloture %}
 {% set faux_sudoc = d.sudoc and d.etat_sudoc not in (none, "rien") and d.routage in ("décision", "sortie", "conversion") and not d.cloture %}
 {% if ouvertes or faux_alma or faux_sudoc or (d.routage not in (none, "auto") and not d.cloture) %}
-<section class="carte border-l-4 border-l-decision">
-  <h2>À trancher</h2>
-  <div class="space-y-3">
+<section class="carte-alerte" aria-label="À trancher">
+  <h2 class="flex items-center gap-2.5 text-[#4a3000]"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8a5a00" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17v.5"/></svg>À trancher</h2>
+  <div class="flex flex-col gap-3">
   {% for e in d.exceptions %}{% if not e.resolue %}{% set i = loop.index0 %}
-    <div class="sous-carte">
-      <p class="text-sm font-semibold">{{ e.objet }}</p>
-      <p class="text-xs text-sourdine">{{ e.motif }}</p>
+    <div class="bg-carte rounded-tuile p-4">
+      <div class="flex flex-wrap justify-between gap-2"><p class="font-semibold">{{ e.objet }}</p><span class="puce bg-decision-clair text-decision-fonce font-medium">{{ e.motif }}</span></div>
       {% if e.etape == "provenance" %}
       <form method="post" action="/dossiers/{{ d.id }}/provenance" class="flex flex-wrap items-center gap-2 mt-2">
         {% for v in e.candidats %}<label class="text-sm"><input type="radio" name="valeur" value="{{ v }}" required> {{ v }}</label>{% endfor %}
-        <input class="champ flex-1 min-w-40" name="commentaire" placeholder="commentaire (facultatif)">
-        {{ champ_auteur() }}<button class="btn btn-sm">Choisir et reprendre</button>
+        <input class="champ champ-sm flex-1 min-w-40" name="commentaire" placeholder="commentaire (facultatif)">
+        {{ champ_auteur() }}<button class="btn-principal btn-sm">Choisir et reprendre</button>
       </form>
       {% elif e.etape in ("idref_personnes", "idref_organisations") %}
       <form method="post" action="/dossiers/{{ d.id }}/ppn" class="mt-2 space-y-1.5">
         <input type="hidden" name="exception" value="{{ i }}">
         {% for c in e.candidats[:5] %}
-        <label class="flex items-center gap-2 text-xs"><input type="radio" name="ppn" value="{{ c.ppn }}">
+        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" name="ppn" value="{{ c.ppn }}">
           <a class="font-mono" href="{{ c.url or ('https://www.idref.fr/' ~ c.ppn) }}" target="_blank" rel="noopener">{{ c.ppn }}</a>
           {{ c.libelle or "" }} <span class="text-sourdine">({{ c.score }})</span></label>
         {% endfor %}
-        <label class="flex items-center gap-2 text-xs"><input type="radio" name="ppn" value="sans-lien"> sans lien (repli $a$b)</label>
+        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" name="ppn" value="sans-lien"> sans lien (repli $a$b)</label>
         <div class="flex flex-wrap items-center gap-2">
-          <input class="champ w-36 font-mono" name="saisie" placeholder="ou saisir un PPN" pattern="[0-9]{8}[0-9Xx]">
-          {{ champ_auteur() }}<button class="btn btn-sm">Valider</button>
+          <input class="champ champ-sm w-40 font-mono" name="saisie" placeholder="ou saisir un PPN" pattern="[0-9]{8}[0-9Xx]">
+          {{ champ_auteur() }}<button class="btn-principal btn-sm">Valider</button>
         </div>
       </form>
       {% elif e.etape == "dewey" %}
       <form method="post" action="/dossiers/{{ d.id }}/dewey" class="mt-2 space-y-1">
         <input type="hidden" name="exception" value="{{ i }}">
         {% for c in e.candidats %}
-        <label class="flex items-center gap-2 text-xs"><input type="radio" name="code" value="{{ c.code }}" required>
+        <label class="flex items-center gap-2.5 text-sm"><input class="accent-primaire" type="radio" name="code" value="{{ c.code }}" required>
           <span class="font-mono">{{ c.code }}</span> {{ c.libelle }} <span class="text-sourdine">({{ c.score }})</span></label>
         {% endfor %}
-        <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn btn-sm">Retenir la classe</button></div>
+        <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Retenir la classe</button></div>
       </form>
       {% endif %}
     </div>
   {% endif %}{% endfor %}
 
   {% if faux_alma %}
-  <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">
+  <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="bg-carte rounded-tuile p-4 space-y-2">
     <p class="text-sm font-semibold">Notice Alma non pertinente ?</p>
     <p class="text-xs text-sourdine">Après contrôle, déclarer un faux positif reprend le traitement avec l'état Alma « absent ».</p>
     <input type="hidden" name="service" value="alma">
-    <input class="champ" name="commentaire" placeholder="motif (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn btn-sm">Déclarer un faux positif et reprendre</button></div>
+    <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
+    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Déclarer un faux positif et reprendre</button></div>
   </form>
   {% elif faux_sudoc %}
-  <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">
+  <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="bg-carte rounded-tuile p-4 space-y-2">
     <p class="text-sm font-semibold">Candidat(s) Sudoc non pertinent(s) ?</p>
     <p class="text-xs text-sourdine">Déclarer un faux positif reprend le traitement avec l'état Sudoc « rien ».</p>
     <input type="hidden" name="service" value="sudoc">
-    <input class="champ" name="commentaire" placeholder="motif (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn btn-sm">Déclarer un faux positif et reprendre</button></div>
+    <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
+    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Déclarer un faux positif et reprendre</button></div>
   </form>
   {% endif %}
 
   {% if d.routage not in (none, "auto") and not d.cloture %}
-  <form method="post" action="/dossiers/{{ d.id }}/hors-outil" class="sous-carte space-y-2">
+  <form method="post" action="/dossiers/{{ d.id }}/hors-outil" class="bg-carte rounded-tuile p-4 space-y-2">
     <p class="text-sm font-semibold">Traité hors outil</p>
-    <input class="champ" name="commentaire" placeholder="ce qui a été fait (obligatoire)" required>
+    <input class="champ champ-sm" name="commentaire" placeholder="ce qui a été fait (obligatoire)" required>
     <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-discret btn-sm">Marquer comme traité</button></div>
   </form>
   {% endif %}

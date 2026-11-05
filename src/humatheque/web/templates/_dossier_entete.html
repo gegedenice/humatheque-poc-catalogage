@@ -1,0 +1,59 @@
+{% from "_composants.html" import badge, en_cours, statut_etape %}
+{# En-tête et frise du dossier ; avec oob=True, remplacés hors bande lors du rafraîchissement. #}
+{% set d = vue.dossier %}
+<div id="entete-dossier" class="flex flex-col gap-5 mb-6" {% if oob %}hx-swap-oob="true"{% endif %}>
+  <div class="flex flex-wrap items-end gap-4">
+    <div class="flex-[1_1_420px] min-w-0 flex flex-col gap-1.5">
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="break-words">{{ vue.titre or d.document.id }}</h1>
+        {% if vue.etat != "termine" %}<span class="puce bg-primaire-clair text-primaire-fonce">{{ en_cours("traitement en cours") }}</span>
+        {% else %}{{ badge(d.routage or "auto") }}{% if vue.exceptions_ouvertes %}<span class="puce bg-decision-clair text-decision-fonce">{{ vue.exceptions_ouvertes }} exception(s)</span>{% endif %}{% endif %}
+      </div>
+      <p class="text-[13px] text-sourdine break-words">
+        <span class="font-mono">{{ d.document.id }}</span> · {{ "thèse" if d.document.type_document == "these" else "mémoire" }}
+        · traité le {{ d.cree_le | date("%d/%m/%Y %H:%M") }}
+        · <span class="font-mono">{{ d.fournisseur_vlm or "—" }}</span>
+        · spec <span class="font-mono">{{ d.version_spec or "—" }}</span>
+        {% if d.extraction %}· prompt <span class="font-mono">{{ d.extraction.prompt.nom }} · {{ d.extraction.prompt.empreinte }} · {{ d.extraction.strategie }}</span>{% endif %}
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {% if vue.etat == "termine" %}
+      <form method="post" action="/dossiers/{{ d.id }}/relancer"><button class="btn btn-sm">Relancer</button></form>
+      <form method="post" action="/dossiers/{{ d.id }}/relancer"><input type="hidden" name="depuis" value="extraction">
+        <button class="btn btn-sm" title="Rappelle le VLM puis toutes les étapes">Relancer l'extraction</button></form>
+      {% endif %}
+      {% if vue.telechargements %}
+      <details class="relative">
+        <summary class="btn-principal btn-sm list-none [&::-webkit-details-marker]:hidden">Télécharger ▾</summary>
+        <ul class="absolute right-0 z-20 mt-2 min-w-[14rem] rounded-2xl bg-carte shadow-lg border border-filet py-2">
+          {% for libelle, fichier in vue.telechargements.items() %}
+          <li><a class="block px-4 py-2 text-sm text-encre no-underline hover:bg-tonal" hx-boost="false" href="/dossiers/{{ d.id }}/telecharger/{{ fichier }}">{{ libelle }}</a></li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if d.motif_arret %}
+  <p class="avis bg-decision-clair text-decision-fonce"><span class="font-semibold">Arrêt</span>
+    {% if d.etape_arret %}({{ d.etape_arret }}){% endif %} : {{ d.motif_arret }}</p>
+  {% endif %}
+  {% if d.cloture %}
+  <p class="avis bg-auto-clair text-auto-fonce">✓ Traité hors outil par {{ d.cloture.par }} le {{ d.cloture.le | date }} : {{ d.cloture.commentaire }}</p>
+  {% endif %}
+
+  <section aria-label="Étapes" class="bg-carte rounded-[24px] shadow-carte px-5 py-4 overflow-x-auto">
+    <ol class="flex min-w-[880px]">
+      {% for e in vue.etapes %}
+      <li class="flex-1 flex flex-col items-center gap-1.5 text-center px-1"
+          title="{{ e.statut }}{% if e.motif %} · {{ e.motif }}{% endif %}{% if e.tentatives > 1 %} · {{ e.tentatives }} tentatives{% endif %}">
+        {{ statut_etape(e.statut) }}
+        <span class="text-xs font-medium leading-tight">{{ e.libelle }}</span>
+        <span class="font-mono text-[11px] text-sourdine">{% if e.duree is not none %}{{ "%.1f" | format(e.duree) | replace(".", ",") }} s{% elif e.statut == "ignoree" %}ignorée{% else %}—{% endif %}{% if e.tentatives > 1 %} · ×{{ e.tentatives }}{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>

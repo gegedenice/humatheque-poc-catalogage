@@ -135,7 +135,7 @@ def dossier_fragment(request: Request, dossier_id: str):
     """Panneau droit du dossier, rafraîchi tant que le traitement est en cours ; à la fin,
     rechargement complet pour monter l'éditeur (îlot hors fragment rafraîchi)."""
     vue = _app(request).vue_dossier(dossier_id)
-    reponse = _rendre(request, "_dossier_panneau.html", vue=vue)
+    reponse = _rendre(request, "_dossier_panneau.html", vue=vue, oob=True)
     if vue.etat == "termine":
         reponse.headers["HX-Refresh"] = "true"
     return reponse

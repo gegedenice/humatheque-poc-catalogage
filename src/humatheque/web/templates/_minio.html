@@ -5,38 +5,39 @@
   {% if not vue.configure %}
     {{ vide("Stockage S3 non configuré : renseignez MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY et MINIO_SECRET_KEY dans .env.") }}
   {% elif vue.erreur %}
-    <p class="text-sm rounded-lg border border-sortie text-sortie px-3 py-2">{{ vue.erreur }}</p>
-    <button class="btn-discret btn-sm mt-2" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Réessayer</button>
+    <div class="tuile border-sortie-clair flex flex-col gap-3">
+      <div class="flex items-center gap-3"><span aria-hidden="true" class="w-10 h-10 rounded-xl bg-sortie-clair text-sortie-fonce flex items-center justify-center font-bold">!</span><span class="font-semibold">Bucket injoignable</span></div>
+      <p class="text-[13px] text-sourdine break-words">{{ vue.erreur }}</p>
+      <div class="flex gap-2"><button class="btn-tonal btn-sm" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Réessayer</button>
+        <a class="btn-discret btn-sm" href="/admin">Santé des services</a></div>
+    </div>
   {% elif not vue.dossiers %}
     {{ vide("Aucun dossier sous " ~ vue.bucket ~ "/" ~ vue.prefixe ~ ".") }}
   {% else %}
-  <form hx-post="/minio/lancer" hx-target="#bucket" hx-swap="outerHTML">
-    <p class="text-xs text-sourdine mb-2"><span class="font-mono">{{ vue.bucket }}/{{ vue.prefixe }}</span> · {{ vue.dossiers | length }} dossier(s), {{ vue.dossiers | selectattr("nouveau") | list | length }} nouveau(x) · type déterminé par le dossier TH / MM</p>
-    <div class="max-h-80 overflow-y-auto border border-filet rounded-lg">
-      <table class="tableau">
-        <tbody>
-        {% for l in vue.dossiers %}{% set d = l.document %}
-          <tr class="{% if d.invalide and d.images %}text-sourdine{% endif %}">
-            <td class="w-6"><input type="checkbox" name="dossiers" value="{{ d.id }}" aria-label="{{ d.id }}"
-                 {% if d.invalide and d.images %}disabled{% elif l.nouveau %}checked{% endif %}></td>
-            <td class="font-mono text-xs">{{ d.id }}<br><span class="text-sourdine">{{ d.images | length }} image(s){% if d.invalide %} · {{ d.invalide }}{% endif %}</span></td>
-            <td class="text-xs text-right whitespace-nowrap">
-              {% if l.modifie %}<span class="pastille text-decision" title="images changées depuis le dernier traitement : non retraité d'office">modifié</span><br>{% endif %}
-              {% if l.nouveau %}<span class="pastille text-incident">nouveau</span>
-              {% elif l.etat != "termine" %}<span class="text-decision">en cours</span>
-              {% else %}<a href="/dossiers/{{ l.dossier_id }}">{{ badge(l.routage or "auto") }}</a>{% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-3">{{ parametres_avances(reglables) }}</div>
-    <div class="flex flex-wrap items-center gap-2 mt-3">
-      <select class="champ w-auto" name="fournisseur" aria-label="Fournisseur VLM">
+  <form hx-post="/minio/lancer" hx-target="#bucket" hx-swap="outerHTML" class="flex flex-col gap-3">
+    <p class="text-[13px] text-sourdine"><span class="font-mono">{{ vue.bucket }}/{{ vue.prefixe }}</span> · {{ vue.dossiers | length }} dossier(s), {{ vue.dossiers | selectattr("nouveau") | list | length }} nouveau(x) · type déterminé par le dossier TH / MM</p>
+    <ul class="max-h-80 overflow-y-auto -mx-1 px-1">
+      {% for l in vue.dossiers %}{% set d = l.document %}
+      <li class="flex items-center gap-3 py-2 border-b border-filet/70 {% if d.invalide and d.images %}text-sourdine{% endif %}">
+        <input class="w-[18px] h-[18px] accent-primaire flex-none" type="checkbox" name="dossiers" value="{{ d.id }}" aria-label="{{ d.id }}"
+               {% if d.invalide and d.images %}disabled{% elif l.nouveau %}checked{% endif %}>
+        <span class="flex-1 min-w-0 flex flex-col"><span class="font-mono text-[13px] break-all">{{ d.id }}</span>
+          <span class="text-xs text-contour">{{ d.images | length }} image(s){% if d.invalide %} · {{ d.invalide }}{% endif %}</span></span>
+        <span class="flex flex-col items-end gap-1">
+          {% if l.modifie %}<span class="puce bg-decision-clair text-decision-fonce" title="images changées depuis le dernier traitement : non retraité d'office">modifié</span>{% endif %}
+          {% if l.nouveau %}<span class="puce bg-incident-clair text-incident-fonce">nouveau</span>
+          {% elif l.etat != "termine" %}<span class="puce bg-primaire-clair text-primaire-fonce">en cours</span>
+          {% else %}<a class="no-underline" href="/dossiers/{{ l.dossier_id }}">{{ badge(l.routage or "auto") }}</a>{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {{ parametres_avances(reglables) }}
+    <div class="flex flex-wrap items-center gap-2">
+      <select class="champ champ-sm w-auto rounded-full" name="fournisseur" aria-label="Fournisseur VLM">
         {% for f in fournisseurs %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
       </select>
-      <button class="btn-principal btn-sm">Traiter la sélection</button>
+      <button class="btn-tonal btn-sm">Traiter la sélection</button>
       <button type="button" class="btn-discret btn-sm" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Rebalayer</button>
     </div>
   </form>

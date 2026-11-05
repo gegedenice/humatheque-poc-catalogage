@@ -2,34 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Material 3 (proposition A des maquettes) : surfaces tonales, cartes arrondies,
+   boutons pleins / tonaux / contour / texte, puces de routage. */
 @layer base {
   [hidden] { display: none !important; }
-  body { @apply bg-papier text-encre font-sans text-[15px] leading-snug; }
-  h1 { @apply text-xl font-semibold; }
-  h2 { @apply text-[15px] font-semibold mb-2.5; }
-  a { @apply underline-offset-2; }
+  body { @apply bg-papier text-encre font-sans text-[15px] leading-snug antialiased; }
+  h1 { @apply text-[26px] font-semibold tracking-tight leading-tight; }
+  h2 { @apply text-lg font-semibold mb-3; }
+  h3 { @apply text-sm font-semibold; }
+  a { @apply text-primaire underline-offset-2 hover:text-primaire-fonce; }
+  :focus-visible { @apply outline-none ring-2 ring-primaire/50 ring-offset-1; }
 }
 
 @layer components {
-  .carte { @apply bg-carte border border-filet rounded-xl p-4; }
-  .sous-carte { @apply border border-filet rounded-lg p-3 bg-[#fafbfc]; }
-  .btn { @apply inline-flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-lg border-[1.5px] border-encre bg-white text-encre cursor-pointer hover:bg-encre hover:text-white disabled:opacity-50; }
-  .btn-principal { @apply btn bg-encre text-white hover:opacity-90; }
-  .btn-discret { @apply btn border-filet text-sourdine hover:bg-papier hover:text-encre; }
-  .btn-sm { @apply text-xs px-2.5 py-1.5; }
-  .pastille { @apply font-mono text-[10px] px-2 py-px rounded-full border border-current whitespace-nowrap; }
-  .kpi { @apply bg-carte border border-filet rounded-xl px-3.5 py-3; }
-  .kpi-valeur { @apply font-mono text-[26px] font-semibold leading-none; }
-  .kpi-libelle { @apply text-[11.5px] text-sourdine mt-1.5; }
-  .filtre { @apply text-xs font-semibold border-[1.5px] border-filet bg-white text-encre rounded-full px-3 py-1 cursor-pointer no-underline; }
-  .filtre-actif { @apply bg-encre text-white border-encre; }
+  /* surfaces */
+  .carte { @apply bg-carte rounded-carte shadow-carte p-4 sm:p-6; }
+  .sous-carte { @apply rounded-tuile bg-tonal p-4; }
+  .tuile { @apply rounded-tuile border border-filet p-4; }
+  .carte-alerte { @apply rounded-carte bg-[#fff4e0] p-4 sm:p-6; }
+
+  /* boutons */
+  .btn { @apply inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full text-sm font-semibold no-underline cursor-pointer
+                 border border-contour bg-transparent text-primaire hover:bg-primaire/5 hover:text-primaire
+                 disabled:opacity-40 disabled:cursor-not-allowed transition-colors; }
+  .btn-principal { @apply btn border-0 bg-primaire text-white hover:bg-primaire-fonce hover:text-white; }
+  .btn-tonal { @apply btn border-0 bg-primaire-clair text-primaire-fonce hover:bg-[#cdd4fb] hover:text-primaire-fonce; }
+  .btn-succes { @apply btn border-0 bg-auto text-white hover:bg-auto-fonce hover:text-white; }
+  .btn-discret { @apply btn border-0 px-3 text-primaire hover:bg-primaire/5; }
+  .btn-sm { @apply h-9 px-4 text-[13px]; }
+  .btn-grand { @apply h-12 px-7 text-[15px]; }
+  .btn-icone { @apply inline-flex items-center justify-center w-10 h-10 rounded-full text-sourdine hover:bg-encre/5 cursor-pointer; }
+
+  /* puces */
+  .pastille { @apply inline-flex items-center gap-1 rounded-md border border-current px-2 py-px text-[11px] font-medium whitespace-nowrap; }
+  .puce { @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap; }
+  .puce-contour { @apply inline-flex items-center gap-2 h-8 px-3.5 rounded-lg border border-[#c4c6d0] text-sm text-sourdine whitespace-nowrap; }
+  .filtre { @apply inline-flex items-center gap-1.5 h-8 px-3.5 rounded-lg border border-contour text-sm text-sourdine no-underline cursor-pointer hover:bg-encre/5 hover:text-encre; }
+  .filtre-actif { @apply border-transparent bg-primaire-clair text-primaire-fonce font-semibold hover:bg-primaire-clair hover:text-primaire-fonce; }
+
+  /* indicateurs */
+  .kpi { @apply bg-carte rounded-[24px] shadow-carte px-6 py-5 flex flex-col gap-3; }
+  .kpi-valeur { @apply text-[44px] font-semibold leading-none tracking-tight; }
+  .kpi-libelle { @apply text-sm font-medium text-sourdine; }
+
+  /* tableaux */
   .tableau { @apply w-full border-collapse text-[13px]; }
   .defilant { @apply overflow-x-auto -mx-1 px-1; }
-  .tableau th { @apply text-[11px] text-sourdine font-semibold text-left border-b border-filet px-2 py-2 align-top; }
-  .tableau td { @apply border-b border-filet px-2 py-2 text-left align-top; }
-  .champ { @apply w-full rounded-lg border border-filet px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-encre/30; }
-  .etiquette { @apply block text-xs font-semibold text-sourdine mb-1; }
-  .vide { @apply text-sourdine text-sm py-4 text-center; }
-  .ligne-journal { @apply grid grid-cols-[auto_1fr] gap-2 font-mono text-[11px] py-1 border-b border-papier text-sourdine; }
-  .code { @apply font-mono text-xs whitespace-pre-wrap break-all bg-papier rounded-lg p-3 overflow-auto; }
+  .tableau th { @apply text-xs text-sourdine font-semibold text-left border-b border-filet px-3 py-2.5 align-top; }
+  .tableau td { @apply border-b border-filet/70 px-3 py-3 text-left align-top; }
+  .tableau tbody tr { @apply hover:bg-tonal/70; }
+
+  /* formulaires */
+  .champ { @apply w-full h-12 rounded-lg border border-contour bg-white px-4 text-[15px] text-encre
+                  focus:outline-none focus:border-primaire focus:ring-1 focus:ring-primaire; }
+  textarea.champ { @apply h-auto py-3; }
+  .champ-sm { @apply h-10 px-3 text-sm; }
+  .etiquette { @apply block text-xs font-medium text-sourdine mb-1.5; }
+  .segmente { @apply flex h-10 rounded-full border border-contour overflow-hidden; }
+  .segmente label { @apply flex-1 flex items-center justify-center gap-1.5 text-sm cursor-pointer border-l border-contour first:border-l-0 has-[:checked]:bg-primaire-clair has-[:checked]:text-primaire-fonce has-[:checked]:font-semibold; }
+  .segmente input { @apply sr-only; }
+  .interrupteur { @apply relative inline-flex items-center gap-3 cursor-pointer; }
+  .interrupteur input { @apply sr-only; }
+  .interrupteur .piste { @apply relative w-[52px] h-8 flex-none rounded-full border-2 border-contour bg-filet transition-colors; }
+  .interrupteur .piste::after { content: ""; @apply absolute left-1.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-contour transition-all; }
+  .interrupteur input:checked + .piste { @apply border-primaire bg-primaire; }
+  .interrupteur input:checked + .piste::after { @apply left-[22px] w-6 h-6 bg-white; }
+  .interrupteur input:disabled + .piste { @apply opacity-40; }
+  .interrupteur input:focus-visible + .piste { @apply ring-2 ring-primaire/50 ring-offset-1; }
+  .curseur { @apply w-full accent-primaire; }
+
+  /* onglets */
+  .onglets { @apply flex gap-1 border-b border-filet overflow-x-auto; }
+  .onglet { @apply h-12 px-4 -mb-px border-b-[3px] border-transparent text-sm text-sourdine whitespace-nowrap cursor-pointer bg-transparent hover:text-encre; }
+  .onglet[aria-selected="true"] { @apply border-primaire text-primaire font-semibold; }
+
+  /* états */
+  .vide { @apply text-sourdine text-sm py-6 text-center; }
+  .ligne-journal { @apply grid grid-cols-[auto_1fr] gap-3 font-mono text-xs py-1.5 border-b border-filet/60 text-sourdine; }
+  .code { @apply font-mono text-xs whitespace-pre-wrap break-all bg-tonal rounded-xl p-3 overflow-auto; }
+  .avis { @apply rounded-2xl px-4 py-3 text-sm; }
+
+  /* navigation */
+  .rail-lien { @apply flex flex-col items-center gap-1 text-xs font-medium text-sourdine no-underline hover:text-encre; }
+  .rail-lien .rail-icone { @apply flex items-center justify-center w-14 h-8 rounded-full transition-colors; }
+  .rail-lien:hover .rail-icone { @apply bg-encre/5; }
+  .rail-lien[aria-current="page"] { @apply text-encre font-semibold; }
+  .rail-lien[aria-current="page"] .rail-icone { @apply bg-primaire-clair text-primaire-fonce; }
 }

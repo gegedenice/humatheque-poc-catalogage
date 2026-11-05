@@ -1,80 +1,99 @@
 {% extends "base.html" %}
-{% from "_composants.html" import vide %}
-{% from "_reglages.html" import parametres_avances %}
+{% from "_composants.html" import vide, en_cours %}
+{% from "_reglages.html" import champs_reglables %}
 {% block titre %}Administration{% endblock %}
+{% block fil %}Accueil · santé des services, lots automatiques, déclencheurs (ING-F-003, ING-F-004){% endblock %}
+{% block entete %}<h1>Administration</h1>{% endblock %}
+{% block entete_droite %}
+<span class="text-[13px] text-sourdine">{% if reglages.maj_le %}Modifié le {{ reglages.maj_le | date("%d/%m/%Y à %H:%M") }} par {{ reglages.auteur }}{% else %}Valeurs initiales lues dans .env et config/{% endif %}</span>
+{% endblock %}
 {% block contenu %}
-<h1>Administration</h1>
-<p class="text-sm text-sourdine mt-1">Santé des services, réglages des lots automatiques et déclencheurs (ING-F-003, ING-F-004).
-  {% if reglages.maj_le %}Dernière modification le {{ reglages.maj_le | date("%d/%m/%Y %H:%M") }} par {{ reglages.auteur }}.{% else %}Valeurs initiales lues dans .env et config/.{% endif %}</p>
-
-<section class="carte mt-4">
+<section class="carte mb-6">
   <h2>Santé des services</h2>
   <div id="sante" hx-get="/admin/sante" hx-trigger="load" hx-swap="innerHTML">
-    <p class="vide">Contrôle en cours…</p>
+    <div class="vide">{{ en_cours("Contrôle en cours…") }}</div>
   </div>
 </section>
 
-<form class="grid grid-cols-1 gap-4 mt-4 lg:grid-cols-2 items-start" method="post" action="/admin/reglages">
-  <section class="carte min-w-0 space-y-3">
-    <h2>Lots automatiques</h2>
-    <p class="text-xs text-sourdine">Appliqués aux lots créés par un déclencheur ; proposés aussi par défaut dans le formulaire « Nouveau traitement ».</p>
+{% macro interrupteur(nom, actif, libelle, desactive=False) -%}
+  <label class="interrupteur justify-between w-full font-semibold">
+    <span>{{ libelle }}</span>
+    <input type="checkbox" name="{{ nom }}" {% if actif %}checked{% endif %} {% if desactive %}disabled{% endif %}><span class="piste" aria-hidden="true"></span>
+  </label>
+{%- endmacro %}
+
+<form class="flex flex-wrap gap-6 items-start" method="post" action="/admin/reglages">
+  <section class="carte flex-[1_1_420px] min-w-0 flex flex-col gap-4">
+    <div>
+      <h2 class="mb-1">Lots automatiques</h2>
+      <p class="text-[13px] text-sourdine">Appliqués aux lots créés par un déclencheur ; proposés aussi par défaut dans « Nouveau traitement ».</p>
+    </div>
     <label class="block"><span class="etiquette">Fournisseur VLM</span>
       <select class="champ" name="fournisseur">
         {% for f in fournisseurs %}<option value="{{ f }}" {% if f == reglages.fournisseur %}selected{% endif %}>{{ f }}</option>{% endfor %}
       </select></label>
-    {{ parametres_avances(reglables) }}
+    <div class="sous-carte">
+      <p class="text-sm font-semibold mb-3">Paramètres avancés <span class="font-normal text-sourdine">· défauts de <span class="font-mono">config/services.yaml</span></span></p>
+      {{ champs_reglables(reglables) }}
+    </div>
   </section>
 
-  <section class="carte min-w-0 space-y-3">
-    <h2>Déclencheurs</h2>
+  <section class="carte flex-[1_1_420px] min-w-0 flex flex-col gap-3.5">
+    <h2 class="mb-0">Déclencheurs</h2>
     {% set d = reglages.declencheurs %}
-    {% if not s3 %}<p class="text-xs rounded-lg border border-decision text-decision px-3 py-2">Stockage S3 non configuré : balayage et évènements indisponibles.</p>{% endif %}
-    <fieldset class="sous-carte space-y-2">
-      <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" name="balayage_actif" {% if d.balayage.actif %}checked{% endif %} {% if not s3 %}disabled{% endif %}> Balayage périodique du bucket</label>
-      <label class="text-xs text-sourdine">toutes les <input class="champ inline-block w-20 font-mono" type="number" min="5" max="1440" name="balayage_intervalle" value="{{ d.balayage.intervalle_minutes }}"> minutes : les nouveaux dossiers forment un lot</label>
+    {% if not s3 %}<p class="avis bg-decision-clair text-decision-fonce">Stockage S3 non configuré : balayage et évènements indisponibles.</p>{% endif %}
+    <fieldset class="tuile flex flex-col gap-3">
+      {{ interrupteur("balayage_actif", d.balayage.actif, "Balayage périodique du bucket", not s3) }}
+      <label class="flex flex-wrap items-center gap-2 text-[13px] text-sourdine">toutes les
+        <input class="champ champ-sm w-24 font-mono" type="number" min="5" max="1440" name="balayage_intervalle" value="{{ d.balayage.intervalle_minutes }}"> minutes : les nouveaux dossiers forment un lot</label>
     </fieldset>
-    <fieldset class="sous-carte space-y-2">
-      <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" name="planification_actif" {% if d.planification.actif %}checked{% endif %}> Traitement à heure fixe</label>
-      <label class="block text-xs text-sourdine">expression cron (minute heure jour mois jour-de-semaine), ex. <span class="font-mono">30 2 * * 1-5</span> = 2 h 30 du lundi au vendredi
-        <input class="champ font-mono mt-1" name="planification_cron" value="{{ d.planification.cron }}" placeholder="30 2 * * *"></label>
-      {% if etat.prochaine_planification %}<p class="text-xs">Prochain déclenchement : <span class="font-mono">{{ etat.prochaine_planification | date("%d/%m/%Y %H:%M") }}</span></p>{% endif %}
+    <fieldset class="tuile flex flex-col gap-3">
+      {{ interrupteur("planification_actif", d.planification.actif, "Traitement à heure fixe") }}
+      <label class="block"><span class="etiquette">Expression cron (minute heure jour mois jour-de-semaine), ex. <span class="font-mono">30 2 * * 1-5</span> = 2 h 30 du lundi au vendredi</span>
+        <input class="champ font-mono" name="planification_cron" value="{{ d.planification.cron }}" placeholder="30 2 * * *"></label>
+      {% if etat.prochaine_planification %}<span class="self-start puce bg-rail text-encre font-normal">Prochain déclenchement : <span class="font-mono">{{ etat.prochaine_planification | date("%d/%m/%Y %H:%M") }}</span></span>{% endif %}
     </fieldset>
-    <fieldset class="sous-carte space-y-2">
-      <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" name="evenements_actif" {% if d.evenements.actif %}checked{% endif %} {% if not s3 %}disabled{% endif %}> Évènements S3 (notifications du bucket)</label>
-      <label class="text-xs text-sourdine">traitement après <input class="champ inline-block w-20 font-mono" type="number" min="0" max="3600" name="evenements_delai" value="{{ d.evenements.delai_secondes }}"> s sans nouvel évènement (un dossier se dépose en plusieurs fois)</label>
+    <fieldset class="tuile flex flex-col gap-3">
+      {{ interrupteur("evenements_actif", d.evenements.actif, "Évènements S3 (notifications du bucket)", not s3) }}
+      <label class="flex flex-wrap items-center gap-2 text-[13px] text-sourdine">traitement après
+        <input class="champ champ-sm w-24 font-mono" type="number" min="0" max="3600" name="evenements_delai" value="{{ d.evenements.delai_secondes }}"> s sans nouvel évènement (un dossier se dépose en plusieurs fois)</label>
       {% if d.evenements.jeton %}
-      <p class="text-xs">URL à déclarer dans les notifications du bucket (webhook, évènements <span class="font-mono">s3:ObjectCreated:*</span>) :</p>
+      <p class="text-[13px]">URL à déclarer dans les notifications du bucket (webhook, évènements <span class="font-mono">s3:ObjectCreated:*</span>) :</p>
       <p class="code">{{ base }}/minio/evenements?jeton={{ d.evenements.jeton }}</p>
-      {% else %}<p class="text-xs text-sourdine">Le jeton et l'URL du webhook sont générés à l'activation.</p>{% endif %}
+      {% else %}<p class="text-[13px] text-sourdine">Le jeton et l'URL du webhook sont générés à l'activation.</p>{% endif %}
     </fieldset>
-    <p class="text-xs text-sourdine">Un seul lot automatique à la fois : les dossiers arrivés pendant un lot attendent le déclenchement suivant. Un dossier déjà traité dont les images changent est signalé, jamais retraité d'office.</p>
+    <p class="text-[13px] text-sourdine">Un seul lot automatique à la fois : les dossiers arrivés pendant un lot attendent le déclenchement suivant. Un dossier déjà traité dont les images changent est signalé, jamais retraité d'office.</p>
   </section>
 
-  <div class="lg:col-span-2 flex flex-wrap items-center gap-2">
-    <label class="text-xs text-sourdine">Catalogueur <input class="champ inline-block w-40 ml-1" name="auteur" value="{{ auteur }}" required></label>
-    <button class="btn-principal">Enregistrer les réglages</button>
+  <div class="basis-full flex flex-wrap items-center justify-end gap-3">
+    <label class="text-sm text-sourdine flex items-center gap-2.5">Catalogueur <input class="champ champ-sm w-44 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+    <button class="btn-principal btn-grand">Enregistrer les réglages</button>
   </div>
 </form>
 
-<section class="carte mt-4">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-    <h2 class="mb-0">Planificateur</h2>
+<section class="carte mt-6 flex flex-wrap gap-6 items-start">
+  <div class="flex-[1_1_320px] flex flex-col gap-3">
+    <div class="flex items-center gap-3"><h2 class="mb-0">Planificateur</h2>
+      {% if etat.actif %}<span class="puce bg-auto-clair text-auto-fonce">actif</span>{% else %}<span class="puce bg-rail text-sourdine">arrêté</span>{% endif %}</div>
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-sourdine">Fil d'exécution</dt><dd>{{ "actif" if etat.actif else "arrêté (démarré par « humatheque serve »)" }}</dd>
+      <dt class="text-sourdine">Dernier tour</dt><dd class="font-mono">{{ etat.dernier_tour | date("%d/%m %H:%M:%S") or "—" }}</dd>
+      <dt class="text-sourdine">Dernier balayage périodique</dt><dd class="font-mono">{{ etat.dernier_balayage | date("%d/%m %H:%M") or "—" }}</dd>
+      <dt class="text-sourdine">Évènement en attente</dt><dd class="font-mono">{{ etat.evenement_en_attente | date("%d/%m %H:%M:%S") or "—" }}</dd>
+      <dt class="text-sourdine">Mot de passe de l'application</dt><dd>{{ "activé" if mot_de_passe else "désactivé (MOT_DE_PASSE vide)" }}</dd>
+    </dl>
     <div class="flex flex-wrap gap-2">
-      <form method="post" action="/admin/tick"><button class="btn-discret btn-sm" title="Exécute un tour tout de suite">Exécuter un tour</button></form>
+      <form method="post" action="/admin/tick"><button class="btn-tonal btn-sm" title="Exécute un tour tout de suite">Exécuter un tour</button></form>
       {% if reglages.declencheurs.evenements.jeton %}
-      <form method="post" action="/admin/jeton" class="flex items-center gap-2"><input type="hidden" name="auteur" value="{{ auteur or 'administration' }}">
-        <button class="btn-discret btn-sm">Renouveler le jeton</button></form>{% endif %}
+      <form method="post" action="/admin/jeton"><input type="hidden" name="auteur" value="{{ auteur or 'administration' }}">
+        <button class="btn btn-sm">Renouveler le jeton</button></form>{% endif %}
     </div>
   </div>
-  <dl class="text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 mt-2">
-    <dt class="text-sourdine">Fil d'exécution</dt><dd>{{ "actif" if etat.actif else "arrêté (démarré par « humatheque serve »)" }}</dd>
-    <dt class="text-sourdine">Dernier tour</dt><dd>{{ etat.dernier_tour | date("%d/%m %H:%M:%S") or "—" }}</dd>
-    <dt class="text-sourdine">Dernier balayage périodique</dt><dd>{{ etat.dernier_balayage | date("%d/%m %H:%M") or "—" }}</dd>
-    <dt class="text-sourdine">Évènement en attente</dt><dd>{{ etat.evenement_en_attente | date("%d/%m %H:%M:%S") or "—" }}</dd>
-    <dt class="text-sourdine">Mot de passe de l'application</dt><dd>{{ "activé" if mot_de_passe else "désactivé (MOT_DE_PASSE vide)" }}</dd>
-  </dl>
-  {% if etat.derniers_resultats %}
-  <div class="mt-2">{% for r in etat.derniers_resultats %}<div class="ligne-journal"><span></span><span>{{ r }}</span></div>{% endfor %}</div>
-  {% endif %}
+  <div class="flex-[1_1_360px] flex flex-col gap-2">
+    <h3>Derniers résultats</h3>
+    {% if etat.derniers_resultats %}
+    <ul class="flex flex-col gap-1.5">{% for r in etat.derniers_resultats %}<li class="text-[13px] rounded-xl bg-tonal px-3 py-2">{{ r }}</li>{% endfor %}</ul>
+    {% else %}<p class="text-sm text-sourdine">Aucun tour exécuté depuis le démarrage.</p>{% endif %}
+  </div>
 </section>
 {% endblock %}
