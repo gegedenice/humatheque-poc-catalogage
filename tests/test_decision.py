@@ -1,4 +1,8 @@
-"""Moteur de décision (SPEC §7, §11 étape 4) : une ligne par situation S01 à S13."""
+"""Moteur de décision (SPEC §7, §11 étape 4) : une ligne par situation S01 à S14.
+
+Décision du 05/11 : une notice trouvée au-dessus du seuil (Alma `présent`, candidat
+Sudoc retenu) arrête le workflow sans alerte (routage `auto`) ; seul le candidat
+incertain part en décision (S10, S14)."""
 
 import pytest
 
@@ -19,22 +23,24 @@ def _d(spec, alma, sudoc, prov):
 
 # (clé) → (situation, suite, profil cible, routage)
 @pytest.mark.parametrize("cle, attendu", [
-    (("présent", "rien", "EPHE"), ("S01", "arreter", None, "sortie")),
-    (("présent", "originale imprimée", "hors EPHE"), ("S01", "arreter", None, "sortie")),
-    (("présent", "indéterminé", "mémoire"), ("S01", "arreter", None, "sortie")),
-    (("absent", "originale imprimée", "hors EPHE"), ("S02", "convertir", TR, "conversion")),
-    (("absent", "électronique seule", "hors EPHE"), ("S03", "convertir", TR, "conversion")),
-    (("absent", "reproduction imprimée", "hors EPHE"), ("S04", "arreter", None, "sortie")),
-    (("absent", "reproduction microfiche", "hors EPHE"), ("S05", "convertir", TR, "conversion")),
-    (("absent", "électronique seule", "EPHE"), ("S06", "convertir", TO, "conversion")),
-    (("absent", "reproduction imprimée", "EPHE"), ("S07", "convertir", TO, "conversion")),
-    (("absent", "reproduction microfiche", "EPHE"), ("S07", "convertir", TO, "conversion")),
+    (("présent", "rien", "EPHE"), ("S01", "arreter", None, "auto")),
+    (("présent", "originale imprimée", "hors EPHE"), ("S01", "arreter", None, "auto")),
+    (("présent", "indéterminé", "mémoire"), ("S01", "arreter", None, "auto")),
+    (("absent", "originale imprimée", "hors EPHE"), ("S02", "convertir", TR, "auto")),
+    (("absent", "électronique seule", "hors EPHE"), ("S03", "convertir", TR, "auto")),
+    (("absent", "reproduction imprimée", "hors EPHE"), ("S04", "arreter", None, "auto")),
+    (("absent", "reproduction microfiche", "hors EPHE"), ("S05", "convertir", TR, "auto")),
+    (("absent", "électronique seule", "EPHE"), ("S06", "convertir", TO, "auto")),
+    (("absent", "reproduction imprimée", "EPHE"), ("S07", "convertir", TO, "auto")),
+    (("absent", "reproduction microfiche", "EPHE"), ("S07", "convertir", TO, "auto")),
     (("absent", "rien", "EPHE"), ("S08", "creer", TO, "auto")),
     (("absent", "rien", "hors EPHE"), ("S09", "creer", TR, "auto")),
+    (("incertain", "non vérifié", "EPHE"), ("S14", "arreter", None, "décision")),
+    (("incertain", "non vérifié", "mémoire"), ("S14", "arreter", None, "décision")),
     (("absent", "ambigu", "EPHE"), ("S10", "arreter", None, "décision")),
     (("absent", "ambigu", "mémoire"), ("S10", "arreter", None, "décision")),
     (("absent", "rien", "mémoire"), ("S12", "creer", MO, "auto")),
-    (("absent", "électronique seule", "mémoire"), ("S13", "convertir", MO, "conversion")),
+    (("absent", "électronique seule", "mémoire"), ("S13", "convertir", MO, "auto")),
 ])
 def test_situations(spec, cle, attendu):
     d = _d(spec, *cle)
@@ -54,11 +60,21 @@ def test_situation_non_prevue(spec, cle):
     assert d.motif == f"situation non prévue ({', '.join(cle)})"
 
 
-def test_deriver_conversion_puis_arret_quel_que_soit_le_routage_de_la_table(spec):
+def test_deriver_conversion_puis_arret_routage_de_la_table(spec):
+    """routage_conversion: null (config/decision.yaml) : le routage vient de Situations."""
     d = _d(spec, "absent", "originale imprimée", "hors EPHE")
-    assert d.ligne["routage"] == "sortie"            # S02 : routage de la table
-    assert (d.suite, d.routage) == ("convertir", "conversion")
+    assert d.ligne["routage"] == "auto"              # S02 : routage de la table
+    assert (d.suite, d.routage) == ("convertir", "auto")
     assert d.action.startswith("Dériver")
+
+
+def test_routage_conversion_impose(spec_fabriquee, monkeypatch):
+    """Un routage_conversion renseigné s'impose encore à toute dérivation."""
+    import humatheque.decision.moteur as moteur
+    cfg = dict(moteur._cfg(), routage_conversion="conversion")
+    monkeypatch.setattr(moteur, "_cfg", lambda: cfg)
+    spec = charger_spec(source="csv", dossier=spec_fabriquee.dossier)
+    assert _d(spec, "absent", "électronique seule", "EPHE").routage == "conversion"
 
 
 def test_premiere_ligne_qui_correspond(spec_fabriquee):

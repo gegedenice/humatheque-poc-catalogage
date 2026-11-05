@@ -78,7 +78,7 @@ def test_mode1_televersement_redirige_vers_le_dossier(client):
 
 @respx.mock
 def test_mode2_lot_file_filtres_et_exports(client):
-    simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
+    simuler(alma=sim.alma("ambiguous_academic_candidate", ppn="229969437"))
     r = _televerser(client, n=3)
     assert r.headers["location"].startswith("/lots/")
     lot = r.headers["location"]
@@ -91,6 +91,16 @@ def test_mode2_lot_file_filtres_et_exports(client):
     assert "Aucun document dans cette catégorie" in frag.text
     assert client.get(f"{lot}/rapport.csv").text.startswith("document,dossier,routage")
     assert client.get(f"{lot}/notices.txt").status_code == 200
+
+
+@respx.mock
+def test_notice_alma_certaine_sans_a_trancher(client):
+    """Notice au-dessus de match_threshold : arrêt en vert, pas de bloc « À trancher » (05/11)."""
+    simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
+    page = client.get(_televerser(client).headers["location"])
+    texte = html.unescape(page.text)
+    assert "Arrêt sans intervention" in texte and "229969437" in texte
+    assert "À trancher" not in texte and "faux positif" not in texte and "Traité hors outil" not in texte
 
 
 @respx.mock

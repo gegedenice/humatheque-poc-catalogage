@@ -27,7 +27,7 @@
     <div class="kpi"><span class="kpi-libelle">Documents à reprendre</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.en_attente") | sum }}</span>
       <span class="text-[13px] text-sourdine">dans {{ vue.a_reprendre | length }} lot(s)</span></div>
     <div class="kpi"><span class="kpi-libelle">Passés seuls</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
-      <span class="text-[13px] text-sourdine">notice prête sans reprise</span></div>
+      <span class="text-[13px] text-sourdine">sans intervention</span></div>
   </section>
 
   {% if vue.a_reprendre and vue.etat != "en_cours" %}

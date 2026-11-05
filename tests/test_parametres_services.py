@@ -75,7 +75,7 @@ def test_reglages_du_lot_appliques_et_traces(app, image):
     ({"idref_personne": {"accept_threshold": "beaucoup"}}, "nombre attendu"),
     ({"dewey": {"method": "magique"}}, "hors de"),
     ({"idref_personne": {"weight_name": "0.5"}}, "non réglable"),
-    ({"alma": {"match_threshold": "0.5"}}, "non réglable"),
+    ({"alma": {"max_candidates": "5"}}, "non réglable"),
 ])
 def test_reglages_refuses(app, image, reglages, motif):
     with pytest.raises(ActionImpossible, match=motif):
@@ -98,7 +98,7 @@ def test_formulaire_parametres_avances(app, tmp_path):
     assert "Paramètres avancés" in page.text and 'name="reglage.idref_personne.accept_threshold"' in page.text
     assert 'value="0.5"' in page.text and 'value="albert" checked' in page.text  # choix segmenté
     assert [r["parametre"] for r in client.get("/api/v1/reglables").json()] == [
-        "accept_threshold", "margin_threshold", "accept_threshold", "method"]
+        "match_threshold", "duplicate_threshold", "accept_threshold", "margin_threshold", "accept_threshold", "method"]
     simuler()
     r = client.post("/lots", data={"type_document": "these", "reglage.idref_personne.accept_threshold": "0.6",
                                    "reglage.dewey.method": "albert"},

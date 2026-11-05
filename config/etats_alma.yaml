@@ -1,9 +1,11 @@
 # Correspondance statut alma-checker → etat_alma (SPEC §6).
-# Au moins une notice trouvée arrête le pipeline (Situations S01).
+# Notice trouvée au-dessus de match_threshold : `présent`, arrêt sans alerte (S01).
+# Candidat entre ambiguous_threshold et match_threshold, ou notice proche hors
+# type TU : `incertain`, arrêt en décision (S14) — décision du 05/11.
 correspondance:
   academic_record_found: présent
-  ambiguous_academic_candidate: présent
-  off_profile_match_only: présent
+  ambiguous_academic_candidate: incertain
+  off_profile_match_only: incertain
   no_academic_record_found: absent
 
 # Motif affiché par statut.

@@ -314,13 +314,16 @@ dans le dossier :
    déduction ; en cas de désaccord avec la règle, le document part en décision.
 3. **alma-checker** (`https://alma-checker.smartbiblia.fr`, route
    `/check/thesis` ou `/check/dissertation`). **Au moins une notice trouvée
-   arrête le pipeline** :
+   arrête le pipeline.** Décision du 05/11 : une notice au-dessus de
+   `match_threshold` arrête **sans alerte** (S01, routage `auto`, affiché en
+   vert) ; seul un candidat incertain (entre `ambiguous_threshold` et
+   `match_threshold`, ou hors type TU) part en décision (S14) :
 
    | Statut alma-checker | État Alma | Motif affiché |
    |---|---|---|
    | `academic_record_found` | `présent` | notice de thèse ou mémoire trouvée |
-   | `ambiguous_academic_candidate` | `présent` | candidat incertain |
-   | `off_profile_match_only` | `présent` | notice proche, pas de type TU |
+   | `ambiguous_academic_candidate` | `incertain` | candidat incertain |
+   | `off_profile_match_only` | `incertain` | notice proche, pas de type TU |
    | `no_academic_record_found` | `absent` | — |
 
    Le PPN de `decision_support` est toujours repris dans le rapport. Un faux
@@ -429,7 +432,11 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 - **Aucune ligne ne correspond** : routage `décision`, motif
   « situation non prévue », clé affichée.
 - **Action commençant par « Dériver » : conversion, puis arrêt** (thèses et
-  mémoires), routage `conversion` quel que soit le routage de la table :
+  mémoires), avec le routage de la table (`routage_conversion: null` dans
+  `config/decision.yaml` ; une valeur renseignée s'imposerait à toute
+  dérivation). Décision du 05/11 : un candidat Sudoc retenu (au-dessus de
+  `duplicate_threshold`) arrête le workflow sans alerte, routage `auto` (S02 à
+  S07, S13) ; le cas incertain reste `ambigu` → S10 en décision :
   - **notice source** : parmi les candidats Sudoc retenus dont l'état a
     déterminé `etat_sudoc`, celui qui a le meilleur score ; sa notice UNIMARC est
     lue via `https://www.sudoc.fr/{ppn}.xml` et convertie au format WinIBW ;
@@ -441,7 +448,9 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
   - **conservation** (ALM-SUD-F-002) : notice source et notice convertie sont
     stockées dans le dossier et téléchargeables ;
   - le rapport indique le PPN source, le profil cible et le lien vers le Sudoc.
-- Une action `Arrêt` (S01, S04, S10) arrête sans conversion.
+- Une action `Arrêt` (S01, S04, S10, S14) arrête sans conversion. Le bloc
+  « À trancher » de l'interface (faux positif, traité hors outil) n'apparaît
+  que pour un routage autre que `auto`.
 - **Statuts de service** : `Statuts_services.csv` associe `(service, statut)` à
   un routage `auto | décision | sortie | incident`. **Pour alma-checker et
   sudoc-checker**, le routage ne vient pas de cette table mais des

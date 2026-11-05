@@ -47,8 +47,8 @@ def test_alma_route_selon_type_document(type_document, route):  # ING-T-005
 
 @respx.mock
 @pytest.mark.parametrize("statut, etat", [
-    ("academic_record_found", "présent"), ("ambiguous_academic_candidate", "présent"),
-    ("off_profile_match_only", "présent"), ("no_academic_record_found", "absent"),
+    ("academic_record_found", "présent"), ("ambiguous_academic_candidate", "incertain"),
+    ("off_profile_match_only", "incertain"), ("no_academic_record_found", "absent"),
     ("statut_futur", None),
 ])
 def test_alma_etats(statut, etat):

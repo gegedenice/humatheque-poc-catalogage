@@ -23,7 +23,7 @@
 {% set attente = [] %}{% for r, n in ind.par_routage.items() %}{% if r != "auto" %}{% set _ = attente.append(n ~ " " ~ libelle_routage(r)) %}{% endif %}{% endfor %}
 <div id="kpis-lot" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] mb-6" {% if oob %}hx-swap-oob="true"{% endif %}>
   {{ kpi(ind.documents, "Documents", "dans le lot" ~ (" · " ~ ind.en_cours ~ " en cours" if ind.en_cours else ""), "principal") }}
-  {{ kpi(ind.passes_seuls, "Passés seuls", "notice prête", "ok") }}
+  {{ kpi(ind.passes_seuls, "Passés seuls", "sans intervention : notice prête ou arrêt sur notice existante", "ok") }}
   {{ kpi(ind.en_attente, "En attente de reprise", attente | join(" · "), "attente") }}
   {{ kpi(ind.repris, "Repris", "par un catalogueur", "repris") }}
 </div>

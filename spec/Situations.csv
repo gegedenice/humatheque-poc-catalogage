@@ -1,8 +1,9 @@
 id,etat_alma,etat_sudoc,provenance,action,profil_cible,routage,statut
-S01,présent,*,*,Arrêt,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",sortie,seed
-S02,absent,originale imprimée,hors EPHE,Dériver de la notice de thèse originelle,these_reproduction_imprimee,sortie,seed
+S01,présent,*,*,Arrêt,"these_originale_imprimee, these_reproduction_imprimee, memoire_original_imprime",auto,seed
+S14,incertain,*,*,Arrêt,,décision,à discuter
+S02,absent,originale imprimée,hors EPHE,Dériver de la notice de thèse originelle,these_reproduction_imprimee,auto,seed
 S03,absent,électronique seule,hors EPHE,Dériver de la notice électronique,these_reproduction_imprimee,auto,à discuter
-S04,absent,reproduction imprimée,hors EPHE,Arrêt,,sortie,seed
+S04,absent,reproduction imprimée,hors EPHE,Arrêt,,auto,seed
 S05,absent,reproduction microfiche,hors EPHE,Dériver de la notice de thèse microfichée,these_reproduction_imprimee,auto,à discuter
 S06,absent,électronique seule,EPHE,Dériver de la notice électronique,these_originale_imprimee,auto,seed
 S07,absent,reproduction imprimée | reproduction microfiche,EPHE,Dériver de la notice de reproduction,these_originale_imprimee,auto,à discuter

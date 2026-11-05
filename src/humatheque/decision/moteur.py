@@ -99,7 +99,7 @@ def decider(spec: Spec, cle: Cle, vocab: Vocabulaires | None = None) -> Decision
             profil = profils[0] if len(profils) == 1 else None
             if suite == "convertir":
                 return Decision(cle=cle, situation=s.id, ligne=ligne, action=s.action, suite=suite,
-                                profil_cible=profil, routage=cfg["routage_conversion"],
+                                profil_cible=profil, routage=cfg.get("routage_conversion") or s.routage,
                                 motif=f"{s.id} : {s.action}")
             return Decision(cle=cle, situation=s.id, ligne=ligne, action=s.action, suite=suite,
                             profil_cible=profil if suite == "creer" else None,
