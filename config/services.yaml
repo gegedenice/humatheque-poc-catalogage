@@ -39,7 +39,7 @@ idref_personne:
     max_candidates: 5            # IDREF_MAX_CANDIDATES (05/11 : 20 → 5, temps de réponse)
     max_docs_per_role: 5         # IDREF_MAX_DOCS_PER_ROLE (05/11 : 20 → 5)
     reference_top_k: 3          # IDREF_REFERENCE_TOP_K
-    embedding_model: ""          # IDREF_EMBEDDING_MODEL
+    embedding_model: "minilm"          # IDREF_EMBEDDING_MODEL
     weight_name: 0.40            # DEFAULT_WEIGHT_NAME
     weight_attrra_source: 0.15   # DEFAULT_WEIGHT_ATTRRA_SOURCE
     weight_attrra_note: 0.15     # DEFAULT_WEIGHT_ATTRRA_NOTE
