@@ -47,4 +47,4 @@ motifs:
   sudoc_indetermine: nature de la notice Sudoc non qualifiable
   document_invalide: document invalide
   titre_absent: titre non extrait
-  seuil_sudoc: SUDOC_DUPLICATE_THRESHOLD non configuré
+  seuil_sudoc: duplicate_threshold de sudoc-checker absent de config/services.yaml

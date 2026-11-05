@@ -183,6 +183,7 @@ class DossierBucket(BaseModel):
 
     document: DocumentDetecte
     nouveau: bool
+    modifie: bool = Field(False, description="images changées depuis le dernier traitement")
     dossier_id: str | None = None
     lot_id: str | None = None
     etat: str | None = None

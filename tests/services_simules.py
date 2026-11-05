@@ -114,7 +114,6 @@ def services(spec, fournisseur=None):
         sudoc=ClientService("sudoc-checker", SUDOC_URL),
         idref=ClientService("idref-linker", IDREF_URL),
         dewey=ClientService("dewey-classifier", DEWEY_URL),
-        seuil_sudoc=0.78,
     )
 
 

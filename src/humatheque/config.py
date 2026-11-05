@@ -49,9 +49,6 @@ class Reglages(BaseSettings):
     alma_checker_api_url: str = ""
     alma_api_key: SecretStr = SecretStr("")
     sudoc_checker_api_url: str = ""
-    # Seuil de doublon Sudoc : envoyé à sudoc-checker (duplicate_threshold) et utilisé
-    # par l'agrégation des thesis_state (même valeur des deux côtés)
-    sudoc_duplicate_threshold: float | None = None
     idref_qualinka_api_url: str = ""
     idref_qualinka_api_key: SecretStr = SecretStr("")
     dewey_classification_api_url: str = ""
@@ -63,7 +60,7 @@ class Reglages(BaseSettings):
     dewey_seuil: float | None = None
 
     # VLM : fournisseurs OpenAI-compatibles (repris du POC)
-    vlm_fournisseur: str = "vlm"
+    vlm_fournisseur: str = "hf"
     vlm_image_max_size: int = 768
     vlm_image_jpeg_quality: int = 85
     openai_api_url: str = "https://api.openai.com/v1/chat/completions"
@@ -90,14 +87,21 @@ class Reglages(BaseSettings):
     minio_prefixe: str = "poc/"
     minio_access_key: SecretStr = SecretStr("")
     minio_secret_key: SecretStr = SecretStr("")
-    ingestion_auto: bool = False
-    planification_cron: str = ""
+    # Déclencheurs automatiques (SPEC §3.1, étape 8) : valeurs initiales, modifiables
+    # ensuite dans la page d'administration (enregistrées en base).
+    ingestion_auto: bool = False          # balayage périodique du bucket
+    balayage_intervalle: int = 60         # minutes
+    planification_cron: str = ""          # vide = pas de traitement à heure fixe
+    evenements_delai: int = 60            # secondes de calme avant de traiter après un évènement S3
+
+    # Mot de passe de l'application (vide = pas d'authentification)
+    mot_de_passe: SecretStr = SecretStr("")
 
     # Cache du dictionnaire reaccentue (défaut : data/reaccentue-cache.pz). L'image
     # Docker le construit au build hors du volume data/.
     reaccentue_cache: Path | None = None
 
-    @field_validator("dewey_seuil", "sudoc_duplicate_threshold", mode="before")
+    @field_validator("dewey_seuil", mode="before")
     @classmethod
     def _vide_none(cls, v: Any) -> Any:
         return None if isinstance(v, str) and not v.strip() else v

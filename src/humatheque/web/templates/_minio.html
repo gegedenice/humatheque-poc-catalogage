@@ -21,6 +21,7 @@
                  {% if d.invalide and d.images %}disabled{% elif l.nouveau %}checked{% endif %}></td>
             <td class="font-mono text-xs">{{ d.id }}<br><span class="text-sourdine">{{ d.images | length }} image(s){% if d.invalide %} · {{ d.invalide }}{% endif %}</span></td>
             <td class="text-xs text-right whitespace-nowrap">
+              {% if l.modifie %}<span class="pastille text-decision" title="images changées depuis le dernier traitement : non retraité d'office">modifié</span><br>{% endif %}
               {% if l.nouveau %}<span class="pastille text-incident">nouveau</span>
               {% elif l.etat != "termine" %}<span class="text-decision">en cours</span>
               {% else %}<a href="/dossiers/{{ l.dossier_id }}">{{ badge(l.routage or "auto") }}</a>{% endif %}

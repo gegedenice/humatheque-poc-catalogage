@@ -167,3 +167,34 @@ def balayage(request: Request) -> VueBucket:
 def lancer_selection(request: Request, selection: Selection) -> Lot:
     return _app(request).lancer_selection(selection.identifiants, selection.fournisseur,
                                           reglages=selection.reglages_services)
+
+
+
+# ---------------------------------------------------------------- administration (étape 8)
+from humatheque.application.administration import ReglagesAdmin, Sante  # noqa: E402
+from humatheque.application.planificateur import EtatPlanificateur  # noqa: E402
+
+
+class ModificationReglages(BaseModel):
+    reglages: ReglagesAdmin
+    auteur: str
+
+
+@routeur.get("/admin/reglages", response_model=ReglagesAdmin)
+def lire_reglages(request: Request) -> ReglagesAdmin:
+    return _app(request).reglages_admin()
+
+
+@routeur.put("/admin/reglages", response_model=ReglagesAdmin)
+def ecrire_reglages(request: Request, corps: ModificationReglages) -> ReglagesAdmin:
+    return _app(request).modifier_reglages_admin(corps.reglages, corps.auteur)
+
+
+@routeur.get("/admin/sante", response_model=list[Sante])
+def sante(request: Request) -> list[Sante]:
+    return _app(request).sante()
+
+
+@routeur.get("/admin/planificateur", response_model=EtatPlanificateur)
+def planificateur(request: Request) -> EtatPlanificateur:
+    return request.app.state.planificateur.etat()

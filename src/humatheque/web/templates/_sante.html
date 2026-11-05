@@ -1,0 +1,15 @@
+{# Santé des services (étape 8). #}
+<div class="defilant"><table class="tableau">
+  <thead><tr><th>Composant</th><th>État</th><th>Temps</th><th>Détail</th></tr></thead>
+  <tbody>
+  {% for s in sante %}
+    <tr>
+      <td class="text-xs font-semibold">{{ s.composant }}{% if s.url %}<br><span class="font-mono font-normal text-sourdine break-all">{{ s.url }}</span>{% endif %}</td>
+      <td>{% if s.ok is none %}<span class="pastille text-sourdine">—</span>{% elif s.ok %}<span class="pastille text-auto">disponible</span>{% else %}<span class="pastille text-sortie">en échec</span>{% endif %}</td>
+      <td class="font-mono text-xs">{% if s.duree is not none %}{{ "%.2f" | format(s.duree) }} s{% endif %}</td>
+      <td class="text-xs">{{ s.detail }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+<button class="btn-discret btn-sm mt-2" hx-get="/admin/sante" hx-target="#sante" hx-swap="innerHTML">Re-tester</button>

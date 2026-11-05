@@ -43,10 +43,10 @@ def test_parametres_envoyes_par_defaut(app, image):
     app.creer_lot(EntreeLot(documents=[[image]]))
     alma, sudoc = _corps(routes["alma"]), _corps(routes["sudoc"])
     assert (alma["match_threshold"], alma["ambiguous_threshold"], alma["max_candidates"]) == (0.78, 0.62, 20)
-    assert sudoc["duplicate_threshold"] == 0.78  # = SUDOC_DUPLICATE_THRESHOLD : même seuil que l'agrégation
+    assert sudoc["duplicate_threshold"] == 0.78  # config/services.yaml : même seuil que l'agrégation
     assert sudoc["ambiguous_threshold"] == 0.62
     idref = _corps(routes["idref"])
-    assert (idref["accept_threshold"], idref["margin_threshold"]) == (0.65, 0.08)
+    assert (idref["accept_threshold"], idref["margin_threshold"]) == (0.5, 0.08)  # décision du 05/11
     assert (idref["weight_attrra_source"], idref["weight_references"]) == (0.15, 0.25)  # décision du 04/11
     orgs = _corps(routes["orgs"])
     assert (orgs["accept_threshold"], orgs["allow_remote"]) == (0.72, False)
@@ -96,7 +96,7 @@ def test_formulaire_parametres_avances(app, tmp_path):
     client = TestClient(create_app(app), follow_redirects=False)
     page = client.get("/")
     assert "Paramètres avancés" in page.text and 'name="reglage.idref_personne.accept_threshold"' in page.text
-    assert 'value="0.65"' in page.text and '<option value="albert" selected>' in page.text
+    assert 'value="0.5"' in page.text and '<option value="albert" selected>' in page.text
     assert [r["parametre"] for r in client.get("/api/v1/reglables").json()] == [
         "accept_threshold", "margin_threshold", "accept_threshold", "method"]
     simuler()

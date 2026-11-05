@@ -3,6 +3,12 @@
 {% from "_reglages.html" import parametres_avances %}
 {% block titre %}Nouveau traitement{% endblock %}
 {% block contenu %}
+{% if nouveaux_lots %}
+<div class="carte border-l-4 border-l-incident mb-4 text-sm">
+  <span class="font-semibold">{{ nouveaux_lots | length }} lot(s) automatique(s) depuis votre dernière visite :</span>
+  {% for l in nouveaux_lots[:5] %}<a class="font-mono text-xs ml-2" href="/lots/{{ l.id }}">{{ l.id }}</a> <span class="text-xs text-sourdine">({{ l.declencheur }}, {{ l.nb_documents }} doc.)</span>{% endfor %}
+</div>
+{% endif %}
 <h1>Nouveau traitement</h1>
 <p class="text-sm text-sourdine mt-1">Un document donne un dossier suivi pas à pas (mode 1) ; plusieurs documents forment un lot traité en tâche de fond (mode 2).</p>
 

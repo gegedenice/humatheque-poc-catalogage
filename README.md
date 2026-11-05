@@ -30,7 +30,7 @@ l'avance.
 
 | Commande | Rôle |
 |---|---|
-| `humatheque serve [--host --port]` | interface web et API JSON `/api/v1` (documentation : `/api/v1/docs`) |
+| `humatheque serve [--host --port]` | interface web, API JSON `/api/v1` (documentation : `/api/v1/docs`) et planificateur des déclencheurs |
 | `humatheque check-spec [--source csv\|grist] [--json]` | vérifie la spécification ; code retour 1 si erreur bloquante |
 | `humatheque spec-export [--dossier spec]` | instantané des tables Grist dans `spec/` + copie dans `spec/archives/<horodatage>/` |
 | `humatheque run-url URL… [--un-document] [--type these\|memoire] [--notice]` | traite des URL d'images dans le terminal |
@@ -50,16 +50,29 @@ l'avance.
   `VLM_STRATEGIE` (`requete_unique` ou `par_image`).
 - **Services** : `ALMA_CHECKER_API_URL`, `SUDOC_CHECKER_API_URL`,
   `IDREF_QUALINKA_API_URL`, `DEWEY_CLASSIFICATION_API_URL` (clés facultatives) ;
-  `SUDOC_DUPLICATE_THRESHOLD` (seuil de doublon Sudoc, envoyé au service et
-  utilisé par l'agrégation) ; `IDREF_TIMEOUT` (idref-linker dépasse souvent une
-  minute par personne) ; `DEWEY_SEUIL` (vide : première classe retenue).
-  Les autres paramètres des services sont dans `config/services.yaml`.
+  `IDREF_TIMEOUT` ; `DEWEY_SEUIL` (vide : première classe retenue). Les
+  paramètres de requête des services (seuils dont `duplicate_threshold`
+  Sudoc, nombres de candidats, poids IdRef, méthode Dewey) sont dans
+  `config/services.yaml`.
 - **Stockage S3** (MinIO ou tout service compatible S3) : `MINIO_ENDPOINT`,
   `MINIO_BUCKET`, `MINIO_PREFIXE`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`. Un
   dossier = un document ; le type vient du dossier parent (`TH`/`MM`,
   `theses`/`memoires` : `config/ingestion.yaml`).
 - **Spécification** : `SPEC_SOURCE` (`csv` par défaut, ou `grist`), `GRIST_URL`,
   `GRIST_DOC_ID`, `GRIST_API_KEY`.
+- **Déclencheurs automatiques** (valeurs initiales, ensuite réglées dans
+  `/admin`) : `INGESTION_AUTO` (balayage périodique), `BALAYAGE_INTERVALLE`
+  (minutes), `PLANIFICATION_CRON`, `EVENEMENTS_DELAI` (secondes).
+- **Mot de passe** : `MOT_DE_PASSE` (vide : pas d'authentification).
+
+## Administration
+
+La page `/admin` affiche la santé des services, les réglages des lots
+automatiques (fournisseur VLM, paramètres avancés) et les trois déclencheurs :
+balayage périodique, traitement à heure fixe (cron) et évènements S3. Pour les
+évènements, déclarer dans les notifications du bucket (webhook, évènements
+`s3:ObjectCreated:*`) l'URL affichée, qui porte un jeton. Le planificateur
+tourne dans l'application (`humatheque serve`) : une seule instance.
 
 Les règles métier lues hors de la spec sont dans `config/*.yaml` (états Sudoc
 et Alma, provenance, listes de civilités et d'articles, prompts d'extraction…).

@@ -110,13 +110,24 @@ mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
 - **Sélection manuelle** (ING-F-005) : la page `/` liste les dossiers du bucket
   (déjà traités ou non, avec leur dernier statut) et permet d'en lancer une
   sélection. `humatheque scan-minio` fait la même chose en ligne de commande.
-- **Détection automatique et traitement planifié** (ING-F-003, ING-F-004 :
-  **à arbitrer**). Prévoir l'architecture sans les activer par défaut :
-  - balayage périodique du bucket (nouveaux dossiers = absents de l'historique)
-    et route `POST /minio/evenements` pour les notifications d'évènements S3 ;
-  - planification à heure(s) fixe(s) (`PLANIFICATION_CRON`, vide = désactivé),
-    qui crée un lot avec les nouveaux documents ;
-  - drapeaux `INGESTION_AUTO=false`, `PLANIFICATION_CRON=` dans `.env.example`.
+- **Détection automatique et traitement planifié** (ING-F-003, ING-F-004 ;
+  décisions du 05/11). Trois déclencheurs au choix, réglés dans la page
+  d'administration (§9.3), désactivés par défaut :
+  - balayage périodique du bucket toutes les N minutes (nouveaux dossiers =
+    absents de l'historique) ;
+  - traitement à heure fixe (expression cron) ;
+  - évènements S3 : `POST /minio/evenements?jeton=…` (jeton affiché dans
+    l'administration) ; le lot est créé après un délai sans nouvel évènement
+    (stabilisation : un dossier se dépose objet par objet).
+  Un planificateur interne à l'application (fil d'exécution, une seule
+  instance) applique ces réglages. Un seul lot automatique à la fois : les
+  dossiers arrivés pendant un lot attendent le déclenchement suivant. Les lots
+  automatiques utilisent le fournisseur et les paramètres avancés de
+  l'administration. Un dossier déjà traité dont les images changent est
+  signalé (« modifié »), jamais retraité d'office. L'accueil affiche les lots
+  automatiques créés depuis la dernière visite (pas de courriel).
+  Valeurs initiales dans `.env` : `INGESTION_AUTO`, `BALAYAGE_INTERVALLE`,
+  `PLANIFICATION_CRON`, `EVENEMENTS_DELAI`.
 - **Historique** (ING-F-006, ING-T-003, ING-T-004) : chaque balayage et chaque
   traitement est enregistré (date, déclencheur manuel / planifié /
   évènement, documents, résultat) et consultable dans l'interface (§9).
@@ -323,9 +334,9 @@ dans le dossier :
    document (`qualification/`, fonction pure) :
 
    - candidats retenus : ceux de `candidates` dont `score.final` atteint
-     `SUDOC_DUPLICATE_THRESHOLD` (`.env`), envoyé au service comme
-     `duplicate_threshold` : le statut du service et l'agrégation utilisent
-     le même seuil ;
+     `duplicate_threshold` (`config/services.yaml`, décision du 05/11),
+     envoyé au service : le statut du service et l'agrégation utilisent le
+     même seuil ;
    - correspondance `thesis_state` → `etat_sudoc` dans `config/etats_sudoc.yaml` :
 
      | `thesis_state` | `etat_sudoc` |
@@ -573,6 +584,13 @@ défaut sur la version générée.
   l'état de la spec chargée et les avertissements du vérificateur. Si le
   fournisseur VLM est un endpoint Hugging Face dédié : indicateur d'état et
   bouton de réveil de l'endpoint (repris du POC).
+- **`/admin` Administration** (décisions du 05/11) : santé des services
+  (alma, sudoc, idref, dewey, VLM, stockage S3, Grist, spécification), réglages
+  des lots automatiques (fournisseur, paramètres avancés ; proposés aussi par
+  défaut dans le formulaire), déclencheurs (§3.1), état du planificateur.
+- **Mot de passe** : `MOT_DE_PASSE` dans `.env` protège toute l'application
+  (pages par cookie de session, API par `Authorization: Bearer`) ; vide =
+  désactivé (état actuel).
 - **`/historique`** (ING-F-006, ING-T-004) : balayages et traitements, avec date,
   déclencheur, nombre de documents, routages, lien vers chaque lot.
 - **`/lots/{id}` Lot** (mode 2) :
@@ -630,12 +648,15 @@ défaut sur la version générée.
   - `ALMA_CHECKER_API_URL`, `ALMA_API_KEY` ;
   - `SPEC_SOURCE=csv`, `GRIST_URL=http://grist:8484`, `GRIST_DOC_ID`,
     `GRIST_API_KEY`, `GRIST_SESSION_SECRET`, `GRIST_DEFAULT_EMAIL` ;
-  - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_DUPLICATE_THRESHOLD` ;
+  - `CODE_ETAB=EPHE`, `MAX_WORKERS` (les seuils des services sont dans
+    `config/services.yaml`) ;
   - `VLM_MODEL=google/gemma-4-26B-A4B-it`, `VLM_STRATEGIE=requete_unique`,
     `VLM_TIMEOUT`, `HTTP_TIMEOUT`, `RELANCES_AUTO=2` ;
   - `PROVENANCE_CONFIRMATION_LLM=false` ;
   - `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_PREFIXE=poc/`, `MINIO_ACCESS_KEY`,
-    `MINIO_SECRET_KEY`, `INGESTION_AUTO=false`, `PLANIFICATION_CRON=` ;
+    `MINIO_SECRET_KEY`, `INGESTION_AUTO=false`, `BALAYAGE_INTERVALLE=60`,
+    `PLANIFICATION_CRON=`, `EVENEMENTS_DELAI=60` ;
+  - `MOT_DE_PASSE=` (vide : pas d'authentification) ;
   - `REGLES_STATUTS_EXCLUS=rejeté`.
 - **Déploiement** :
   - `Dockerfile` : image `python:3.12-slim` avec `uv` ; le cache reaccentue est
@@ -706,15 +727,15 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
    donne le même résultat qu'en mode `csv` sur les mêmes exports, et
    `spec-export` reproduit les CSV. Puis essai réel sur 5 URL de
    `minio_urls.txt` et sur 5 dossiers du bucket `poc/`. Consigner les écarts dans `docs/ESSAI.md`.
-8. **Après arbitrage seulement** : détection automatique et planification
-   (ING-F-003, ING-F-004).
+8. **Détection automatique et planification** (ING-F-003, ING-F-004, arbitrées
+   le 05/11) : page d'administration, planificateur, mot de passe prévu.
 
 ## 12. Traçabilité avec les exigences du wiki
 
 | Exigence wiki | Section | État |
 |---|---|---|
 | ING-F-001, ING-F-002 | §3.1 | intégrée |
-| ING-F-003, ING-F-004 | §3.1, §11 étape 8 | à arbitrer, architecture prévue, désactivée |
+| ING-F-003, ING-F-004 | §3.1, §9.3, §11 étape 8 | intégrée (05/11) : trois déclencheurs au choix, désactivés par défaut |
 | ING-F-005, ING-F-006 | §3, §3.1, §9 | intégrée |
 | ING-F-007 | §6 | déjà couverte |
 | ING-F-008 | §3.1 | intégrée |
