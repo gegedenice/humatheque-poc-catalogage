@@ -8,7 +8,9 @@ actions:
   prefixe_conversion: Dériver   # conversion de la notice Sudoc puis arrêt
 
 # Routage imposé à une action de conversion, quel que soit celui de la table.
-routage_conversion: conversion
+# null : routage de la table (décision du 05/11 : une notice Sudoc au-dessus de
+# duplicate_threshold arrête le workflow sans alerte, routage `auto`).
+routage_conversion: null
 
 # Situation sans ligne correspondante.
 non_prevue:

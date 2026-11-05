@@ -66,6 +66,16 @@ dewey:
 
 # Réglages par lot (SPEC §3, « Paramètres avancés »).
 reglables:
+  - service: alma
+    parametre: match_threshold
+    libelle: "Alma : seuil de correspondance"
+    min: 0
+    max: 1
+  - service: sudoc
+    parametre: duplicate_threshold
+    libelle: "Sudoc : seuil de doublon"
+    min: 0
+    max: 1
   - service: idref_personne
     parametre: accept_threshold
     libelle: "IdRef personnes : seuil d'acceptation"

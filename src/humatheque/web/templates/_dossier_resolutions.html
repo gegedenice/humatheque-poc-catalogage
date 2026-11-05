@@ -4,9 +4,12 @@
   <label class="text-xs text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40" name="auteur" value="{{ auteur }}" required></label>
 {%- endmacro %}
 {% set ouvertes = d.exceptions | rejectattr("resolue") | list %}
-{% set faux_alma = d.alma and d.etat_alma not in (none, "absent") and not d.cloture %}
-{% set faux_sudoc = d.sudoc and d.etat_sudoc not in (none, "rien") and d.routage in ("décision", "sortie", "conversion") and not d.cloture %}
-{% if ouvertes or faux_alma or faux_sudoc or (d.routage not in (none, "auto") and not d.cloture) %}
+{# Faux positif proposé seulement quand le workflow attend une décision : une notice
+   au-dessus du seuil arrête le workflow sans alerte (routage auto, décision du 05/11). #}
+{% set a_decider = d.routage not in (none, "auto") and not d.cloture %}
+{% set faux_alma = a_decider and d.routage == "décision" and d.alma and d.etat_alma not in (none, "absent") %}
+{% set faux_sudoc = a_decider and d.routage == "décision" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
+{% if ouvertes or a_decider %}
 <section class="carte-alerte" aria-label="À trancher">
   <h2 class="flex items-center gap-2.5 text-[#4a3000]"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8a5a00" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17v.5"/></svg>À trancher</h2>
   <div class="flex flex-col gap-3">
@@ -64,7 +67,7 @@
   </form>
   {% endif %}
 
-  {% if d.routage not in (none, "auto") and not d.cloture %}
+  {% if a_decider %}
   <form method="post" action="/dossiers/{{ d.id }}/hors-outil" class="bg-carte rounded-tuile p-4 space-y-2">
     <p class="text-sm font-semibold">Traité hors outil</p>
     <input class="champ champ-sm" name="commentaire" placeholder="ce qui a été fait (obligatoire)" required>

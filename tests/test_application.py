@@ -70,16 +70,28 @@ def test_lot_mode2_indicateurs_et_file(app, image):
 
 
 @respx.mock
-def test_file_d_exceptions_filtres_et_reprise(app, image):
+def test_notice_alma_certaine_hors_file(app, image):
+    """Notice Alma au-dessus de match_threshold : arrêt sans alerte, hors file (05/11)."""
     simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
+    lot = app.creer_lot(EntreeLot(documents=[[image]]))
+    vue = app.vue_lot(lot.id)
+    assert vue.file == [] and vue.indicateurs.par_routage == {"auto": 1} and vue.indicateurs.en_attente == 0
+    (ligne,) = app.store.lignes_du_lot(lot.id)
+    d = app.vue_dossier(ligne.id).dossier
+    assert (d.decision.situation, d.etape_arret) == ("S01", "situation") and "229969437" in d.motif_arret
+
+
+@respx.mock
+def test_file_d_exceptions_filtres_et_reprise(app, image):
+    simuler(alma=sim.alma("ambiguous_academic_candidate", ppn="229969437"))
     lot = app.creer_lot(EntreeLot(documents=[[image], [image]]))
     vue = app.vue_lot(lot.id)
-    assert vue.indicateurs.en_attente == 2 and vue.indicateurs.par_routage == {"sortie": 2}
+    assert vue.indicateurs.en_attente == 2 and vue.indicateurs.par_routage == {"décision": 2}
     ligne = vue.file[0]
-    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("sortie", "situation", "Situation")
+    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("décision", "situation", "Situation")
     assert "229969437" in ligne.motif
     assert app.vue_lot(lot.id, "incidents").file == []
-    assert len(app.vue_lot(lot.id, "sorties").file) == 2
+    assert len(app.vue_lot(lot.id, "decisions").file) == 2
 
     # Reprise : faux positif Alma sur le premier dossier
     simuler()  # Sudoc et suite répondent normalement
@@ -124,7 +136,7 @@ def test_conversion_telechargements_iso(app, image):  # ALM-SUD-F-002
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
     v = app.vue_dossier(ligne.id)
-    assert v.dossier.routage == "conversion"
+    assert v.dossier.routage == "auto"  # candidat Sudoc retenu : conversion sans alerte (05/11)
     assert {"source.iso", "convertie.iso", "convertie.txt"} <= set(v.telechargements.values())
     _, iso, _ = app.telecharger(ligne.id, "source.iso")
     assert iso.endswith(b"\x1d")

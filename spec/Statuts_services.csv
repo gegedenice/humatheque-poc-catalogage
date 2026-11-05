@@ -2,9 +2,9 @@ service,statut,signification,routage,remarque
 extraction-vlm,json_valide,Extraction parsée,auto,
 extraction-vlm,json_invalide,Sortie non parseable,incident,
 extraction-vlm,confiance_basse,Score de confiance sous le seuil,décision,Seuil à fixer
-alma-checker,academic_record_found,Notice de thèse ou mémoire trouvée,sortie,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
-alma-checker,ambiguous_academic_candidate,Candidat incertain,sortie,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
-alma-checker,off_profile_match_only,"Notice proche, pas de type TU",sortie,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,academic_record_found,Notice de thèse ou mémoire trouvée,auto,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,ambiguous_academic_candidate,Candidat incertain,décision,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
+alma-checker,off_profile_match_only,"Notice proche, pas de type TU",décision,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
 alma-checker,no_academic_record_found,Aucune notice trouvée,auto,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"
 alma-checker,error,Erreur de service,incident,Pas un statut de l'API : réponse HTTP 4xx/5xx ou service injoignable
 sudoc-checker,duplicate_found,Candidat imprimé au-dessus du seuil de doublon,,"Ignorée par le moteur (SPEC §7) : état via la correspondance du §6, routage via Situations"

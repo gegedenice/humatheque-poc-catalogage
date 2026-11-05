@@ -86,12 +86,16 @@ def test_s08_sans_civilite_dans_200g(workflow):
 
 
 @respx.mock
-@pytest.mark.parametrize("statut", ["academic_record_found", "ambiguous_academic_candidate", "off_profile_match_only"])
-def test_s01_arret_avec_ppn_alma(workflow, statut):
+@pytest.mark.parametrize("statut, situation, routage", [
+    ("academic_record_found", "S01", "auto"),                 # au-dessus de match_threshold : arrêt sans alerte
+    ("ambiguous_academic_candidate", "S14", "décision"),      # candidat incertain : à trancher
+    ("off_profile_match_only", "S14", "décision"),
+])
+def test_s01_s14_arret_avec_ppn_alma(workflow, statut, situation, routage):  # ALM-SUD (décision du 05/11)
     routes = simuler(alma=sim.alma(statut, ppn="229969437"))
     d = workflow.executer(dossier())
-    assert d.decision.situation == "S01"
-    assert (d.routage, d.etape_arret) == ("sortie", "situation")
+    assert d.decision.situation == situation
+    assert (d.routage, d.etape_arret) == (routage, "situation")
     assert d.alma.ppn == "229969437" and "229969437" in d.motif_arret
     assert not routes["sudoc"].called and d.etapes["sudoc"].statut == "ignoree"
     assert not routes["idref"].called and d.notice is None
@@ -102,7 +106,7 @@ def test_s06_conversion_copie_puis_arret(workflow):
     routes = simuler(sudoc=sim.sudoc([("229969437", 0.95, "electronic")], "electronic_only"))
     d = workflow.executer(dossier())
     assert d.decision.situation == "S06" and d.decision.suite == "convertir"
-    assert (d.routage, d.etape_arret) == ("conversion", "conversion")
+    assert (d.routage, d.etape_arret) == ("auto", "conversion")  # candidat retenu : sans alerte
     assert d.ppn_source == "229969437"
     assert d.notice_convertie.iso == d.notice_source_iso  # copie de la source (v1)
     assert d.notice_source_iso.startswith("0") and "\x1d" in d.notice_source_iso  # ISO 2709
@@ -114,7 +118,7 @@ def test_s06_conversion_copie_puis_arret(workflow):
     assert not routes["idref"].called and d.notice is None
     # Relance : pas de nouvelle conversion ni d'IdRef
     workflow.executer(d)
-    assert routes["notice"].call_count == 1 and not routes["idref"].called and d.routage == "conversion"
+    assert routes["notice"].call_count == 1 and not routes["idref"].called and d.routage == "auto"
 
 
 @respx.mock
@@ -144,14 +148,14 @@ def test_provenance_choix_invalide():
 def test_faux_positif_alma_reprise(workflow):  # ALM-SUD-006
     routes = simuler(alma=sim.alma("off_profile_match_only", ppn="111"))
     d = workflow.executer(dossier())
-    assert d.routage == "sortie"
+    assert (d.routage, d.decision.situation) == ("décision", "S14")
     with pytest.raises(ResolutionImpossible):
         declarer_faux_positif(d, "alma", "", auteur="cat")
     declarer_faux_positif(d, "alma", "notice d'un autre ouvrage", auteur="cat")
     workflow.executer(d)
     assert d.etat_alma == "absent" and d.decision.situation == "S08" and d.notice is not None
     assert routes["alma"].call_count == 1 and routes["sudoc"].call_count == 1
-    assert any(e.type == "resolution" and e.detail["avant"] == "présent" for e in d.journal)
+    assert any(e.type == "resolution" and e.detail["avant"] == "incertain" for e in d.journal)
 
 
 @respx.mock

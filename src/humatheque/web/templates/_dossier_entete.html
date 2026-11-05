@@ -37,7 +37,8 @@
   </div>
 
   {% if d.motif_arret %}
-  <p class="avis bg-decision-clair text-decision-fonce"><span class="font-semibold">Arrêt</span>
+  {# Arrêt sans alerte (routage auto : notice trouvée au-dessus du seuil, décision du 05/11) en vert. #}
+  <p class="avis {{ 'bg-auto-clair text-auto-fonce' if d.routage == 'auto' else 'bg-decision-clair text-decision-fonce' }}"><span class="font-semibold">{{ "✓ Arrêt sans intervention" if d.routage == "auto" else "Arrêt" }}</span>
     {% if d.etape_arret %}({{ d.etape_arret }}){% endif %} : {{ d.motif_arret }}</p>
   {% endif %}
   {% if d.cloture %}
