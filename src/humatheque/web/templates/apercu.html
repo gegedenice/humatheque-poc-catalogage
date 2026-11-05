@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_composants.html" import badge, vide %}
+{# Consultation en lecture seule (pas d'éditeur) : images à gauche, notice finale à droite. #}
+{% block titre %}{{ vue.document_id }} · aperçu{% endblock %}
+{% block fil %}<a class="text-sourdine" href="/lots/{{ vue.lot_id }}">Lot <span class="font-mono">{{ vue.lot_id }}</span></a> › <span class="font-mono">{{ vue.document_id }}</span> › aperçu{% endblock %}
+{% block entete %}
+<div class="flex flex-wrap items-center gap-3">
+  <h1 class="break-words">{{ vue.titre or vue.document_id }}</h1>{{ badge(vue.routage) }}
+</div>
+<p class="text-[13px] text-sourdine"><span class="font-mono">{{ vue.document_id }}</span> · {{ "thèse" if vue.type_document == "these" else "mémoire" }}{% if vue.situation %} · situation {{ vue.situation }}{% endif %}{% if vue.profil %} · profil {{ vue.profil }}{% endif %}</p>
+{% endblock %}
+{% block entete_droite %}
+<div class="flex flex-wrap items-center gap-2">
+  <a class="btn btn-sm" href="/dossiers/{{ vue.dossier_id }}">Ouvrir le dossier complet</a>
+  {% if vue.telechargements %}
+  <details class="relative">
+    <summary class="btn-principal btn-sm list-none [&::-webkit-details-marker]:hidden">Télécharger ▾</summary>
+    <ul class="absolute right-0 z-20 mt-2 min-w-[14rem] rounded-2xl bg-carte shadow-lg border border-filet py-2">
+      {% for libelle, fichier in vue.telechargements.items() %}
+      <li><a class="block px-4 py-2 text-sm text-encre no-underline hover:bg-tonal" hx-boost="false" href="/dossiers/{{ vue.dossier_id }}/telecharger/{{ fichier }}">{{ libelle }}</a></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}
+{% block contenu %}
+<div class="flex flex-wrap gap-6 items-start">
+  <section class="flex-[1_1_420px] min-w-0 bg-carte rounded-carte shadow-carte p-3 lg:sticky lg:top-3" aria-label="Images du document">
+    {% if vue.images | selectattr("url") | list %}
+    <div id="visionneuse" class="w-full h-[75vh] bg-[#2a2d35] rounded-tuile" hx-preserve="true"
+         data-images='{{ vue.images | selectattr("url") | map(attribute="url") | list | tojson }}'></div>
+    <p class="text-xs text-sourdine px-2 pt-2.5">{{ vue.images | length }} image(s) · molette pour zoomer, flèches pour changer d'image.</p>
+    {% else %}{{ vide("Aucune image affichable pour ce document.") }}{% endif %}
+  </section>
+
+  <section class="carte flex-[1_1_520px] min-w-0 flex flex-col gap-4" aria-label="Notice finale">
+    <div class="flex flex-wrap items-center gap-2">
+      <h2 class="mb-0">Notice produite</h2>
+      {% if vue.origine %}<span class="puce bg-rail text-sourdine font-medium">{{ vue.origine }}</span>{% endif %}
+    </div>
+    {% if vue.motif_arret %}
+    <p class="avis {{ 'bg-auto-clair text-auto-fonce' if vue.routage == 'auto' else 'bg-decision-clair text-decision-fonce' }}">
+      <span class="font-semibold">{{ "✓ Arrêt sans intervention" if vue.routage == "auto" else "Arrêt" }}</span> : {{ vue.motif_arret }}</p>
+    {% endif %}
+    {% if vue.notice %}
+    <pre class="font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words rounded-2xl border border-filet bg-[#fbfbfe] p-4 overflow-x-auto">{{ vue.notice | colorer_notice }}</pre>
+    {% else %}{{ vide("Pas de notice produite pour ce document : le traitement s'est arrêté avant la génération.") }}{% endif %}
+    {% if vue.alertes %}
+    <ul class="flex flex-wrap gap-1.5" aria-label="Alertes">{% for a in vue.alertes %}<li class="puce bg-decision-clair text-decision-fonce font-medium">{{ a }}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

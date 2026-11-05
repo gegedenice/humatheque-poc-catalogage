@@ -136,6 +136,12 @@ def dossier(request: Request, dossier_id: str):
     return _rendre(request, "dossier.html", vue=a.vue_dossier(dossier_id), notice=a.vue_notice(dossier_id))
 
 
+@routeur.get("/dossiers/{dossier_id}/apercu")
+def apercu(request: Request, dossier_id: str):
+    """Consultation en lecture seule : images et notice finale."""
+    return _rendre(request, "apercu.html", vue=_app(request).vue_apercu(dossier_id))
+
+
 @routeur.get("/dossiers/{dossier_id}/fragment")
 def dossier_fragment(request: Request, dossier_id: str):
     """Panneau droit du dossier, rafraîchi tant que le traitement est en cours ; à la fin,

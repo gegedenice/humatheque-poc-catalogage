@@ -21,7 +21,7 @@ from typing import Any
 
 from humatheque.application.vues import (
     Accueil, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
-    LigneException, LigneJournal, Reglable, ResumeLot, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
+    LigneException, LigneJournal, Reglable, ResumeLot, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
 )
 from humatheque.config import charger_yaml
 from humatheque import ingestion
@@ -316,9 +316,16 @@ class Application(Administration):
         if filtre not in FILTRES:
             filtre = "tous"
         dossiers = self.store.dossiers_du_lot(lot_id)
-        file = []
+        file, passes = [], []
         for ligne, d in dossiers:
-            if ligne.etat != "termine" or (d.routage or "auto") == "auto":
+            if ligne.etat == "termine" and (d.routage or "auto") == "auto":
+                passes.append(LigneException(
+                    dossier_id=d.id, document_id=d.document.id, titre=(d.metadonnees or {}).get("title"),
+                    etape=d.etape_arret, etape_libelle=LIBELLES_ETAPES.get(d.etape_arret or "", d.etape_arret),
+                    motif=d.motif_arret or (d.decision.motif if d.decision else None), routage="auto",
+                    repris=any(e.type == "resolution" for e in d.journal)))
+                continue
+            if ligne.etat != "termine":
                 continue
             if FILTRES[filtre] and d.routage != FILTRES[filtre]:
                 continue
@@ -333,7 +340,7 @@ class Application(Administration):
         file.sort(key=lambda l: l.traite)
         return VueLot(lot=lot, indicateurs=self._indicateurs(dossiers), en_cours=lot.termine_le is None,
                       filtre=filtre, file=file, journal=self._journal_lot(lot, dossiers),
-                      etapes=self._avancement(dossiers))
+                      etapes=self._avancement(dossiers), passes=passes)
 
     def _avancement(self, dossiers: list[tuple[Any, Dossier]]) -> list[dict[str, Any]]:
         lignes = []
@@ -394,6 +401,27 @@ class Application(Administration):
         return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=titre,
                           etapes=etapes, images=images, champs=champs,
                           exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel)
+
+    def vue_apercu(self, dossier_id: str) -> VueApercu:
+        """Images et notice finale, sans édition : version courante (validée, éditée ou
+        générée), à défaut la notice générée ou convertie."""
+        v = self.vue_dossier(dossier_id)
+        d = v.dossier
+        versions = self.store.versions(d.id)
+        notice, origine = None, None
+        if versions:
+            courante = versions[-1]
+            notice, origine = courante.texte, f"version {courante.numero} · {courante.statut}"
+        elif d.notice_texte:
+            notice, origine = d.notice_texte, "notice générée"
+        elif d.notice_convertie:
+            notice, origine = d.notice_convertie.texte, f"notice convertie depuis le PPN {d.ppn_source}"
+        profil = (d.notice.profil if d.notice else None) or (d.notice_convertie.profil_cible if d.notice_convertie else None)
+        return VueApercu(dossier_id=d.id, lot_id=v.lot_id, document_id=d.document.id,
+                         type_document=d.document.type_document, titre=v.titre, routage=d.routage or "auto",
+                         situation=d.decision.situation if d.decision else None, motif_arret=d.motif_arret,
+                         images=v.images, notice=notice, origine=origine, profil=profil, alertes=d.alertes,
+                         telechargements=v.telechargements)
 
     def url_image(self, image: str) -> str:
         if image.startswith(("http://", "https://")):

@@ -177,6 +177,35 @@ def test_api_spec(client):
 
 
 @respx.mock
+def test_apercu_documents_passes_seuls(client, app):
+    """Lot : documents en auto listés avec un lien « Voir » ; aperçu = image + notice, sans éditeur."""
+    simuler()
+    lot = _televerser(client, n=2).headers["location"]
+    page = html.unescape(client.get(lot).text)
+    assert "Documents passés seuls" in page and page.count('/apercu">Voir</a>') == 2
+    lot_id = lot.rsplit("/", 1)[1]
+    dossier_id = app.vue_lot(lot_id).passes[0].dossier_id
+    apercu = client.get(f"/dossiers/{dossier_id}/apercu")
+    assert apercu.status_code == 200
+    assert 'id="visionneuse"' in apercu.text and 'id="editeur-notice"' not in apercu.text
+    texte = html.unescape(apercu.text)
+    assert "Notice produite" in texte and ("notice générée" in texte or "version 1" in texte)
+    assert '<span class="text-primaire font-semibold">700</span>' in apercu.text
+    assert "Ouvrir le dossier complet" in texte
+    vue = client.get(f"/api/v1/dossiers/{dossier_id}/apercu").json()
+    assert vue["routage"] == "auto" and vue["notice"].splitlines()[0][:3].isdigit()
+
+
+@respx.mock
+def test_apercu_arret_sans_notice(client):
+    """Arrêt sur notice Alma certaine : aperçu sans notice, arrêt affiché en vert."""
+    simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
+    page = client.get(_televerser(client).headers["location"] + "/apercu")
+    texte = html.unescape(page.text)
+    assert "Arrêt sans intervention" in texte and "229969437" in texte and "Pas de notice produite" in texte
+
+
+@respx.mock
 def test_formulaire_idref_un_seul_bouton(client, app):
     """Choix IdRef : présentation par autorité, un seul bouton de validation pour tous."""
     simuler(idref_statut="low_confidence")

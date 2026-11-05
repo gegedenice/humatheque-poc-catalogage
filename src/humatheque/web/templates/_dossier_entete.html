@@ -19,6 +19,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-2">
       {% if vue.etat == "termine" %}
+      <a class="btn-tonal btn-sm" href="/dossiers/{{ d.id }}/apercu" title="Image et notice finale, sans édition">Aperçu</a>
       <form method="post" action="/dossiers/{{ d.id }}/relancer"><button class="btn btn-sm">Relancer</button></form>
       <form method="post" action="/dossiers/{{ d.id }}/relancer"><input type="hidden" name="depuis" value="extraction">
         <button class="btn btn-sm" title="Rappelle le VLM puis toutes les étapes">Relancer l'extraction</button></form>

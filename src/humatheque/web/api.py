@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from humatheque.application import Application
 from humatheque.application.vues import (
-    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueBucket, VueDossier, VueLot, VueLots, VueNotice,
+    EntreeLot, EtatSpec, Historique, Reglable, ResumeVersion, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice,
 )
 from humatheque.notice.validation import Marqueur
 from humatheque.store import Lot
@@ -64,6 +64,11 @@ def dossier(request: Request, dossier_id: str) -> VueDossier:
 
 class Relance(BaseModel):
     depuis: str | None = None
+
+
+@routeur.get("/dossiers/{dossier_id}/apercu", response_model=VueApercu)
+def apercu(request: Request, dossier_id: str) -> VueApercu:
+    return _app(request).vue_apercu(dossier_id)
 
 
 @routeur.post("/dossiers/{dossier_id}/relancer", response_model=VueDossier)
