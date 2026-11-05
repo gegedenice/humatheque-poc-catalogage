@@ -49,9 +49,6 @@ class Reglages(BaseSettings):
     alma_checker_api_url: str = ""
     alma_api_key: SecretStr = SecretStr("")
     sudoc_checker_api_url: str = ""
-    # Seuil de doublon Sudoc : envoyé à sudoc-checker (duplicate_threshold) et utilisé
-    # par l'agrégation des thesis_state (même valeur des deux côtés)
-    sudoc_duplicate_threshold: float | None = None
     idref_qualinka_api_url: str = ""
     idref_qualinka_api_key: SecretStr = SecretStr("")
     dewey_classification_api_url: str = ""
@@ -97,7 +94,7 @@ class Reglages(BaseSettings):
     # Docker le construit au build hors du volume data/.
     reaccentue_cache: Path | None = None
 
-    @field_validator("dewey_seuil", "sudoc_duplicate_threshold", mode="before")
+    @field_validator("dewey_seuil", mode="before")
     @classmethod
     def _vide_none(cls, v: Any) -> Any:
         return None if isinstance(v, str) and not v.strip() else v

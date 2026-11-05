@@ -50,10 +50,10 @@ l'avance.
   `VLM_STRATEGIE` (`requete_unique` ou `par_image`).
 - **Services** : `ALMA_CHECKER_API_URL`, `SUDOC_CHECKER_API_URL`,
   `IDREF_QUALINKA_API_URL`, `DEWEY_CLASSIFICATION_API_URL` (clés facultatives) ;
-  `SUDOC_DUPLICATE_THRESHOLD` (seuil de doublon Sudoc, envoyé au service et
-  utilisé par l'agrégation) ; `IDREF_TIMEOUT` (idref-linker dépasse souvent une
-  minute par personne) ; `DEWEY_SEUIL` (vide : première classe retenue).
-  Les autres paramètres des services sont dans `config/services.yaml`.
+  `IDREF_TIMEOUT` ; `DEWEY_SEUIL` (vide : première classe retenue). Les
+  paramètres de requête des services (seuils dont `duplicate_threshold`
+  Sudoc, nombres de candidats, poids IdRef, méthode Dewey) sont dans
+  `config/services.yaml`.
 - **Stockage S3** (MinIO ou tout service compatible S3) : `MINIO_ENDPOINT`,
   `MINIO_BUCKET`, `MINIO_PREFIXE`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`. Un
   dossier = un document ; le type vient du dossier parent (`TH`/`MM`,

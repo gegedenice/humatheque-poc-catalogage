@@ -323,9 +323,9 @@ dans le dossier :
    document (`qualification/`, fonction pure) :
 
    - candidats retenus : ceux de `candidates` dont `score.final` atteint
-     `SUDOC_DUPLICATE_THRESHOLD` (`.env`), envoyé au service comme
-     `duplicate_threshold` : le statut du service et l'agrégation utilisent
-     le même seuil ;
+     `duplicate_threshold` (`config/services.yaml`, décision du 05/11),
+     envoyé au service : le statut du service et l'agrégation utilisent le
+     même seuil ;
    - correspondance `thesis_state` → `etat_sudoc` dans `config/etats_sudoc.yaml` :
 
      | `thesis_state` | `etat_sudoc` |
@@ -630,7 +630,8 @@ défaut sur la version générée.
   - `ALMA_CHECKER_API_URL`, `ALMA_API_KEY` ;
   - `SPEC_SOURCE=csv`, `GRIST_URL=http://grist:8484`, `GRIST_DOC_ID`,
     `GRIST_API_KEY`, `GRIST_SESSION_SECRET`, `GRIST_DEFAULT_EMAIL` ;
-  - `CODE_ETAB=EPHE`, `MAX_WORKERS`, `SUDOC_DUPLICATE_THRESHOLD` ;
+  - `CODE_ETAB=EPHE`, `MAX_WORKERS` (les seuils des services sont dans
+    `config/services.yaml`) ;
   - `VLM_MODEL=google/gemma-4-26B-A4B-it`, `VLM_STRATEGIE=requete_unique`,
     `VLM_TIMEOUT`, `HTTP_TIMEOUT`, `RELANCES_AUTO=2` ;
   - `PROVENANCE_CONFIRMATION_LLM=false` ;

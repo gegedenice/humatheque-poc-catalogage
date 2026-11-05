@@ -20,9 +20,10 @@ alma:
 
 sudoc:
   routes: {these: /check/thesis, memoire: /check/dissertation}
-  # duplicate_threshold = SUDOC_DUPLICATE_THRESHOLD (.env) : le même seuil sert au
-  # statut du service et à l'agrégation des thesis_state (qualification/).
+  # duplicate_threshold sert aussi à retenir les candidats lors de l'agrégation des
+  # thesis_state (qualification/) : même seuil pour le statut du service et l'état.
   parametres:
+    duplicate_threshold: 0.78    # SUDOC_DUPLICATE_THRESHOLD
     ambiguous_threshold: 0.62    # SUDOC_AMBIGUOUS_THRESHOLD
     max_records_per_query: 10    # SUDOC_MAX_RECORDS_PER_QUERY
     max_candidates: 20           # SUDOC_MAX_CANDIDATES
@@ -33,7 +34,7 @@ sudoc:
 idref_personne:
   route: /align/person
   parametres:
-    accept_threshold: 0.65       # IDREF_ACCEPT_THRESHOLD
+    accept_threshold: 0.5        # IDREF_ACCEPT_THRESHOLD (05/11 : 0.65 → 0.5)
     margin_threshold: 0.08       # IDREF_MARGIN_THRESHOLD
     max_candidates: 5            # IDREF_MAX_CANDIDATES (05/11 : 20 → 5, temps de réponse)
     max_docs_per_role: 5         # IDREF_MAX_DOCS_PER_ROLE (05/11 : 20 → 5)

@@ -58,7 +58,6 @@ class Services:
     sudoc: ClientService
     idref: ClientService
     dewey: ClientService
-    seuil_sudoc: float | None = None
     seuil_dewey: float | None = None
     depot: Any = None  # ingestion.Depot : lit les images s3:// (None : stockage non configuré)
     # Réglages du lot (« Paramètres avancés ») : {service: {paramètre: valeur}}
@@ -67,8 +66,6 @@ class Services:
     def parametres(self, service: str) -> dict[str, Any]:
         """Paramètres de requête : config/services.yaml, puis réglages du lot."""
         p = {**(charger_yaml("services")[service].get("parametres") or {}), **self.reglages_lot.get(service, {})}
-        if service == "sudoc" and self.seuil_sudoc is not None:
-            p["duplicate_threshold"] = self.seuil_sudoc
         return p
 
     def lire_s3(self, u: str) -> bytes:
@@ -259,11 +256,14 @@ class Workflow:
         return Suite()
 
     def _etape_sudoc(self, d: Dossier) -> Suite:
-        if self.services.seuil_sudoc is None:
+        parametres = self.services.parametres("sudoc")
+        # Même seuil pour le statut du service et l'agrégation des thesis_state
+        seuil = parametres.get("duplicate_threshold")
+        if seuil is None:
             raise _Incident("service_indisponible", _cfg()["motifs"]["seuil_sudoc"])
         reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees, d.document.type_document,
-                              self.services.parametres("sudoc"))
-        q = agreger(reponse, self.services.seuil_sudoc)
+                              parametres)
+        q = agreger(reponse, float(seuil))
         d.sudoc = q
         d.noter("sudoc", "decision", {"etat": q.etat, "justification": q.justification, "ppn_source": q.ppn_source})
         if q.incident:
@@ -424,7 +424,6 @@ def services_depuis_reglages(spec: Spec, fournisseur_vlm: str | None = None) -> 
                             r.idref_timeout),
         dewey=ClientService("dewey-classifier", r.dewey_classification_api_url,
                             r.classification_api_key.get_secret_value(), r.http_timeout),
-        seuil_sudoc=r.sudoc_duplicate_threshold,
         seuil_dewey=r.dewey_seuil,
         depot=depot_depuis_reglages(r),
     )
