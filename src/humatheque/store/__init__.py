@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS notice_versions (
     diff TEXT NOT NULL,
     PRIMARY KEY (dossier_id, numero)
 );
+CREATE TABLE IF NOT EXISTS reglages_admin (
+    cle TEXT PRIMARY KEY,
+    valeur TEXT NOT NULL,
+    maj_le TEXT NOT NULL,
+    auteur TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS ingestions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     le TEXT NOT NULL,
@@ -231,3 +237,16 @@ class Store:
         with self._verrou, self._connexion() as c:
             c.execute("UPDATE notice_versions SET statut = ? WHERE dossier_id = ? AND numero = ?",
                       (statut, dossier_id, numero))
+
+    # ------------------------------------------------------------ réglages d'administration
+    def reglage_admin(self, cle: str) -> tuple[Any, str, str] | None:
+        """(valeur, maj_le, auteur) ou None."""
+        with self._connexion() as c:
+            r = c.execute("SELECT * FROM reglages_admin WHERE cle = ?", (cle,)).fetchone()
+        return (json.loads(r["valeur"]), r["maj_le"], r["auteur"]) if r else None
+
+    def ecrire_reglage_admin(self, cle: str, valeur: Any, auteur: str) -> None:
+        with self._verrou, self._connexion() as c:
+            c.execute("INSERT INTO reglages_admin VALUES (?, ?, ?, ?) ON CONFLICT(cle) DO UPDATE SET "
+                      "valeur = excluded.valeur, maj_le = excluded.maj_le, auteur = excluded.auteur",
+                      (cle, json.dumps(valeur, ensure_ascii=False), _maintenant(), auteur))

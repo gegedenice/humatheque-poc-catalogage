@@ -31,6 +31,11 @@ class BucketSimule:
             raise DepotIndisponible("connexion refusée")
         return sorted(self.objets)
 
+    def verifier(self):
+        if self.panne:
+            raise DepotIndisponible("connexion refusée")
+        return True
+
     def lire(self, cle):
         self.lectures.append(cle)
         if cle not in self.objets:
@@ -198,7 +203,7 @@ def test_routes_bucket(client, app):
 
 def test_evenements_desactives(client):
     r = client.post("/minio/evenements")
-    assert r.status_code == 403 and "INGESTION_AUTO=false" in r.text
+    assert r.status_code == 403 and "désactivé" in r.text
 
 
 @respx.mock

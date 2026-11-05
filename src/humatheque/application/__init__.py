@@ -89,7 +89,10 @@ def documents_depuis_liste(texte: str) -> list[list[str]]:
     return docs
 
 
-class Application:
+from humatheque.application.administration import Administration  # noqa: E402
+
+
+class Application(Administration):
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
                  spec: Spec | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
@@ -122,19 +125,26 @@ class Application:
 
     def accueil(self) -> Accueil:
         return Accueil(spec=self.etat_spec(), fournisseurs=FOURNISSEURS,
-                       fournisseur_defaut=self.reglages.vlm_fournisseur,
+                       fournisseur_defaut=self.reglages_admin().fournisseur,
                        lots=[self._resume(l) for l in self.store.lots(10)], reglables=self.reglables())
 
     # ============================================================ paramètres avancés (SPEC §3)
     @staticmethod
-    def reglables() -> list[Reglable]:
+    def reglables_config() -> list[Reglable]:
+        """Paramètres réglables et défauts de config/services.yaml."""
         cfg = charger_yaml("services")
         return [Reglable(defaut=cfg[r["service"]]["parametres"][r["parametre"]], **r) for r in cfg.get("reglables") or []]
+
+    def reglables(self) -> list[Reglable]:
+        """Défauts proposés : config/services.yaml, puis réglages de l'administration."""
+        admin = self.reglages_admin().reglages_services
+        return [r.model_copy(update={"defaut": admin.get(r.service, {}).get(r.parametre, r.defaut)})
+                for r in self.reglables_config()]
 
     def valider_reglages(self, valeurs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
         """Réglages du lot : seuls les paramètres déclarés réglables, dans leurs bornes ;
         les valeurs égales au défaut sont omises."""
-        permis = {(r.service, r.parametre): r for r in self.reglables()}
+        permis = {(r.service, r.parametre): r for r in self.reglables_config()}
         retenus: dict[str, dict[str, Any]] = {}
         for service, params in (valeurs or {}).items():
             for parametre, brut in (params or {}).items():
@@ -586,7 +596,12 @@ class Application:
         lignes = []
         for doc in documents:
             dernier = derniers.get(doc.id)
-            lignes.append(DossierBucket(document=doc, nouveau=dernier is None,
+            # Dossier modifié depuis son dernier traitement : signalé, jamais retraité d'office
+            modifie = False
+            if dernier is not None:
+                precedent = self.store.dossier(dernier.id)
+                modifie = precedent is not None and precedent.document.images != doc.images
+            lignes.append(DossierBucket(document=doc, nouveau=dernier is None, modifie=modifie,
                                         dossier_id=dernier.id if dernier else None,
                                         lot_id=dernier.lot_id if dernier else None,
                                         etat=dernier.etat if dernier else None,
@@ -612,10 +627,14 @@ class Application:
         périodique, la planification et les évènements S3 (ING-F-003, ING-F-004), qui ne
         sont pas activés tant que l'arbitrage n'est pas rendu (INGESTION_AUTO=false)."""
         vue = self.balayer(declencheur)
-        nouveaux = [l.document for l in vue.dossiers if l.nouveau]
+        if vue.erreur:
+            raise ActionImpossible(vue.erreur)
+        # Un dossier de type inconnu n'est pas traité automatiquement (il reste signalé)
+        nouveaux = [l.document for l in vue.dossiers if l.nouveau and l.document.type_document]
         if not nouveaux:
             return None
-        return self._lot_de_documents(nouveaux, None, "minio", declencheur)
+        admin = self.reglages_admin()
+        return self._lot_de_documents(nouveaux, admin.fournisseur, "minio", declencheur, admin.reglages_services)
 
     def televerser_dossiers(self, fichiers: list[tuple[str, bytes]], type_par_defaut: str,
                             fournisseur: str | None = None, reglages: dict[str, dict[str, Any]] | None = None) -> Lot:

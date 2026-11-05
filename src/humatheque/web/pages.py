@@ -33,9 +33,22 @@ def _rediriger(url: str, auteur: str | None = None) -> RedirectResponse:
 
 
 # ---------------------------------------------------------------- accueil
+COOKIE_VISITE = "derniere_visite"
+
+
 @routeur.get("/")
 def accueil(request: Request):
-    return _rendre(request, "accueil.html", vue=_app(request).accueil())
+    from datetime import UTC, datetime
+
+    a = _app(request)
+    try:
+        visite = datetime.fromisoformat(request.cookies.get(COOKIE_VISITE, ""))
+    except ValueError:
+        visite = None
+    nouveaux = a.lots_automatiques_depuis(visite) if visite else []
+    r = _rendre(request, "accueil.html", vue=a.accueil(), nouveaux_lots=nouveaux)
+    r.set_cookie(COOKIE_VISITE, datetime.now(UTC).isoformat(), max_age=3600 * 24 * 365, samesite="lax")
+    return r
 
 
 @routeur.post("/spec/recharger")
@@ -249,11 +262,114 @@ def objet_s3(request: Request, uri: str):
 
 
 @routeur.post("/minio/evenements")
-def evenements_s3(request: Request):
-    """Notifications d'évènements S3 (ING-F-003) : architecture prévue, désactivée tant que
-    INGESTION_AUTO=false (arbitrage en attente, SPEC §11 étape 8)."""
+def evenements_s3(request: Request, jeton: str = ""):
+    """Notification d'évènement S3 (ING-F-003) : signalée au planificateur, qui crée le lot
+    après le délai de stabilisation. Protégée par le jeton affiché dans /admin."""
+    import hmac
+
     a = _app(request)
-    if not a.reglages.ingestion_auto:
-        return Response("Ingestion automatique désactivée (INGESTION_AUTO=false).", status_code=403)
-    lot = a.traiter_nouveaux("evenement")
-    return Response(lot.id if lot else "aucun nouveau dossier", status_code=202)
+    ev = a.reglages_admin().declencheurs.evenements
+    if not ev.actif:
+        return Response("Déclencheur « évènements S3 » désactivé (page Administration).", status_code=403)
+    fourni = jeton or request.headers.get("Authorization", "").removeprefix("Bearer ")
+    if not ev.jeton or not hmac.compare_digest(fourni, ev.jeton):
+        return Response("Jeton absent ou invalide.", status_code=401)
+    request.app.state.planificateur.signaler_evenement()
+    return Response(f"Évènement pris en compte : traitement après {ev.delai_secondes} s sans nouvel évènement.",
+                    status_code=202)
+
+
+# ---------------------------------------------------------------- administration (étape 8)
+@routeur.get("/admin")
+def administration(request: Request):
+    a = _app(request)
+    return _rendre(request, "admin.html", reglages=a.reglages_admin(), reglables=a.reglables(),
+                   fournisseurs=a.accueil().fournisseurs, etat=request.app.state.planificateur.etat(),
+                   s3=a.depot is not None, base=str(request.base_url).rstrip("/"),
+                   mot_de_passe=bool(a.reglages.mot_de_passe.get_secret_value()))
+
+
+@routeur.get("/admin/sante")
+def sante(request: Request):
+    return _rendre(request, "_sante.html", sante=_app(request).sante())
+
+
+@routeur.post("/admin/reglages")
+async def reglages_admin(request: Request):
+    from humatheque.application.administration import (
+        Balayage, Declencheurs, Evenements, Planification, ReglagesAdmin,
+    )
+
+    a = _app(request)
+    f = await request.form()
+    actuel = a.reglages_admin()
+
+    def entier(cle: str, defaut: int) -> int:
+        try:
+            return int(str(f.get(cle) or defaut))
+        except ValueError as e:
+            raise ActionImpossible(f"{cle} : nombre entier attendu") from e
+
+    try:
+        nouveaux = ReglagesAdmin(
+            fournisseur=str(f.get("fournisseur") or actuel.fournisseur),
+            reglages_services=await _reglages_formulaire(request),
+            declencheurs=Declencheurs(
+                balayage=Balayage(actif=f.get("balayage_actif") == "on",
+                                  intervalle_minutes=entier("balayage_intervalle", 60)),
+                planification=Planification(actif=f.get("planification_actif") == "on",
+                                            cron=str(f.get("planification_cron") or "").strip()),
+                evenements=Evenements(actif=f.get("evenements_actif") == "on",
+                                      jeton=actuel.declencheurs.evenements.jeton,
+                                      delai_secondes=entier("evenements_delai", 60))))
+    except ValueError as e:  # bornes pydantic
+        raise ActionImpossible(f"réglage invalide : {e.errors()[0]['loc'][-1]} hors bornes"
+                               if hasattr(e, "errors") else str(e)) from e
+    a.modifier_reglages_admin(nouveaux, _auteur(str(f.get("auteur") or "")))
+    return _rediriger("/admin", str(f.get("auteur") or ""))
+
+
+@routeur.post("/admin/jeton")
+def jeton(request: Request, auteur: Annotated[str, Form()]):
+    _app(request).renouveler_jeton(_auteur(auteur))
+    return _rediriger("/admin", auteur)
+
+
+@routeur.post("/admin/tick")
+def tick(request: Request):
+    """Exécute un tour du planificateur tout de suite (essai)."""
+    resultat = request.app.state.planificateur.tick()
+    return _rediriger("/admin")
+
+
+# ---------------------------------------------------------------- connexion (MOT_DE_PASSE)
+@routeur.get("/login")
+def connexion(request: Request, suite: str = "/"):
+    return _rendre(request, "login.html", suite=suite, erreur=None)
+
+
+@routeur.post("/login")
+def connexion_post(request: Request, mot_de_passe: Annotated[str, Form()], suite: Annotated[str, Form()] = "/"):
+    import hmac
+
+    from humatheque.web.auth import COOKIE, jeton_session
+
+    attendu = _app(request).reglages.mot_de_passe.get_secret_value()
+    if not attendu:
+        return _rediriger("/")
+    if not hmac.compare_digest(mot_de_passe, attendu):
+        r = _rendre(request, "login.html", suite=suite, erreur="Mot de passe incorrect.")
+        r.status_code = 401
+        return r
+    r = _rediriger(suite if suite.startswith("/") and not suite.startswith("//") else "/")
+    r.set_cookie(COOKIE, jeton_session(attendu), httponly=True, samesite="lax", max_age=3600 * 12)
+    return r
+
+
+@routeur.get("/logout")
+def deconnexion(request: Request):
+    from humatheque.web.auth import COOKIE
+
+    r = _rediriger("/login")
+    r.delete_cookie(COOKIE)
+    return r

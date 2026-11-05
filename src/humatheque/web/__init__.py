@@ -30,9 +30,29 @@ gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=lamb
 gabarits.env.filters["date"] = lambda d, f="%d/%m %H:%M": d.astimezone().strftime(f) if d else ""
 
 
-def create_app(application: Application | None = None) -> FastAPI:
-    app = FastAPI(title="humatheque-catalogage", docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json")
-    app.state.application = application or Application()
+def create_app(application: Application | None = None, planificateur: bool = False) -> FastAPI:
+    """`planificateur=True` démarre les déclencheurs automatiques (humatheque serve)."""
+    from contextlib import asynccontextmanager
+
+    from humatheque.application.planificateur import Planificateur
+
+    a = application or Application()
+    plan = Planificateur(a)
+
+    @asynccontextmanager
+    async def cycle(_app: FastAPI):
+        if planificateur:
+            plan.demarrer()
+        yield
+        plan.arreter()
+
+    app = FastAPI(title="humatheque-catalogage", docs_url="/api/v1/docs", openapi_url="/api/v1/openapi.json",
+                  lifespan=cycle)
+    app.state.application = a
+    app.state.planificateur = plan
+    from humatheque.web.auth import Authentification
+
+    app.add_middleware(Authentification)
     app.mount("/static", StaticFiles(directory=str(ICI / "static")), name="static")
 
     from humatheque.web import api, pages

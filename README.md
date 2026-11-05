@@ -30,7 +30,7 @@ l'avance.
 
 | Commande | Rôle |
 |---|---|
-| `humatheque serve [--host --port]` | interface web et API JSON `/api/v1` (documentation : `/api/v1/docs`) |
+| `humatheque serve [--host --port]` | interface web, API JSON `/api/v1` (documentation : `/api/v1/docs`) et planificateur des déclencheurs |
 | `humatheque check-spec [--source csv\|grist] [--json]` | vérifie la spécification ; code retour 1 si erreur bloquante |
 | `humatheque spec-export [--dossier spec]` | instantané des tables Grist dans `spec/` + copie dans `spec/archives/<horodatage>/` |
 | `humatheque run-url URL… [--un-document] [--type these\|memoire] [--notice]` | traite des URL d'images dans le terminal |
@@ -60,6 +60,19 @@ l'avance.
   `theses`/`memoires` : `config/ingestion.yaml`).
 - **Spécification** : `SPEC_SOURCE` (`csv` par défaut, ou `grist`), `GRIST_URL`,
   `GRIST_DOC_ID`, `GRIST_API_KEY`.
+- **Déclencheurs automatiques** (valeurs initiales, ensuite réglées dans
+  `/admin`) : `INGESTION_AUTO` (balayage périodique), `BALAYAGE_INTERVALLE`
+  (minutes), `PLANIFICATION_CRON`, `EVENEMENTS_DELAI` (secondes).
+- **Mot de passe** : `MOT_DE_PASSE` (vide : pas d'authentification).
+
+## Administration
+
+La page `/admin` affiche la santé des services, les réglages des lots
+automatiques (fournisseur VLM, paramètres avancés) et les trois déclencheurs :
+balayage périodique, traitement à heure fixe (cron) et évènements S3. Pour les
+évènements, déclarer dans les notifications du bucket (webhook, évènements
+`s3:ObjectCreated:*`) l'URL affichée, qui porte un jeton. Le planificateur
+tourne dans l'application (`humatheque serve`) : une seule instance.
 
 Les règles métier lues hors de la spec sont dans `config/*.yaml` (états Sudoc
 et Alma, provenance, listes de civilités et d'articles, prompts d'extraction…).

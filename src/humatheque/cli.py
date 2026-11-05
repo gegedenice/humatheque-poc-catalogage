@@ -87,7 +87,7 @@ def serve(args: argparse.Namespace) -> int:
 
     from humatheque.web import create_app
 
-    uvicorn.run(create_app(), host=args.host, port=args.port)
+    uvicorn.run(create_app(planificateur=True), host=args.host, port=args.port)
     return 0
 
 

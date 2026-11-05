@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titre %}Connexion{% endblock %}
+{% block contenu %}
+<form class="carte max-w-sm mx-auto mt-10 space-y-3" method="post" action="/login" hx-boost="false">
+  <h1>Connexion</h1>
+  {% if erreur %}<p class="text-sm text-sortie">{{ erreur }}</p>{% endif %}
+  <input type="hidden" name="suite" value="{{ suite }}">
+  <label class="block"><span class="etiquette">Mot de passe</span>
+    <input class="champ" type="password" name="mot_de_passe" autofocus required></label>
+  <button class="btn-principal">Se connecter</button>
+</form>
+{% endblock %}

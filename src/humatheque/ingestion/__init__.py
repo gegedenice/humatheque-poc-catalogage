@@ -97,6 +97,9 @@ class Depot(Protocol):
 
     def lire(self, cle: str) -> bytes: ...
 
+    def verifier(self) -> bool:
+        """Le bucket est-il accessible ? (contrôle de santé)"""
+
 
 def uri(bucket: str, cle: str) -> str:
     return f"s3://{bucket}/{cle}"
@@ -133,6 +136,14 @@ class DepotS3:
         try:
             return [o.object_name for o in self._client.list_objects(self.bucket, prefix=self.prefixe or None,
                                                                      recursive=True)]
+        except (S3Error, OSError, ValueError) as e:
+            raise DepotIndisponible(f"bucket {self.bucket} : {e}") from e
+
+    def verifier(self) -> bool:
+        from minio.error import S3Error
+
+        try:
+            return self._client.bucket_exists(self.bucket)
         except (S3Error, OSError, ValueError) as e:
             raise DepotIndisponible(f"bucket {self.bucket} : {e}") from e
 
