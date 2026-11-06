@@ -30,6 +30,8 @@ RUN --mount=type=secret,id=ca,required=false \
 COPY src ./src
 COPY config ./config
 COPY spec ./spec
+COPY regles ./regles
+COPY reference/moteur-regles/exemple_contexte.json ./reference/moteur-regles/
 COPY CLAUDE.md ./
 RUN --mount=type=secret,id=ca,required=false \
     if [ -f /run/secrets/ca ]; then export SSL_CERT_FILE=/run/secrets/ca; fi; \

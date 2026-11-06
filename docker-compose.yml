@@ -1,5 +1,5 @@
 # Démonstrateur + Grist (SPEC §10). docker compose up -d
-# L'application fonctionne sans Grist (SPEC_SOURCE=csv, spec/*.csv).
+# L'application fonctionne sans Grist (règles dans regles/, Statuts_services en CSV).
 services:
   app:
     build: .
@@ -11,6 +11,8 @@ services:
       GRIST_URL: http://grist:8484
     volumes:
       - ./data:/app/data
+      # Règles modifiées depuis Administration › Règles : écrites dans le dépôt (à commiter)
+      - ./regles:/app/regles
     depends_on:
       grist:
         condition: service_started

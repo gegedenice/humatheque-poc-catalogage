@@ -3,8 +3,9 @@
 Application web qui prend un document de thèse ou de mémoire (une ou plusieurs
 images, téléversées, par URL ou depuis le bucket MinIO) et produit une notice
 UNIMARC, ou s'arrête avec un rapport expliquant pourquoi.
-Les règles de catalogage ne sont PAS dans le code : elles sont lues dans la
-spécification Grist (`spec/*.csv` ou API Grist). Spécification fonctionnelle
+Les règles de catalogage ne sont PAS dans le code : elles sont dans `regles/`
+(YAML : `variables.yaml`, `profils/*.yaml`, `decisions.yaml`, conditions
+rule-engine) ; `Statuts_services` reste en `spec/` (CSV ou API Grist). Spécification fonctionnelle
 complète : `docs/SPEC.md`. La lire avant toute modification. Les exigences du
 wiki projet (ING-*, VLM-*, ALM-SUD-*) y sont tracées au §12 : citer leur
 identifiant dans les tests et les messages de commit qui les couvrent.
@@ -12,14 +13,14 @@ identifiant dans les tests et les messages de commit qui les couvrent.
 ## Principes non négociables
 
 1. **Aucune règle UNIMARC codée en dur.** Les zones, sous-zones, valeurs fixes et
-   codes de fonction viennent de `Regles` ; le routage vient de `Situations` et
-   `Statuts_services`. Si une règle manque, on la signale (vérificateur de spec),
-   on ne l'invente pas.
+   codes de fonction viennent des profils de `regles/profils/` ; la décision et
+   le routage viennent de `regles/decisions.yaml` et `Statuts_services`. Si une
+   règle manque, on la signale (vérificateur, `check-spec`), on ne l'invente pas.
 2. **Ne jamais inventer un PPN, un code ou une valeur.** Une donnée absente donne
    une zone omise + une alerte, jamais une valeur plausible.
 3. **Le contexte est le contrat.** Tout ce qui est en amont (extraction,
-   services, normalisation) produit un dict `Contexte` conforme à `Sources` ;
-   le générateur ne lit que ce dict.
+   services, normalisation) produit un dict `Contexte` ; le générateur n'en lit
+   que les variables de `regles/variables.yaml`.
 4. **Traçabilité.** Chaque transformation de texte, chaque appel de service,
    chaque décision et chaque zone produite est journalisée dans le dossier du
    document (avant / après, règle appliquée, statut de la règle).
@@ -33,11 +34,11 @@ identifiant dans les tests et les messages de commit qui les couvrent.
   **Tailwind CSS** via l'exécutable autonome (pas de Node), îlots JavaScript
   limités à l'éditeur de notice **Monaco** et à la visionneuse **OpenSeadragon**
   (vendorisés, sans build), SQLite (`data/humatheque.db`), `httpx`,
-  `pydantic` v2, `pymarc`, `pytest` + `respx`.
+  `pydantic` v2, `pymarc`, PyYAML + `rule-engine`, `pytest` + `respx`.
 - **Couche de services** (`application/`) : toute logique passe par elle ; les
   pages HTML et l'API JSON `/api/v1` l'appellent toutes les deux. Rien de
   métier dans les routes ni les gabarits.
-- **Design** : partir de la maquette du mode 2 (palette, cartes, badges) ;
+- **Design** : Material 3 (maquettes validées le 05/11 : palette, cartes, puces) ;
   soigner états vides, chargement, erreurs ; mêmes composants sur tous les
   écrans.
 - `uv sync` · `uv run pytest` · `uv run humatheque serve` (port 8000)
@@ -54,7 +55,9 @@ identifiant dans les tests et les messages de commit qui les couvrent.
   `metadata.normalize_metadata`, vocabulaires de `config.py`.
   Ne pas reprendre : onglets, annotations, export HF, `unimarc.py`, `specs.py`.
 - `reference/gradio_workflow_app.py` : autre POC Gradio en mode workflow. Comprend toutes les étapes dans l'ordre.
-- `reference/generateur_unimarc.py` : moteur de gabarits de départ.
+- `reference/generateur_unimarc.py` : moteur de gabarits de départ (historique).
+- `reference/moteur-regles/` : moteur de règles YAML de référence (décision,
+  génération, vérification), exemple de contexte et tests sur les règles réelles.
 - `reference/workflow-mindmap.svg` : workflow cible validé en atelier.
 - `reference/maquette-mode2-batch.html` : maquette du reporting de lot (style et
   structure à reprendre).
