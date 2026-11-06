@@ -1,0 +1,22 @@
+{
+  "titre_classement": "Les @coraux tempérés de Méditerranée",
+  "sous_titre": ["écophysiologie et adaptation"],
+  "auteur": {"forme": "Marie Durand", "nom": "Durand", "prenom": "Marie", "ppn": null},
+  "diplome": "Thèse de doctorat",
+  "discipline": "Biologie marine",
+  "volumaison": "1 volume",
+  "etablissement": {"forme": "École pratique des hautes études", "ppn": "026404583"},
+  "cotutelle": [],
+  "ecole_doctorale": null,
+  "annee": "1998",
+  "directeur": [
+    {"forme": "Jean Martin", "nom": "Martin", "prenom": "Jean", "ppn": "026594803"},
+    {"forme": "Anne Petit", "nom": "Petit", "prenom": "Anne", "ppn": null}
+  ],
+  "president": null,
+  "rapporteur": [{"forme": "Paul Leroy", "nom": "Leroy", "prenom": "Paul", "ppn": null}],
+  "membre_jury": [],
+  "langue": "fre",
+  "dewey": null,
+  "numero_nnt": null
+}

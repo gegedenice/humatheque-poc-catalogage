@@ -1,0 +1,31 @@
+# Dictionnaire des variables utilisables dans les profils.
+#   source      : d'où vient la valeur (extraction.<champ du schéma>, calcul, service, constante)
+#   type        : texte (défaut), personne ({x.forme} {x.nom} {x.prenom} {x.ppn}), organisme ({x.forme} {x.ppn})
+#   liste       : true si plusieurs valeurs possibles
+#   disponible  : false si le pipeline ne produit pas encore la valeur (sous-zone toujours omise)
+# {x} seul vaut {x.forme} pour une personne ou un organisme.
+
+titre:              {source: extraction.title, description: "Titre propre, casse de phrase"}
+titre_classement:   {source: calcul, description: "Titre avec @ après l'article initial"}
+sous_titre:         {source: extraction.subtitle, liste: true, description: "Sous-titre(s), casse du complément du titre"}
+auteur:             {source: extraction.author, type: personne, description: "Auteur"}
+diplome:            {source: extraction.degree_type, description: "Type de diplôme, liste fermée selon le type de document"}
+discipline:         {source: extraction.discipline, description: "Discipline, texte libre"}
+volume:             {source: extraction.volume, description: "Numéro de tome mentionné, vide si absent"}
+volumaison:         {source: calcul, description: "« 1 volume » si aucun tome n'est mentionné, « ? volumes » sinon"}
+etablissement:      {source: extraction.granting_institution, type: organisme, description: "Établissement de soutenance"}
+cotutelle:          {source: extraction.co_tutelle_institutions, type: organisme, liste: true, description: "Établissements de cotutelle"}
+ecole_doctorale:    {source: extraction.doctoral_school, type: organisme, description: "École doctorale"}
+annee:              {source: extraction.defense_year, description: "Année de soutenance (aaaa)"}
+directeur:          {source: extraction.advisor, type: personne, liste: true, description: "Directeur(s)"}
+president:          {source: extraction.jury_president, type: personne, description: "Président du jury"}
+rapporteur:         {source: extraction.reviewers, type: personne, liste: true, description: "Rapporteurs"}
+membre_jury:        {source: extraction.committee_members, type: personne, liste: true, description: "Membres du jury"}
+langue:             {source: extraction.language, description: "Langue du document, ISO 639-3"}
+resume:             {source: extraction.abstract, description: "Résumé"}
+langue_resume:      {source: extraction.abstract_lang, disponible: false, description: "Langue du résumé"}
+titre_parallele:    {source: extraction.parallel_title, disponible: false, description: "Titre parallèle"}
+langue_titre_parallele: {source: extraction.parallel_title_lang, disponible: false, description: "Langue du titre parallèle"}
+partenaire:         {source: extraction.partner_institutions, type: organisme, liste: true, disponible: false, description: "Établissements partenaires"}
+numero_nnt:         {source: calcul, disponible: false, description: "Numéro incrémental du NNT (fichier des numéros à définir)"}
+dewey:              {source: service.dewey-classifier, description: "Code domaine TEF retenu"}
