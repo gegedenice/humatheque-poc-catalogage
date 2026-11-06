@@ -10,6 +10,19 @@
 # du formulaire (SPEC §3) ; les valeurs choisies s'appliquent à tous les
 # documents du lot.
 
+# `statuts` : statut renvoyé par le service → issue (terminé, à reprendre,
+# incident ; SPEC §7). Une erreur HTTP ou un service injoignable donne toujours
+# « incident ». Un service sans `statuts` (alma, sudoc) est jugé par les états
+# du §6 et regles/decisions.yaml. `non_bloquant: true` : « à reprendre »
+# n'arrête pas la génération (repli + exception à reprendre). `alertes` :
+# alerte ajoutée au dossier pour un statut.
+
+extraction:
+  statuts:
+    json_valide: terminé
+    json_invalide: incident
+    confiance_basse: à reprendre     # seuil de confiance à fixer
+
 alma:
   routes: {these: /check/thesis, memoire: /check/dissertation}
   parametres:
@@ -33,6 +46,9 @@ sudoc:
 
 idref_personne:
   route: /align/person
+  statuts: {accepted: terminé, ambiguous: à reprendre, low_confidence: à reprendre, not_found: à reprendre}
+  alertes: {not_found: proto-notice d'autorité à créer}
+  non_bloquant: true
   parametres:
     accept_threshold: 0.5        # IDREF_ACCEPT_THRESHOLD (05/11 : 0.65 → 0.5)
     margin_threshold: 0.08       # IDREF_MARGIN_THRESHOLD
@@ -48,6 +64,9 @@ idref_personne:
 
 idref_organisations:
   route: /align/thesis-organizations
+  statuts: {accepted: terminé, ambiguous: à reprendre, low_confidence: à reprendre, not_found: à reprendre}
+  alertes: {not_found: proto-notice d'autorité à créer}
+  non_bloquant: true
   parametres:
     accept_threshold: 0.72       # IDREF_ORG_ACCEPT_THRESHOLD
     margin_threshold: 0.08       # IDREF_ORG_MARGIN_THRESHOLD
@@ -58,6 +77,9 @@ idref_organisations:
 
 dewey:
   route: /classify
+  # au_dessus_seuil / sous_seuil : calculés par le démonstrateur (DEWEY_SEUIL), pas par l'API
+  statuts: {au_dessus_seuil: terminé, sous_seuil: à reprendre}
+  non_bloquant: true
   parametres:
     classification_type: multi-label  # CLASSIFICATION_TYPE
     top_k: 5                          # CLASSIFICATION_TOP_K

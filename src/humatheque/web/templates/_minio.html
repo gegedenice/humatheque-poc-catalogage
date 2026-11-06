@@ -27,7 +27,7 @@
           {% if l.modifie %}<span class="puce bg-decision-clair text-decision-fonce" title="images changées depuis le dernier traitement : non retraité d'office">modifié</span>{% endif %}
           {% if l.nouveau %}<span class="puce bg-incident-clair text-incident-fonce">nouveau</span>
           {% elif l.etat != "termine" %}<span class="puce bg-primaire-clair text-primaire-fonce">en cours</span>
-          {% else %}<a class="no-underline" href="/dossiers/{{ l.dossier_id }}">{{ badge(l.routage or "auto") }}</a>{% endif %}
+          {% else %}<a class="no-underline" href="/dossiers/{{ l.dossier_id }}">{{ badge(l.routage or "terminé") }}</a>{% endif %}
         </span>
       </li>
       {% endfor %}

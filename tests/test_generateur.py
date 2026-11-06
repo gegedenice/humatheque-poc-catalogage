@@ -47,7 +47,7 @@ def test_328_reproduction_de_en_tete(originale, reproduction):
 def test_une_701_par_rapporteur_et_repli_sans_ppn(originale):
     rapporteurs = [z for z in originale.zones_de("701") if z.libelle == "rapporteur"]
     assert [z.texte() for z in rapporteurs] == ["701 #1$3TEST00004$4958$4555", "701 #1$aDurand$bClaire$4958$4555"]
-    assert "R048" in originale.replis
+    assert "701 (ligne 22)" in originale.replis
 
 
 def test_200g_unique_a_et_b(originale, regles):
@@ -93,7 +93,7 @@ def test_notice_originale_complete(originale):
         "711 02$aÉcole doctorale de l'EPHE$4996",
     ]
     # numero_nnt indisponible : 029 omise (§8.3 règle 4), alerte de priorité 1 (pas de bouchon)
-    assert originale.alertes == ["regle_prioritaire_omise:R002 R003"]
+    assert originale.alertes == ["zone 029 obligatoire non produite (ligne 2)"]
 
 
 def test_profil_reproduction_sans_029_et_avec_cotutelles(reproduction):
@@ -113,28 +113,28 @@ def test_sous_titre_repete_dans_la_meme_200(originale):
 
 def test_zones_annotees_par_ligne(originale):
     (z105,) = originale.zones_de("105")
-    assert [(r.id, r.statut) for r in z105.regles] == [("R009-R017", "à discuter")]
+    assert [(r.id, r.statut) for r in z105.regles] == [("105 (ligne 7)", "à valider")]
     (z102,) = originale.zones_de("102")
-    assert [(r.id, r.statut) for r in z102.regles] == [("R007", "seed")]
-    assert "R009-R017 [à discuter]" in vers_winibw(originale, annoter=True)
+    assert [(r.id, r.statut) for r in z102.regles] == [("102 (ligne 5)", "validée")]
+    assert "105 (ligne 7) [à valider]" in vers_winibw(originale, annoter=True)
 
 
 def test_inactives_listees_comme_non_couvertes(originale):
     non = {r.regle for r in originale.non_couvertes}
-    assert {"R023", "R029", "R037", "R040"} <= non
+    assert {"200 (ligne 27)", "330 (ligne 31)", "600 (ligne 34)"} <= non
     assert not originale.zones_de("330") and not originale.zones_de("600")
 
 
 def test_ligne_prioritaire_omise_alerte(regles):
     ctx = copy.deepcopy(THESE_ORIGINALE_EPHE) | {"titre_classement": None, "dewey": None, "author": []}
     n = generer(regles, ctx, ORIG)
-    assert "regle_prioritaire_omise:R044" in n.alertes  # 700 sans auteur
-    assert not n.zones_de("686") and "regle_prioritaire_omise:R043" in n.alertes
+    assert "zone 700 obligatoire non produite (ligne 19)" in n.alertes  # 700 sans auteur
+    assert not n.zones_de("686") and "zone 686 obligatoire non produite (ligne 18)" in n.alertes
     assert n.zones_de("200")[0].texte().startswith("200 1#$ele cas du Sénégal")  # $a omis
 
 
 def test_replis_annee(regles):
-    """Grist fait foi : 100$a 19XX, 214$d et 328$d 19.. (seule $d a un repli en 328)."""
+    """Replis d'année (ancienne spécification) : 100$a 19XX, 214$d et 328$d 19.. (seule $d a un repli en 328)."""
     n = generer(regles, copy.deepcopy(THESE_ORIGINALE_EPHE) | {"defense_year": None}, ORIG)
     assert _lignes(n, "100") == ["100 0#$a19XX"]
     assert _lignes(n, "214") == ["214 #1$d19.."]
@@ -150,9 +150,10 @@ def test_personne_sans_ppn_ni_nom_omise(regles):
     assert not [z for z in n.zones_de("701") if z.libelle == "rapporteur"]
 
 
-def test_statut_exclu(regles):
-    n = Generateur(regles, statuts_exclus=["rejeté", "à discuter"]).generer(THESE_ORIGINALE_EPHE, ORIG)
-    assert not n.zones_de("105") and not n.zones_de("686") and n.zones_de("102")
+def test_ligne_inactive_non_produite(regles_fabriquees):
+    regles_fabriquees.modifier_ligne(ORIG, "105 ##", actif=False)
+    n = Generateur(regles_fabriquees.charger()).generer(THESE_ORIGINALE_EPHE, ORIG)
+    assert not n.zones_de("105") and n.zones_de("102") and "105 (ligne 7)" in {r.regle for r in n.non_couvertes}
 
 
 def test_profil_inconnu(regles):

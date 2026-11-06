@@ -3,7 +3,6 @@
 .cache
 .env
 data
-grist-data
 tests
 reference
 !reference/moteur-regles/exemple_contexte.json

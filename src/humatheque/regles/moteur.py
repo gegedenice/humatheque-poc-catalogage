@@ -46,7 +46,7 @@ def regle(condition: str) -> rule_engine.Rule:
 
 # ------------------------------------------------------------------ décision
 class Evaluation(BaseModel):
-    id: str
+    nom: str
     si: str
     vraie: bool | None = Field(None, description="None : non évaluée (règle précédente retenue) ou erreur")
     erreur: str | None = None
@@ -56,17 +56,19 @@ class Choix(BaseModel):
     """Règle retenue pour des faits, et évaluation de chaque condition (banc d'essai)."""
 
     faits: dict[str, Any]
-    regle: dict[str, Any] = Field(description="règle retenue (ou `sinon`, id « sinon »)")
+    regle: dict[str, Any] = Field(description="règle retenue (ou `sinon`, nom « sinon »)")
     action: str
     suite: str
-    routage: str
+    issue: str = Field(description="terminé ou à reprendre")
     profil: str | None = None
     motif: str
     evaluations: list[Evaluation] = Field(default_factory=list)
 
 
 def _action(alors: str) -> dict[str, str]:
-    return conventions()["actions"].get(alors) or {"suite": "arreter", "routage": "décision"}
+    from humatheque import issues
+
+    return conventions()["actions"].get(alors) or {"suite": "arreter", "issue": issues.A_REPRENDRE}
 
 
 def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False) -> Choix:
@@ -75,26 +77,25 @@ def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False
     evaluations = []
     for r in regles.decisions:
         if retenue is not None and not tout_evaluer:
-            evaluations.append(Evaluation(id=r.id, si=r.si))
+            evaluations.append(Evaluation(nom=r.nom, si=r.si))
             continue
         try:
             vraie = regle(r.si).matches(faits)
-            evaluations.append(Evaluation(id=r.id, si=r.si, vraie=vraie))
+            evaluations.append(Evaluation(nom=r.nom, si=r.si, vraie=vraie))
         except rule_engine.errors.EngineError as e:
-            evaluations.append(Evaluation(id=r.id, si=r.si, erreur=getattr(e, "message", str(e))))
+            evaluations.append(Evaluation(nom=r.nom, si=r.si, erreur=getattr(e, "message", str(e))))
             continue
         if vraie and retenue is None:
             retenue = r
     if retenue is None:
-        s = regles.sinon
-        donnees = {"id": "sinon", **s}
+        donnees = {"nom": "sinon", **regles.sinon}
     else:
-        donnees = retenue.model_dump(exclude_none=True)
-    alors = str(donnees.get("alors", "décision"))
+        donnees = retenue.model_dump(exclude_none=True, exclude_defaults=True, by_alias=True)
+        donnees["nom"] = retenue.nom
+    alors = str(donnees.get("alors", "vérification"))
     a = _action(alors)
-    routage = str(donnees.get("routage") or a["routage"])
-    motif = str(donnees.get("motif") or f"{donnees['id']} : {alors}" + (f" ({donnees['profil']})" if donnees.get("profil") else ""))
-    return Choix(faits=faits, regle=donnees, action=alors, suite=a["suite"], routage=routage,
+    motif = str(donnees.get("motif") or donnees["nom"])
+    return Choix(faits=faits, regle=donnees, action=alors, suite=a["suite"], issue=a["issue"],
                  profil=donnees.get("profil"), motif=motif, evaluations=evaluations)
 
 
@@ -181,19 +182,15 @@ def variable_iteree(regles: Regles, l: Ligne) -> str | None:
                  and regles.variables[n].type in types), None)
 
 
-def generer(regles: Regles, profil: str, ctx: dict[str, Any], statuts_exclus: list[str] | None = None) -> Notice:
+def generer(regles: Regles, profil: str, ctx: dict[str, Any]) -> Notice:
     if profil not in regles.profils:
         raise GenerationEchec(f"profil inconnu : {profil}")
     p: Profil = regles.profils[profil]
-    exclus = set(statuts_exclus or [])
-    defaut = conventions().get("statut_par_defaut", "seed")
     notice = Notice(profil=profil, version_spec=regles.version)
     for l in p.lignes:
-        statut = l.statut or defaut
+        statut = l.statut
         if not l.actif:
             notice.non_couvertes.append(RegleNonCouverte(regle=l.trace, zone=l.etiquette, statut=statut))
-            continue
-        if statut in exclus:
             continue
         if l.si:
             try:
@@ -223,6 +220,6 @@ def generer(regles: Regles, profil: str, ctx: dict[str, Any], statuts_exclus: li
                 notice.zones.append(zone)
                 produit = True
         if not produit and l.priorite == 1:
-            notice.alertes.append(f"regle_prioritaire_omise:{l.trace}")
+            notice.alertes.append(f"zone {l.etiquette} obligatoire non produite (ligne {l.numero})")
     notice.trace.append(f"profil {profil} : {len(notice.zones)} zone(s)")
     return notice

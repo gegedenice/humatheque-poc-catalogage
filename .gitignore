@@ -7,7 +7,6 @@ __pycache__/
 
 # Données d'exécution
 data/
-grist-data/
 regles/archives/
 
 # Exécutable Tailwind téléchargé par `humatheque css`

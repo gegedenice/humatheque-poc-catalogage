@@ -1,4 +1,4 @@
-"""Fixtures communes : copie de regles/ et de spec/ dans une racine temporaire,
+"""Fixtures communes : copie de regles/ dans une racine temporaire,
 modifiable fichier par fichier (règles fabriquées pour le vérificateur)."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ RACINE = Path(__file__).resolve().parents[1]
 
 
 class ReglesFabriquees:
-    """Copie de regles/ (et spec/Statuts_services.csv) que l'on altère pour fabriquer des défauts."""
+    """Copie de regles/ que l'on altère pour fabriquer des défauts."""
 
     def __init__(self, racine: Path) -> None:
         self.racine = racine
@@ -42,18 +42,20 @@ class ReglesFabriquees:
         p["lignes"].append(ligne)
         self.ecrire(f"profils/{profil}.yaml", p)
 
-    def modifier_ligne(self, profil: str, ref: str, **champs: Any) -> None:
+    def modifier_ligne(self, profil: str, debut: str, **champs: Any) -> None:
+        """Modifie les lignes du profil qui commencent par `debut` (ex. « 101 0# »)."""
         p = self.lire(f"profils/{profil}.yaml")
-        cibles = [l for l in p["lignes"] if isinstance(l, dict) and l.get("ref") == ref]
-        assert cibles, f"{profil} : aucune ligne {ref}"
+        p["lignes"] = [l if isinstance(l, dict) else {"ligne": l} for l in p["lignes"]]
+        cibles = [l for l in p["lignes"] if l["ligne"].startswith(debut)]
+        assert cibles, f"{profil} : aucune ligne « {debut} »"
         for l in cibles:
             l.update(champs)
         self.ecrire(f"profils/{profil}.yaml", p)
 
-    def modifier_decision(self, id_: str, **champs: Any) -> None:
+    def modifier_decision(self, id_: str, **champs: Any) -> None:  # id_ : nom de la règle
         d = self.lire("decisions.yaml")
-        cibles = [r for r in d["regles"] if r["id"] == id_]
-        assert cibles, f"aucune décision {id_}"
+        cibles = [r for r in d["regles"] if r["nom"] == id_]
+        assert cibles, f"aucune décision « {id_} »"
         for r in cibles:
             r.update(champs)
         self.ecrire("decisions.yaml", d)
@@ -72,7 +74,6 @@ class ReglesFabriquees:
 @pytest.fixture
 def regles_fabriquees(tmp_path: Path) -> ReglesFabriquees:
     shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"))
-    shutil.copytree(RACINE / "spec", tmp_path / "spec")
     return ReglesFabriquees(tmp_path)
 
 

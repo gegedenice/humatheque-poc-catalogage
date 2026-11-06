@@ -4,6 +4,8 @@ est journalisée (qui / quand / quoi) ; le pipeline reprend ensuite par
 
 from __future__ import annotations
 
+from humatheque import issues
+
 import re
 
 from humatheque.config import charger_yaml
@@ -65,7 +67,7 @@ def declarer_faux_positif(d: Dossier, service: str, commentaire: str, auteur: st
     d.reinitialiser_depuis(reprise)
     etape = d.etapes[service]
     if etape.statut == "arret":  # arrêt sur la vérification elle-même : pas de nouvel appel
-        etape.statut, etape.routage, etape.motif = "ok", "auto", f"faux positif déclaré : {commentaire}"
+        etape.statut, etape.routage, etape.motif = "ok", issues.TERMINE, f"faux positif déclaré : {commentaire}"
     d.decision = None
     return d
 

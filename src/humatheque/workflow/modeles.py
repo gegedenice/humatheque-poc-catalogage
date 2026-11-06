@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator, Field
 
 from humatheque.contexte import Contexte
 from humatheque.conversion import NoticeConvertie
@@ -44,15 +44,23 @@ def maintenant() -> datetime:
     return datetime.now(UTC)
 
 
+def _issue(v):
+    from humatheque.issues import normaliser
+
+    return normaliser(v)
+
+
 class Etape(BaseModel):
     nom: str
     statut: str = "a_faire"
-    routage: str | None = None
+    routage: str | None = Field(None, description="issue de l'étape (humatheque.issues)")
     motif: str | None = None
     requete: Any = None
     reponse: Any = None
     appels: list[Appel] = Field(default_factory=list)
     duree: float | None = None
+
+    _norm_routage = field_validator("routage", mode="before")(classmethod(lambda cls, v: _issue(v)))
     erreur: str | None = None
     tentatives: int = 0
     debut: datetime | None = None
@@ -130,10 +138,12 @@ class Dossier(BaseModel):
     exceptions: list[ExceptionDossier] = Field(default_factory=list)
     journal: list[Evenement] = Field(default_factory=list)
 
-    routage: str | None = None
+    routage: str | None = Field(None, description="issue du dossier : terminé, à reprendre, incident")
     motif_arret: str | None = None
     etape_arret: str | None = None
     cloture: Cloture | None = None
+
+    _norm_routage = field_validator("routage", mode="before")(classmethod(lambda cls, v: _issue(v)))
 
     def noter(self, etape: str, type_: str, detail: Any, auteur: str = "système") -> None:
         self.journal.append(Evenement(etape=etape, type=type_, detail=detail, auteur=auteur))

@@ -20,7 +20,7 @@ def test_page_regles_onglets(client):
         r = client.get(f"/admin/regles?onglet={onglet}")
         assert r.status_code == 200 and attendu in html.unescape(r.text), onglet
     page = html.unescape(client.get("/admin/regles").text)
-    assert "S01" in page and 'alma == "présent"' in page and "cas non couvert" in page
+    assert "Notice déjà dans Alma" in page and 'alma == "présent"' in page and "cas non couvert" in page
     assert "Règles de catalogage" in client.get("/admin").text  # sous-menu des deux pages
 
 
@@ -28,7 +28,7 @@ def test_banc_d_essai(client):
     r = client.post("/admin/regles/essai", data={"type": "thèse", "provenance": "hors EPHE", "alma": "absent",
                                                 "sudoc": "originale imprimée"})
     texte = html.unescape(r.text)
-    assert r.status_code == 200 and "S02" in texte and "conversion" in texte
+    assert r.status_code == 200 and "Thèse hors EPHE, originale imprimée au Sudoc" in texte and "conversion" in texte
     assert texte.count("✓") >= 1 and "these-reproduction-imprimee" in texte
     r = client.post("/admin/regles/essai", data={"type": "thèse", "provenance": "EPHE", "alma": "absent",
                                                 "sudoc": "originale imprimée"})
@@ -41,7 +41,7 @@ def test_banc_d_essai_et_apercu_depuis_un_dossier(client, app):
     dossier = _televerser(client).headers["location"].rsplit("/", 1)[1]
     assert app.faits_dossier(dossier)["sudoc"] == "rien"
     r = client.post("/admin/regles/essai", data={"dossier": dossier})
-    assert "S08" in r.text and "dossier" in r.text
+    assert "Thèse EPHE absente du Sudoc" in r.text and "dossier" in r.text
     r = client.post("/admin/regles/apercu", data={"profil": "these-originale-imprimee", "dossier": dossier})
     assert r.status_code == 200 and "700" in r.text and "Variables du contexte" in html.unescape(r.text)
 
@@ -100,6 +100,6 @@ def test_api_regles(client):
     assert r["rapport"]["nb_erreurs"] == 0
     c = client.post("/api/v1/regles/decision", json={"faits": {"type": "thèse", "provenance": "EPHE",
                                                                "alma": "présent", "sudoc": "non vérifié"}}).json()
-    assert c["regle"]["id"] == "S01" and c["routage"] == "auto"
+    assert c["regle"]["nom"] == "Notice déjà dans Alma" and c["issue"] == "terminé"
     a = client.post("/api/v1/regles/apercu", json={"profil": "memoire-original-imprime"}).json()
     assert "701 #1$3026594803$4003" in a["texte"]

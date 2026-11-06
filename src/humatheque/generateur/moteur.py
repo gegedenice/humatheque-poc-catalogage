@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from humatheque.config import reglages
 from humatheque.contexte import variables_profil
 from humatheque.generateur.modeles import Notice
 from humatheque.regles.modeles import Regles
@@ -19,12 +18,11 @@ __all__ = ["GenerationEchec", "Generateur", "generer"]
 
 
 class Generateur:
-    def __init__(self, regles: Regles, statuts_exclus: list[str] | None = None) -> None:
+    def __init__(self, regles: Regles) -> None:
         self.regles = regles
-        self.exclus = statuts_exclus if statuts_exclus is not None else reglages().regles_statuts_exclus
 
     def generer(self, contexte: dict[str, Any], profil: str) -> Notice:
-        return remplir(self.regles, profil, variables_profil(contexte, self.regles), self.exclus)
+        return remplir(self.regles, profil, variables_profil(contexte, self.regles))
 
 
 def generer(regles: Regles, contexte: dict[str, Any], profil: str) -> Notice:

@@ -40,8 +40,8 @@
       {% if vue.origine %}<span class="puce bg-rail text-sourdine font-medium">{{ vue.origine }}</span>{% endif %}
     </div>
     {% if vue.motif_arret %}
-    <p class="avis {{ 'bg-auto-clair text-auto-fonce' if vue.routage == 'auto' else 'bg-decision-clair text-decision-fonce' }}">
-      <span class="font-semibold">{{ "✓ Arrêt sans intervention" if vue.routage == "auto" else "Arrêt" }}</span> : {{ vue.motif_arret }}</p>
+    <p class="avis {{ 'bg-auto-clair text-auto-fonce' if vue.routage == 'terminé' else 'bg-decision-clair text-decision-fonce' }}">
+      <span class="font-semibold">{{ "✓ Arrêt sans intervention" if vue.routage == "terminé" else "Arrêt" }}</span> : {{ vue.motif_arret }}</p>
     {% endif %}
     {% if vue.notice %}
     <pre class="font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words rounded-2xl border border-filet bg-[#fbfbfe] p-4 overflow-x-auto">{{ vue.notice | colorer_notice }}</pre>

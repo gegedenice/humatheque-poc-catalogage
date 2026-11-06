@@ -1,11 +1,11 @@
 {% from "_composants.html" import badge, vide, en_cours, repartition %}
-{% set filtres = [("tous", "Tous"), ("decisions", "Décisions"), ("sorties", "Sorties"), ("conversions", "Conversions"), ("incidents", "Incidents")] %}
+{% set filtres = [("tous", "Tous"), ("a_reprendre", "À reprendre"), ("incidents", "Incidents")] %}
 <div id="lot-dyn" class="flex flex-wrap gap-6 items-start"
      {% if vue.en_cours %}hx-get="/lots/{{ vue.lot.id }}/fragment?filtre={{ vue.filtre }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
   <div class="flex-[999_1_640px] min-w-0 flex flex-col gap-6">
   <section class="carte min-w-0 flex flex-col gap-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="mb-0 text-[22px]">File d'exceptions à reprendre</h2>
+      <h2 class="mb-0 text-[22px]">Documents à reprendre</h2>
       <nav class="flex flex-wrap gap-2" aria-label="Filtres">
         {% for code, libelle in filtres %}
         <a class="filtre {% if vue.filtre == code %}filtre-actif{% endif %}" href="/lots/{{ vue.lot.id }}?filtre={{ code }}"
@@ -16,7 +16,7 @@
     </div>
     {% if vue.file %}
     <div class="defilant"><table class="tableau min-w-[640px]">
-      <thead><tr><th>Document</th><th>Étape</th><th>Routage</th><th>Motif</th><th><span class="sr-only">Action</span></th></tr></thead>
+      <thead><tr><th>Document</th><th>Étape</th><th>Issue</th><th>Motif</th><th><span class="sr-only">Action</span></th></tr></thead>
       <tbody>
       {% for l in vue.file %}
         <tr class="{% if l.traite %}text-sourdine{% endif %}">
@@ -42,8 +42,8 @@
   </section>
 
   {% if vue.passes %}
-  <section class="carte min-w-0 flex flex-col gap-3" aria-label="Documents passés seuls">
-    <h2 class="mb-0">Documents passés seuls <span class="text-sourdine font-normal">({{ vue.passes | length }})</span></h2>
+  <section class="carte min-w-0 flex flex-col gap-3" aria-label="Documents terminés">
+    <h2 class="mb-0">Documents terminés <span class="text-sourdine font-normal">({{ vue.passes | length }})</span></h2>
     <div class="defilant"><table class="tableau min-w-[560px]">
       <thead><tr><th>Document</th><th>Résultat</th><th><span class="sr-only">Actions</span></th></tr></thead>
       <tbody>
@@ -51,7 +51,7 @@
         <tr>
           <td>{% if l.titre %}<span class="block font-semibold">{{ l.titre | truncate(70) }}</span>{% endif %}
             <span class="font-mono text-xs text-sourdine break-all">{{ l.document_id }}</span></td>
-          <td><span class="flex flex-col items-start gap-1">{{ badge("auto") }}<span class="text-sourdine">{{ l.motif or "" }}</span>
+          <td><span class="flex flex-col items-start gap-1">{{ badge("terminé") }}<span class="text-sourdine">{{ l.motif or "" }}</span>
             {% if l.repris %}<span class="text-xs text-sourdine">repris par un catalogueur</span>{% endif %}</span></td>
           <td class="whitespace-nowrap text-right">
             <a class="btn-tonal btn-sm" href="/dossiers/{{ l.dossier_id }}/apercu">Voir</a>
@@ -67,7 +67,7 @@
   <aside class="flex-[1_1_320px] min-w-0 flex flex-col gap-6 lg:sticky lg:top-3">
     {% if vue.indicateurs.par_routage %}
     <section class="carte">
-      <h2>Répartition des routages</h2>
+      <h2>Répartition des issues</h2>
       {{ repartition(vue.indicateurs.par_routage) }}
       <ul class="mt-3 space-y-1.5 text-sm">
         {% for r, n in vue.indicateurs.par_routage.items() %}

@@ -1,23 +1,19 @@
 # Conventions de lecture des règles (SPEC §7, §8). Aucune règle UNIMARC ni aucune
 # décision ici : elles sont dans regles/ ; ce fichier dit seulement comment les lire.
 
-# Actions de decisions.yaml : suite du workflow et routage par défaut.
+# Actions de decisions.yaml : suite du workflow et issue du document
+# (terminé : rien à faire ; à reprendre : un catalogueur doit trancher).
 actions:
-  création:   {suite: creer, routage: auto}
-  conversion: {suite: convertir, routage: conversion}
-  arrêt:      {suite: arreter, routage: sortie}
-  décision:   {suite: arreter, routage: décision}
-
-# Routages admis (decisions.yaml, Statuts_services).
-routages: [auto, décision, sortie, conversion, incident]
+  création:     {suite: creer, issue: terminé}
+  conversion:   {suite: convertir, issue: terminé}
+  arrêt:        {suite: arreter, issue: terminé}
+  vérification: {suite: arreter, issue: à reprendre}
 
 # Attributs d'une variable selon son type (variables.yaml).
 attributs:
   personne: [forme, nom, prenom, ppn]
   organisme: [forme, ppn]
 
-# Statut d'une ligne de profil sans statut déclaré.
-statut_par_defaut: seed
 
 # Contrôle de complétude du vérificateur (§8.4) : produit des valeurs de ces
 # faits, les autres fixés, en écartant les combinaisons incompatibles.
@@ -30,9 +26,3 @@ completude:
 faits:
   type: {these: thèse, memoire: mémoire}
   provenance: {EPHE: EPHE, "hors EPHE": "hors EPHE", absent: incertaine, ambigu: incertaine, mémoire: sans objet}
-
-# Statuts_services (spec/Statuts_services.csv ou Grist) : services dont le
-# routage ne vient pas de cette table (§7) ; seuls les statuts listés y sont lus.
-services_routage_par_etats:
-  alma-checker: [error]
-  sudoc-checker: [error]

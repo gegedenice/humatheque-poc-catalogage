@@ -1,34 +1,12 @@
-# Moteur de décision (SPEC §7). Les décisions sont dans regles/decisions.yaml,
-# les routages des services dans Statuts_services ; ce fichier dit seulement
-# comment appliquer les routages.
+# Moteur de décision (SPEC §7). Les décisions sont dans regles/decisions.yaml ;
+# l'issue des réponses de services dans config/services.yaml (`statuts`).
 
-# Routage qui crée une exception sans être plus sévère qu'une décision.
-routage_decision: décision
-
-# Sévérité décroissante : routage final du dossier = le plus sévère de ses étapes.
-ordre_routages: [incident, sortie, conversion, décision, auto]
-
-# Routage d'un statut de service absent de Statuts_services.
+# Statut de service absent de config/services.yaml : incident.
 statut_inconnu:
-  routage: incident
   motif: statut de service inconnu
 
-# Services dont un routage « décision » n'arrête pas la génération : on
-# utilise le repli et une exception est créée (SPEC §7).
-decision_non_bloquante:
-  - idref-linker /align/person
-  - idref-linker /align/thesis-organizations
-  - dewey-classifier
-
-# Alertes ajoutées pour un (service, statut).
-alertes_statut:
-  idref-linker /align/person:
-    not_found: proto-notice d'autorité à créer
-  idref-linker /align/thesis-organizations:
-    not_found: proto-notice d'autorité à créer
-
 # Valeur d'etat_sudoc quand sudoc-checker n'est pas appelé (notice trouvée
-# dans Alma : arrêt, S01 correspond par son joker).
+# dans Alma : arrêt).
 etat_sudoc_non_verifie: non vérifié
 
 # Motifs d'arrêt du workflow (SPEC §3.1, §6).

@@ -6,7 +6,7 @@
 
   {# ---------------------------------------------------------------- onglets #}
   {# Reprise (résolutions, SPEC §9.3) : onglet discret, présent seulement s'il y a quelque chose à reprendre. #}
-  {% set a_reprendre = vue.etat == "termine" and ((d.exceptions | rejectattr("resolue") | list) or (d.routage not in (none, "auto") and not d.cloture)) %}
+  {% set a_reprendre = vue.etat == "termine" and ((d.exceptions | rejectattr("resolue") | list) or (d.routage not in (none, "terminé") and not d.cloture)) %}
   {% set onglets = [("notice", "Notice"), ("metadonnees", "Métadonnées"), ("services", "Services"),
                     ("reponses", "Réponses brutes"), ("journal", "Journal (" ~ (d.journal | length) ~ ")")] %}
   {% if a_reprendre %}{% set onglets = onglets + [("reprise", "Reprise" ~ (" (" ~ vue.exceptions_ouvertes ~ ")" if vue.exceptions_ouvertes else ""))] %}{% endif %}
@@ -53,7 +53,7 @@
             <tr>
               <td class="font-mono text-xs break-words min-w-[14rem]">{{ z.texte() }}</td>
               <td class="text-[11px] text-sourdine w-40">
-                {% for r in z.regles %}<span title="statut {{ r.statut }}">{{ r.id }}{% if r.statut != "seed" %}·{{ r.statut }}{% endif %}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+                {% for r in z.regles %}<span>{{ r.id }}{% if r.statut == "à valider" %} · à valider{% endif %}</span>{% if not loop.last %}, {% endif %}{% endfor %}
                 {% if z.libelle %}<br>{{ z.libelle }}{% endif %}
               </td>
             </tr>
@@ -117,13 +117,13 @@
         {% endif %}
         {% if d.decision %}
         <p class="text-sm">Faits <span class="font-mono text-xs">{{ d.decision.texte_faits() if d.decision.faits else "—" }}</span>
-          → règle <span class="font-semibold">{{ d.decision.situation or "sinon" }}</span> {{ badge(d.decision.routage) }}</p>
+          → <span class="font-semibold">{{ d.decision.situation or "sinon" }}</span> {{ badge(d.decision.routage) }}</p>
         {% if d.decision.ligne %}
         <dl class="text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 bg-white rounded-xl p-3">
           {% if d.decision.ligne.si %}<dt class="text-sourdine">Condition</dt><dd class="font-mono break-words">{{ d.decision.ligne.si }}</dd>{% endif %}
           <dt class="text-sourdine">Action</dt><dd>{{ d.decision.ligne.alors or d.decision.action }}{% if d.decision.ligne.profil %} · profil {{ d.decision.ligne.profil }}{% endif %}</dd>
           {% if d.decision.ligne.motif %}<dt class="text-sourdine">Motif</dt><dd>{{ d.decision.ligne.motif }}</dd>{% endif %}
-          {% if d.decision.ligne.statut %}<dt class="text-sourdine">Statut</dt><dd>{{ d.decision.ligne.statut }}</dd>{% endif %}
+          {% if d.decision.ligne.get("à_valider") %}<dt class="text-sourdine">Règle</dt><dd><span class="puce bg-decision-clair text-decision-fonce">à valider</span></dd>{% endif %}
         </dl>
         {% endif %}
         {% endif %}

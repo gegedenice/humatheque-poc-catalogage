@@ -23,6 +23,7 @@ from humatheque.application.vues import (
     Accueil, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
     LigneException, LigneJournal, Reglable, ResumeLot, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
 )
+from humatheque import issues
 from humatheque.config import charger_yaml
 from humatheque import ingestion
 from humatheque.config import Reglages, reglages as reglages_par_defaut
@@ -36,12 +37,11 @@ from humatheque.workflow import resolution as res
 
 LIBELLES_ETAPES = {
     "extraction": "Extraction VLM", "provenance": "Provenance", "alma": "Vérification Alma",
-    "sudoc": "Vérification Sudoc", "situation": "Situation", "conversion": "Conversion",
+    "sudoc": "Vérification Sudoc", "situation": "Décision", "conversion": "Conversion",
     "idref_personnes": "IdRef — personnes", "idref_organisations": "IdRef — organismes",
     "dewey": "Classification Dewey", "generation": "Générateur UNIMARC",
 }
-FILTRES = {"tous": None, "decisions": "décision", "sorties": "sortie", "conversions": "conversion",
-           "incidents": "incident"}
+FILTRES = {"tous": None, "a_reprendre": issues.A_REPRENDRE, "incidents": issues.INCIDENT}
 FOURNISSEURS = ["vlm", "openai", "hf", "albert"]
 
 
@@ -110,10 +110,7 @@ class Application(Administration, AdministrationRegles):
     # ============================================================ règles (SPEC §8)
     def etat_spec(self) -> EtatSpec:
         s, r = self.regles, self._rapport
-        grist = None
-        if self.reglages.spec_source == "grist":
-            grist = not any("Grist injoignable" in a for a in s.avertissements)
-        return EtatSpec(source=s.source, emplacement=s.emplacement, version=s.version, grist_joignable=grist,
+        return EtatSpec(emplacement=s.emplacement, version=s.version,
                         avertissements=s.avertissements, constats=r.constats,
                         nb_erreurs=len(r.erreurs), nb_avertissements=len(r.avertissements))
 
@@ -243,7 +240,7 @@ class Application(Administration, AdministrationRegles):
             services.reglages_lot = (lot.parametres if lot else {}).get("services") or {}
             Workflow(services).executer(d, depuis)
         except Exception as e:  # garde-fou : un dossier ne reste jamais « en cours »
-            d.routage, d.motif_arret = "incident", f"erreur inattendue : {e}"
+            d.routage, d.motif_arret = issues.INCIDENT, f"erreur inattendue : {e}"
             d.noter("dossier", "alerte", d.motif_arret)
         self._enregistrer_production(d)
         self.store.enregistrer_dossier(d, ligne.lot_id, ligne.rang, "termine")
@@ -284,13 +281,13 @@ class Application(Administration, AdministrationRegles):
             if ligne.etat != "termine":
                 ind.en_cours += 1
                 continue
-            routage = d.routage or "auto"
+            routage = d.routage or issues.TERMINE
             ind.par_routage[routage] = ind.par_routage.get(routage, 0) + 1
             if repris:
                 ind.repris += 1
-            if routage == "auto" and not repris:
+            if routage == issues.TERMINE and not repris:
                 ind.passes_seuls += 1
-            elif routage != "auto" and d.cloture is None:
+            elif routage != issues.TERMINE and d.cloture is None:
                 ind.en_attente += 1
         return ind
 
@@ -323,11 +320,11 @@ class Application(Administration, AdministrationRegles):
         dossiers = self.store.dossiers_du_lot(lot_id)
         file, passes = [], []
         for ligne, d in dossiers:
-            if ligne.etat == "termine" and (d.routage or "auto") == "auto":
+            if ligne.etat == "termine" and (d.routage or issues.TERMINE) == issues.TERMINE:
                 passes.append(LigneException(
                     dossier_id=d.id, document_id=d.document.id, titre=(d.metadonnees or {}).get("title"),
                     etape=d.etape_arret, etape_libelle=LIBELLES_ETAPES.get(d.etape_arret or "", d.etape_arret),
-                    motif=d.motif_arret or (d.decision.motif if d.decision else None), routage="auto",
+                    motif=d.motif_arret or (d.decision.motif if d.decision else None), routage=issues.TERMINE,
                     repris=any(e.type == "resolution" for e in d.journal)))
                 continue
             if ligne.etat != "termine":
@@ -340,7 +337,7 @@ class Application(Administration, AdministrationRegles):
             file.append(LigneException(
                 dossier_id=d.id, document_id=d.document.id, titre=(d.metadonnees or {}).get("title"),
                 etape=etape, etape_libelle=LIBELLES_ETAPES.get(etape or "", etape), motif=motif,
-                routage=d.routage or "auto", traite=d.cloture is not None,
+                routage=d.routage or issues.TERMINE, traite=d.cloture is not None,
                 repris=any(e.type == "resolution" for e in d.journal), nb_exceptions=len(ouvertes)))
         file.sort(key=lambda l: l.traite)
         return VueLot(lot=lot, indicateurs=self._indicateurs(dossiers), en_cours=lot.termine_le is None,
@@ -364,15 +361,15 @@ class Application(Administration, AdministrationRegles):
         fins = []
         for ligne, d in dossiers:
             if ligne.etat == "termine":
-                texte = f"{d.document.id} → {d.routage or 'auto'}"
+                texte = f"{d.document.id} → {d.routage or issues.TERMINE}"
                 if d.motif_arret:
                     texte += f" ({d.motif_arret[:90]})"
                 fins.append(LigneJournal(horodatage=ligne.maj_le, texte=texte))
         j += sorted(fins, key=lambda l: l.horodatage or lot.cree_le)
         if lot.termine_le:
-            auto = sum(1 for _, d in dossiers if (d.routage or "auto") == "auto")
+            auto = sum(1 for _, d in dossiers if (d.routage or issues.TERMINE) == issues.TERMINE)
             j.append(LigneJournal(horodatage=lot.termine_le,
-                                  texte=f"lot clos : {auto} notice(s) sans exception, {len(dossiers) - auto} à reprendre"))
+                                  texte=f"lot clos : {auto} terminé(s), {len(dossiers) - auto} à reprendre ou en incident"))
         return j
 
     def historique(self) -> Historique:
@@ -423,7 +420,7 @@ class Application(Administration, AdministrationRegles):
             notice, origine = d.notice_convertie.texte, f"notice convertie depuis le PPN {d.ppn_source}"
         profil = (d.notice.profil if d.notice else None) or (d.notice_convertie.profil_cible if d.notice_convertie else None)
         return VueApercu(dossier_id=d.id, lot_id=v.lot_id, document_id=d.document.id,
-                         type_document=d.document.type_document, titre=v.titre, routage=d.routage or "auto",
+                         type_document=d.document.type_document, titre=v.titre, routage=d.routage or issues.TERMINE,
                          situation=d.decision.situation if d.decision else None, motif_arret=d.motif_arret,
                          images=v.images, notice=notice, origine=origine, profil=profil, alertes=d.alertes,
                          telechargements=v.telechargements)
@@ -521,10 +518,10 @@ class Application(Administration, AdministrationRegles):
             raise Introuvable(f"lot {lot_id}")
         sortie = io.StringIO()
         w = csv.writer(sortie)
-        w.writerow(["document", "dossier", "routage", "situation", "etape_arret", "motif", "ppn_alma",
+        w.writerow(["document", "dossier", "issue", "regle_de_decision", "etape_arret", "motif", "ppn_alma",
                     "ppn_source", "exceptions_ouvertes", "traite_hors_outil", "alertes", "version_spec"])
         for ligne, d in self.store.dossiers_du_lot(lot_id):
-            w.writerow([d.document.id, d.id, d.routage or ("en cours" if ligne.etat != "termine" else "auto"),
+            w.writerow([d.document.id, d.id, d.routage or ("en cours" if ligne.etat != "termine" else issues.TERMINE),
                         d.decision.situation if d.decision else "", d.etape_arret or "", d.motif_arret or "",
                         d.alma.ppn if d.alma and d.alma.ppn else "", d.ppn_source or "",
                         sum(1 for e in d.exceptions if not e.resolue), "oui" if d.cloture else "",

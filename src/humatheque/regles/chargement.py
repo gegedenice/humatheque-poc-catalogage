@@ -1,5 +1,4 @@
-"""Chargement des règles (SPEC §8) : `regles/*.yaml` (PyYAML) et `Statuts_services`
-(`spec/Statuts_services.csv`, ou Grist selon `SPEC_SOURCE`, avec repli sur le CSV).
+"""Chargement des règles (SPEC §8) : `regles/*.yaml` (PyYAML).
 
 `construire` lit des textes YAML (fichiers ou brouillons de l'interface) :
 une erreur de syntaxe ou de structure lève `ReglesInvalides` avec le fichier
@@ -8,24 +7,20 @@ et la ligne, sans rien deviner.
 
 from __future__ import annotations
 
-import csv
 import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-import httpx
 import yaml
 from pydantic import ValidationError
 
 from humatheque.config import Reglages, reglages as reglages_par_defaut
-from humatheque.regles.grist import GristInjoignable, lire_tables_grist
-from humatheque.regles.modeles import Ligne, Profil, RegleDecision, Regles, StatutService, Variable
+from humatheque.regles.modeles import Ligne, Profil, RegleDecision, Regles, Variable
 
 FICHIER_VARIABLES = "variables.yaml"
 FICHIER_DECISIONS = "decisions.yaml"
 DOSSIER_PROFILS = "profils"
-TABLE_STATUTS = "Statuts_services"
 
 
 class ReglesInvalides(Exception):
@@ -75,26 +70,14 @@ def _erreurs_pydantic(rel: str, lieu: str, e: ValidationError) -> list[tuple[str
     return [(rel, lieu, f"{'.'.join(str(x) for x in err['loc'])} : {err['msg']}") for err in e.errors()]
 
 
-def lire_statuts_csv(dossier: Path) -> list[dict[str, Any]]:
-    chemin = dossier / f"{TABLE_STATUTS}.csv"
-    if not chemin.exists():
-        raise ReglesInvalides([(f"{TABLE_STATUTS}.csv", "", f"table introuvable dans {dossier}")])
-    with chemin.open(encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
-
-
-def _empreinte(textes: dict[str, str], statuts: list[StatutService]) -> str:
+def _empreinte(textes: dict[str, str]) -> str:
     h = hashlib.sha256()
     for rel in sorted(textes):
         h.update(rel.encode() + b"\0" + textes[rel].encode("utf-8") + b"\0")
-    for s in statuts:
-        h.update(repr(s.model_dump()).encode("utf-8"))
     return h.hexdigest()[:12]
 
 
-def construire(textes: dict[str, str], statuts_bruts: list[dict[str, Any]], *, emplacement: str,
-               source: Literal["csv", "grist"] = "csv", emplacement_statuts: str = "",
-               avertissements: list[str] | None = None) -> Regles:
+def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
     problemes: list[tuple[str, str, str]] = []
 
     # --- variables.yaml
@@ -146,44 +129,17 @@ def construire(textes: dict[str, str], statuts_bruts: list[dict[str, Any]], *, e
             problemes.append((rel, "", f"profil « {profil.profil} » déjà défini dans {profils[profil.profil].fichier}"))
         profils[profil.profil] = profil
 
-    statuts = []
-    for i, s in enumerate(statuts_bruts, start=2):
-        if not any(str(v or "").strip() for v in s.values()):
-            continue
-        try:
-            statuts.append(StatutService.model_validate(s))
-        except ValidationError as e:
-            problemes += _erreurs_pydantic(f"{TABLE_STATUTS}", f"ligne {i}", e)
     if problemes:
         raise ReglesInvalides(problemes)
     return Regles(variables=variables, profils=profils, faits=faits, decisions=decisions, sinon=sinon,
-                  statuts_services=statuts, source=source, emplacement=emplacement,
-                  emplacement_statuts=emplacement_statuts, horodatage=datetime.now(UTC),
-                  empreinte=_empreinte(textes, statuts), avertissements=avertissements or [], textes=dict(textes))
-
-
-def lire_statuts(r: Reglages, source: Literal["csv", "grist"] | None = None,
-                 client: httpx.Client | None = None) -> tuple[list[dict[str, Any]], str, str, list[str]]:
-    """(lignes, source effective, emplacement, avertissements) de Statuts_services."""
-    source = source or r.spec_source
-    if source == "grist":
-        try:
-            tables = lire_tables_grist(r.grist_url, r.grist_doc_id, r.grist_api_key.get_secret_value(),
-                                       [TABLE_STATUTS], timeout=r.http_timeout, client=client)
-            return tables[TABLE_STATUTS], "grist", f"{r.grist_url}/doc/{r.grist_doc_id}", []
-        except GristInjoignable as e:
-            alerte = f"Grist injoignable ({e}) : repli sur {r.dossier_spec / (TABLE_STATUTS + '.csv')}"
-            return lire_statuts_csv(r.dossier_spec), "csv", str(r.dossier_spec), [alerte]
-    return lire_statuts_csv(r.dossier_spec), "csv", str(r.dossier_spec), []
+                  emplacement=emplacement, horodatage=datetime.now(UTC), empreinte=_empreinte(textes),
+                  textes=dict(textes))
 
 
 def charger_regles(reglages: Reglages | None = None, *, dossier: Path | None = None,
-                   source: Literal["csv", "grist"] | None = None, client: httpx.Client | None = None,
                    brouillons: dict[str, str] | None = None) -> Regles:
     """Charge `REGLES_DIR` (ou `dossier`) ; `brouillons` remplace le texte de certains fichiers."""
     r = reglages or reglages_par_defaut()
     dossier = dossier or r.dossier_regles
     textes = {**lire_textes(dossier), **(brouillons or {})}
-    statuts, src, empl, avert = lire_statuts(r, source, client)
-    return construire(textes, statuts, emplacement=str(dossier), source=src, emplacement_statuts=empl,
-                      avertissements=avert)
+    return construire(textes, emplacement=str(dossier))

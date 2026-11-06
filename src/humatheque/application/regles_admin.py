@@ -20,7 +20,7 @@ from humatheque.application import ActionImpossible, Introuvable  # définies av
 from humatheque.contexte import construire, variables_profil
 from humatheque.generateur import vers_winibw
 from humatheque.regles.chargement import ReglesInvalides, charger_regles, fichiers_regles
-from humatheque.regles.moteur import Choix, choisir, generer, productible, variable_iteree
+from humatheque.regles.moteur import Choix, choisir, conventions, generer, productible, variable_iteree
 from humatheque.regles.verificateur import Rapport, verifier, verifier_textes
 
 if TYPE_CHECKING:
@@ -34,8 +34,7 @@ class LigneProfilVue(BaseModel):
     numero: int
     ligne: str
     etiquette: str
-    ref: str | None
-    statut: str
+    a_valider: bool
     priorite: int | None
     remarque: str | None
     si: str | None
@@ -97,15 +96,18 @@ class AdministrationRegles:
         r = self.regles
         profils = []
         for nom, p in r.profils.items():
-            lignes = [LigneProfilVue(numero=l.numero, ligne=l.ligne, etiquette=l.etiquette, ref=l.ref,
-                                     statut=l.statut or "seed", priorite=l.priorite, remarque=l.remarque, si=l.si,
+            lignes = [LigneProfilVue(numero=l.numero, ligne=l.ligne, etiquette=l.etiquette,
+                                     a_valider=l.a_valider, priorite=l.priorite, remarque=l.remarque, si=l.si,
                                      joindre=l.joindre, actif=l.actif, productible=productible(r, l),
                                      repetee_sur=variable_iteree(r, l)) for l in p.lignes]
             profils.append(ProfilVue(profil=nom, libelle=p.libelle, fichier=p.fichier, variables=p.variables,
-                                     lignes=lignes, decisions=[d.id for d in r.decisions if d.profil == nom]))
+                                     lignes=lignes, decisions=[d.nom for d in r.decisions if d.profil == nom]))
         variables = [{"nom": n, **v.model_dump(exclude={"nom"})} for n, v in r.variables.items()]
+        actions = conventions()["actions"]
         return VueRegles(version=r.version, emplacement=r.emplacement, rapport=self._rapport, faits=r.faits,
-                         decisions=[d.model_dump(exclude_none=True) for d in r.decisions], sinon=r.sinon,
+                         decisions=[{**d.model_dump(exclude_none=True),
+                                     "issue": (actions.get(d.alors) or {}).get("issue")} for d in r.decisions],
+                         sinon={**r.sinon, "issue": (actions.get(r.sinon.get("alors")) or {}).get("issue")},
                          profils=profils, variables=variables, fichiers=list(r.textes), journal=self.journal_regles())
 
     def fichiers_regles(self: "Application") -> dict[str, str]:
@@ -161,7 +163,7 @@ class AdministrationRegles:
                 raise ActionImpossible(f"exemple de contexte introuvable ({EXEMPLE}) : choisissez un dossier")
             variables = json.loads(chemin.read_text(encoding="utf-8"))
             source = "exemple (reference/moteur-regles/exemple_contexte.json)"
-        n = generer(self.regles, profil, variables, self.reglages.regles_statuts_exclus)
+        n = generer(self.regles, profil, variables)
         return Apercu(profil=profil, source=source, texte=vers_winibw(n), annote=vers_winibw(n, annoter=True),
                       alertes=n.alertes, non_couvertes=[f"{x.zone} [{x.regle}]" for x in n.non_couvertes],
                       variables=variables)

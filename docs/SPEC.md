@@ -29,11 +29,10 @@ humatheque-catalogage/
   CLAUDE.md  docs/SPEC.md  pyproject.toml  .env.example
   Dockerfile  docker-compose.yml
   regles/                   règles de catalogage (§8) : variables.yaml, profils/*.yaml, decisions.yaml
-  spec/                     instantané Grist de Statuts_services (CSV)
   reference/                POC, maquette, mindmap, moteur-regles/ (lecture seule)
   src/humatheque/
     config.py               settings pydantic (env), chemins, seuils
-    cli.py                  serve | check-spec | run-url | run-batch | scan-minio | spec-export | spec-import
+    cli.py                  serve | check-spec | run-url | run-batch | scan-minio | css
     ingestion/              lecture du bucket MinIO, constitution des documents (§3)
     texte_unimarc/          normalisation de chaînes, « module NOR » du wiki (§4)
       _vendor/reaccentue/   reaccentue vendorisé (+ dico/)
@@ -42,8 +41,8 @@ humatheque-catalogage/
     contexte/               adaptateur extraction → Contexte + fonctions de calcul
     services/               clients HTTP : alma, sudoc, idref, dewey
     qualification/          agrégation des thesis_state Sudoc en état du document (pas d'appel réseau)
-    regles/                 chargement des règles YAML et de Statuts_services, moteur, vérificateur
-    decision/               décisions (rule-engine) + Statuts_services, provenance
+    regles/                 chargement des règles YAML, moteur, vérificateur
+    decision/               décisions (rule-engine), issue des réponses de services, provenance
     conversion/             conversion d'une notice Sudoc existante (copie en v1)
     generateur/             remplissage des profils + sérialisation
     workflow/               orchestrateur : un document → un Dossier
@@ -107,7 +106,7 @@ mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
   illisible, extraction ne renvoyant aucune métadonnée du schéma (page ne
   correspondant à rien) ou sans titre (décision du 05/11 : les vérifications
   Alma et Sudoc exigent un titre). Le document est signalé avec l'alerte
-  `document_invalide` et le motif, routage `décision`.
+  `document_invalide` et le motif, issue « à reprendre ».
 - **Sélection manuelle** (ING-F-005) : la page `/` liste les dossiers du bucket
   (déjà traités ou non, avec leur dernier statut) et permet d'en lancer une
   sélection. `humatheque scan-minio` fait la même chose en ligne de commande.
@@ -309,7 +308,7 @@ dans le dossier :
    - `ambigu` : correspondance partielle (par exemple « hautes études » sans
      « pratique »), ou EPHE présente seulement dans `co_tutelle_institutions`.
 
-   `absent` et `ambigu` arrêtent le document (routage `décision`, motif
+   `absent` et `ambigu` arrêtent le document (issue « à reprendre », motif
    « provenance à confirmer ») ; le catalogueur choisit EPHE ou hors EPHE et le
    pipeline reprend à l'étape 3. La règle appliquée et la forme comparée sont
    journalisées. **Modèle de décision** (optionnel, désactivé par défaut,
@@ -318,9 +317,9 @@ dans le dossier :
 3. **alma-checker** (`https://alma-checker.smartbiblia.fr`, route
    `/check/thesis` ou `/check/dissertation`). **Au moins une notice trouvée
    arrête le pipeline.** Décision du 05/11 : une notice au-dessus de
-   `match_threshold` arrête **sans alerte** (S01, routage `auto`, affiché en
+   `match_threshold` arrête **sans alerte** (« Notice déjà dans Alma », issue « terminé », affiché en
    vert) ; seul un candidat incertain (entre `ambiguous_threshold` et
-   `match_threshold`, ou hors type TU) part en décision (S14) :
+   `match_threshold`, ou hors type TU) est à reprendre (« Candidat Alma à vérifier ») :
 
    | Statut alma-checker | État Alma | Motif affiché |
    |---|---|---|
@@ -355,7 +354,7 @@ dans le dossier :
    - état du document = le plus fort parmi les candidats retenus, dans l'ordre
      `originale imprimée > reproduction imprimée > reproduction microfiche >
      électronique seule` ;
-   - un candidat retenu `unknown` donne `indéterminé` (routage `décision`,
+   - un candidat retenu `unknown` donne `indéterminé` (issue « à reprendre »,
      motif « nature de la notice Sudoc non qualifiable ») : cette notice
      pourrait être l'originale, on ne tranche pas à sa place. **Exception** :
      si une originale imprimée est déjà retenue, l'`unknown` ne change rien et
@@ -364,7 +363,7 @@ dans le dossier :
      `ambiguous_print_candidate`, sinon `rien` ;
    - erreur du service (réponse HTTP 4xx/5xx ou service injoignable ; le
      service n'a pas de statut `error`), ou `thesis_state` absent de la
-     réponse (version du service antérieure) : routage `incident`, sans repli.
+     réponse (version du service antérieure) : issue « incident », sans repli.
 
    Le dossier affiche le tableau de tous les candidats (PPN, score, `carrier`,
    `thesis_state`, retenu oui/non) et l'état agrégé avec sa justification.
@@ -395,13 +394,13 @@ pas rappelées, sauf demande explicite (ING-F-007).
 est imposé ; la route appelée dépend du type de document (ING-T-005).
 
 **Reprise après vérification manuelle** (ALM-SUD-006) : quand le traitement
-s'arrête sur une vérification Alma ou Sudoc (situation de type sortie ou
+s'arrête sur une vérification Alma ou Sudoc (document à reprendre ou
 décision), le catalogueur peut, après contrôle, déclarer le résultat non
 pertinent (faux positif) avec un commentaire. Le pipeline reprend alors à
 l'étape suivant le point d'arrêt, avec l'état corrigé (`absent` pour Alma,
 `rien` pour Sudoc) ; la correction est journalisée.
 
-**Gestion des erreurs** : toutes donnent un routage `incident` avec un motif
+**Gestion des erreurs** : toutes donnent l'issue « incident » avec un motif
 explicite et l'arrêt du document.
 
 | Situation | Statut de l'étape | Reprise |
@@ -430,16 +429,26 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
   conditions sont des expressions `rule-engine` (`==`, `!=`, `in [...]`, `and`,
   `or`, `not`, comparaisons numériques), ce qui permet d'ajouter plus tard des
   faits produits par un modèle de décision (`qualite_extraction < 0.6`).
-- **Actions** : `création` (profil), `conversion` (profil cible), `arrêt`
-  (motif), `décision` (motif). **Routage** : champ `routage` de la règle ; à
-  défaut `auto` pour une création, `conversion` pour une conversion, `sortie`
-  pour un arrêt, `décision` pour une décision.
-- **Décision du 05/11** : une notice trouvée au-dessus du seuil (Alma
-  `présent`, candidat Sudoc retenu au-dessus de `duplicate_threshold`) arrête
-  le workflow **sans alerte** : `routage: auto` sur S01, S02 à S07 et S13,
-  affiché en vert. Seul le cas incertain part en décision : Alma `incertain`
-  (S14) ou Sudoc `ambigu` / `indéterminé` (S10).
-- **`sinon`** : routage `décision`, motif « situation non prévue », faits affichés.
+- **Règles nommées** : chaque règle porte un `nom` en clair, qui sert
+  d'identifiant (unique) et s'affiche dans le dossier, le rapport et
+  l'administration (« Notice déjà dans Alma », « Thèse EPHE absente du Sudoc »…).
+  `à_valider: true` signale une règle encore en discussion (décision du 06/11 :
+  plus d'identifiants hérités de Grist).
+- **Actions et issue** : l'issue du document découle de l'action, sans champ
+  `routage` (décision du 06/11) :
+
+  | Action | Effet | Issue |
+  |---|---|---|
+  | `création` (profil) | la notice est produite | Terminé |
+  | `conversion` (profil cible) | la notice Sudoc est dérivée | Terminé |
+  | `arrêt` (motif) | rien à produire (notice déjà au catalogue) | Terminé |
+  | `vérification` (motif) | un catalogueur doit trancher | À reprendre |
+
+  Une panne technique donne l'issue **Incident**, sans règle. Décision du
+  05/11 : une notice trouvée au-dessus du seuil arrête sans alerte (terminé) ;
+  seul le cas incertain est à reprendre (Alma `incertain`, Sudoc `ambigu` /
+  `indéterminé`).
+- **`sinon`** : action `vérification`, motif « Situation non prévue », faits affichés.
 - **Action `conversion` : conversion, puis arrêt** (thèses et mémoires) :
   - **notice source** : parmi les candidats Sudoc retenus dont l'état a
     déterminé `etat_sudoc`, celui qui a le meilleur score ; sa notice UNIMARC est
@@ -452,23 +461,24 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
   - **conservation** (ALM-SUD-F-002) : notice source et notice convertie sont
     stockées dans le dossier et téléchargeables ;
   - le rapport indique le PPN source, le profil cible et le lien vers le Sudoc.
-- Une action `arrêt` (S01, S04) ou `décision` (S10, S14, P01) arrête sans
-  conversion. L'onglet « Reprise » du dossier (faux positif, traité hors outil)
-  n'apparaît que pour un routage autre que `auto`.
-- **Statuts de service** : `Statuts_services.csv` associe `(service, statut)` à
-  un routage `auto | décision | sortie | incident`. **Pour alma-checker et
-  sudoc-checker**, le routage ne vient pas de cette table mais des
-  correspondances du §6 (états) et de `decisions.yaml`. Seule leur ligne `error`
-  y est lue (`incident`) : ce n'est pas un statut des API, elle désigne une
-  réponse HTTP 4xx/5xx ou un service injoignable (`service_indisponible`).
-  Les autres lignes de ces deux services documentent les statuts réels des
-  API (README dans `docs/services/`) ; les anciennes lignes fictives
-  (`present`, `absent`, `reproduction_found`) ont été retirées. Pour IdRef et Dewey, un
-  statut `décision` **n'arrête pas** la génération : on utilise le repli
-  (`$a{nom}$b{prenom}` ou zone omise) et une exception est créée. `not_found`
-  côté IdRef ajoute l'alerte « proto-notice d'autorité à créer ».
-- **Routage final du dossier** : le plus sévère de ses étapes, dans l'ordre
-  `incident > sortie > conversion > décision > auto`.
+- Une action `arrêt` ou `vérification` arrête sans conversion. L'onglet
+  « Reprise » du dossier (faux positif, traité hors outil) n'apparaît que pour
+  un document à reprendre ou en incident.
+- **Réponses des services** : `config/services.yaml` associe, pour chaque
+  service, son statut à une issue (`statuts`), une alerte éventuelle
+  (`alertes`) et le caractère non bloquant (`non_bloquant`). Une erreur HTTP
+  (4xx/5xx), un service injoignable (`service_indisponible`) ou un statut
+  absent du fichier donnent « incident ». **alma-checker et sudoc-checker**
+  n'ont pas de `statuts` : ils sont jugés par les états du §6 et
+  `decisions.yaml`. Pour IdRef et Dewey (`non_bloquant: true`), « à reprendre »
+  **n'arrête pas** la génération : on utilise le repli (`$a{nom}$b{prenom}` ou
+  zone omise) et une exception est créée. `not_found` côté IdRef ajoute l'alerte
+  « proto-notice d'autorité à créer ». (Décision du 06/11 : l'ancienne table
+  Grist `Statuts_services` est retirée.)
+- **Issue du dossier** : la plus sévère de ses étapes, dans l'ordre
+  `incident > à reprendre > terminé`. Les dossiers enregistrés avec l'ancien
+  routage sont relus avec la nouvelle issue (auto, sortie, conversion → terminé ;
+  décision → à reprendre).
 
 ## 8. Règles et générateur
 
@@ -481,19 +491,15 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 | `regles/profils/these-reproduction-imprimee.yaml` | Notice-modèle de la thèse de reproduction imprimée |
 | `regles/profils/memoire-original-imprime.yaml` | Notice-modèle du mémoire original imprimé |
 | `regles/decisions.yaml` | Faits, règles de décision, `sinon` |
-| `spec/Statuts_services.csv` | Routage des statuts de services (Grist ou CSV, §7) |
 
 Le dossier des règles est `REGLES_DIR` (`regles` par défaut). Les fichiers
 sont versionnés avec le code. Le bouton « Recharger les règles » les relit sans
 redémarrer ; la version chargée (date et empreinte des fichiers) est
 enregistrée dans chaque dossier. L'API `GET /api/v1/regles` les sert tels
-quels. `Statuts_services` est lu selon `SPEC_SOURCE` (`csv` par défaut, ou
-`grist` avec repli sur le CSV si Grist est injoignable) ; `humatheque
-spec-export` en écrit un instantané dans `spec/`, `humatheque spec-import` crée
-la table dans Grist depuis le CSV. La référence d'implémentation est
-`reference/moteur-regles/` (moteur, exemple de contexte, tests sur les règles
-réelles). En cas d'écart UNIMARC entre cette référence et l'ancien classeur
-Grist, le classeur fait foi (décision du 06/11).
+quels. La référence d'implémentation est `reference/moteur-regles/` (moteur,
+exemple de contexte, tests sur les règles réelles). En cas d'écart UNIMARC
+entre cette référence et l'ancien classeur Grist, le classeur a fait foi lors de
+la migration (décision du 06/11) ; Grist est ensuite retiré du projet.
 
 ### 8.2 Format d'un profil
 
@@ -503,18 +509,20 @@ libelle: Thèse originale imprimée
 variables: [annee, langue, titre_classement, auteur, directeur, ...]
 lignes:
   - "008 $aAax3"
-  - {ligne: "100 0#$a{annee} || 100 0#$a19XX", priorite: 1, statut: à discuter, ref: R004}
+  - {ligne: "100 0#$a{annee} || 100 0#$a19XX", priorite: 1, à_valider: true}
   - {ligne: "200 1#$a{titre_classement}$f{auteur}$gsous la direction de {directeur}",
-     joindre: {directeur: [", ", " et "]}, ref: R022 R024-R026}
-  - {ligne: "700 #1$3{auteur.ppn}$4070 || 700 #1$a{auteur.nom}$b{auteur.prenom}$4070", priorite: 1, ref: R044}
-  - {ligne: "330 ##$a{resume}", actif: false, ref: R037}
+     joindre: {directeur: [", ", " et "]}}
+  - {ligne: "700 #1$3{auteur.ppn}$4070 || 700 #1$a{auteur.nom}$b{auteur.prenom}$4070", priorite: 1}
+  - {ligne: "330 ##$a{resume}", actif: false}
 ```
 
 - Une ligne est une zone écrite comme dans WinIBW (`ZZZ II$a…`, `#` = blanc ;
   sans indicateurs : zone de contrôle). Forme courte : une chaîne. Forme
   développée : `ligne`, et au besoin `si` (condition rule-engine sur les
-  variables), `priorite`, `statut` (`seed`, `à discuter`, `validé`), `remarque`,
-  `ref` (ancienne règle Grist), `actif`, `joindre`.
+  variables), `priorite`, `remarque`, `joindre`, `à_valider` (`true` : ligne
+  encore en discussion ; absent : validée) et `actif` (`false` : zone documentée
+  mais non produite). Décision du 06/11 : plus de `ref` ni de `statut` hérités
+  de Grist.
 - `{variable}` ou `{variable.attribut}` (`forme`, `nom`, `prenom`, `ppn` pour une
   personne ; `forme`, `ppn` pour un organisme). `{x}` seul vaut `{x.forme}`.
 - `joindre: {variable: [séparateur, dernier séparateur]}` (ou un seul
@@ -535,14 +543,13 @@ lignes:
 4. **Ligne vide** : si toutes les sous-zones à variable sont omises, la zone est
    omise ; une ligne sans variable est toujours produite.
 5. **Priorité 1** : une ligne `priorite: 1` qui ne produit rien déclenche une
-   alerte `regle_prioritaire_omise:<ref>`.
+   alerte en clair : « zone 029 obligatoire non produite (ligne 2) ».
 6. **`actif: false`** : jamais produite, listée comme « non couverte ».
 7. **`si`** : la ligne n'est produite que si la condition est vraie.
-8. **Statut** : une ligne dont le statut est dans `REGLES_STATUTS_EXCLUS`
-   (`rejeté` par défaut) est ignorée.
-9. **Ordre** : zones triées par étiquette ; sous-zones dans l'ordre de la ligne.
+8. **Ordre** : zones triées par étiquette ; sous-zones dans l'ordre de la ligne.
 
-Chaque zone produite garde la trace de sa ligne (`ref`, `statut`), affichée en
+Chaque zone produite garde la trace de sa ligne (zone et numéro, « 105 (ligne 7) »,
+et « à valider » le cas échéant), affichée en
 annotation dans le dossier et l'éditeur. Décisions du 06/11 sur les écarts avec
 l'ancienne référence : 029$b = `{annee}{code_etab}{numero_nnt}` ; aucune zone
 600 à 607 n'est produite (R040, ligne inactive).
@@ -558,11 +565,10 @@ chaque enregistrement depuis l'interface (§9.3), affiché dans l'interface.
 | erreur | Zone sans étiquette sur 3 chiffres |
 | erreur | Variable absente de `variables.yaml` ; attribut impossible pour le type |
 | erreur | Ligne qui se répète sur deux variables différentes ; `joindre` sur une variable qui n'est pas une liste de la ligne |
-| erreur | Condition rule-engine invalide (profil ou décision) ; profil inconnu dans une décision ; action ou routage inconnus ; identifiants de décision en double |
+| erreur | Condition rule-engine invalide (profil ou décision) ; profil inconnu dans une décision ; action inconnue ; nom de règle de décision en double |
 | avertissement | Variable utilisée mais absente de la liste `variables` du profil |
 | avertissement | Profil atteint par aucune décision |
 | avertissement | **Cas non couvert** : combinaison des valeurs de faits (Alma absent) qui tombe dans `sinon` |
-| avertissement | Lignes alma-checker et sudoc-checker de `Statuts_services` autres que `error` |
 | info | Variable déclarée dans un profil mais utilisée par aucune ligne active |
 
 Avec les règles actuelles, le contrôle de complétude doit signaler 4 cas :
@@ -602,9 +608,10 @@ défaut sur la version générée.
   dans les routes ni dans les gabarits. Un front différent (React par exemple)
   pourra se brancher sur l'API sans réécrire la logique.
 - **Style** : Tailwind CSS compilé par l'**exécutable autonome** (sans Node),
-  jetons de couleur repris de la maquette (palette, badges de routage), une
+  jetons de couleur repris de la maquette (palette, pastilles d'issue), une
   seule feuille compilée dans `static/`. Soigner les états vides, de
-  chargement et d'erreur ; badges de routage identiques sur tous les écrans.
+  chargement et d'erreur ; pastilles d'issue (Terminé, À reprendre, Incident)
+  identiques sur tous les écrans.
 - **Visionneuse** : OpenSeadragon (zoom, déplacement, défilement entre les
   images du document), vendorisé dans `static/`.
 
@@ -642,7 +649,7 @@ défaut sur la version générée.
   bouton de réveil de l'endpoint (repris du POC).
 - **Administration** : deux pages.
   - **`/admin` Services et déclencheurs** (décisions du 05/11) : santé des
-    services (alma, sudoc, idref, dewey, VLM, stockage S3, Grist, règles),
+    services (alma, sudoc, idref, dewey, VLM, stockage S3, règles),
     réglages des lots automatiques (fournisseur, paramètres avancés ; proposés
     aussi par défaut dans le formulaire), déclencheurs (§3.1), état du
     planificateur.
@@ -660,11 +667,11 @@ défaut sur la version générée.
   (pages par cookie de session, API par `Authorization: Bearer`) ; vide =
   désactivé (état actuel).
 - **`/historique`** (ING-F-006, ING-T-004) : balayages et traitements, avec date,
-  déclencheur, nombre de documents, routages, lien vers chaque lot.
+  déclencheur, nombre de documents, issues, lien vers chaque lot.
 - **`/lots/{id}` Lot** (mode 2) :
   - les indicateurs de la maquette : documents, passés seuls, en attente,
     repris ;
-  - les filtres Décisions / Sorties / Conversions / Incidents ;
+  - les filtres À reprendre / Incidents ;
   - la file d'exceptions (document, étape, motif, bouton Reprendre) ;
   - le journal ;
   - l'export : CSV du rapport et fichier texte de toutes les notices produites.
@@ -691,7 +698,7 @@ défaut sur la version générée.
     (ALM-SUD-F-004) ;
   - les réponses brutes des API, repliées par défaut et dépliables
     (ALM-SUD-F-003) ;
-  - la notice, chaque zone annotée par sa ligne de profil (`ref`, `statut`) ;
+  - la notice, chaque zone annotée par sa ligne de profil (zone, numéro, « à valider ») ;
   - les alertes.
 
   **Résolution d'exception** :
@@ -714,8 +721,7 @@ défaut sur la version générée.
 - **`.env.example`** :
   - les variables du `config.py` du POC (VLM, Albert, HF, sudoc, idref, dewey) ;
   - `ALMA_CHECKER_API_URL`, `ALMA_API_KEY` ;
-  - `REGLES_DIR=regles`, `SPEC_SOURCE=csv`, `GRIST_URL=http://grist:8484`, `GRIST_DOC_ID`,
-    `GRIST_API_KEY`, `GRIST_SESSION_SECRET`, `GRIST_DEFAULT_EMAIL` ;
+  - `REGLES_DIR=regles` ;
   - `CODE_ETAB=EPHE`, `MAX_WORKERS` (les seuils des services sont dans
     `config/services.yaml`) ;
   - `VLM_MODEL=google/gemma-4-26B-A4B-it`, `VLM_STRATEGIE=requete_unique`,
@@ -725,42 +731,27 @@ défaut sur la version générée.
     `MINIO_SECRET_KEY`, `INGESTION_AUTO=false`, `BALAYAGE_INTERVALLE=60`,
     `PLANIFICATION_CRON=`, `EVENEMENTS_DELAI=60` ;
   - `MOT_DE_PASSE=` (vide : pas d'authentification) ;
-  - `REGLES_STATUTS_EXCLUS=rejeté`.
 - **Déploiement** :
   - `Dockerfile` : image `python:3.12-slim` avec `uv` ; le cache reaccentue est
     construit au build ; l'exécutable autonome Tailwind est téléchargé (version
     figée) et compile la feuille de style au build. En développement :
     `uv run humatheque css --watch` ;
-  - `docker-compose.yml` : **deux services**, même convention que les autres
-    services smartbiblia :
-    - `app` : construit depuis le `Dockerfile`, port 8000, volume `./data`,
-      `env_file: .env`, `depends_on: grist` (sans en dépendre pour démarrer :
-      l'app fonctionne avec `regles/` et `spec/Statuts_services.csv` si Grist est absent) ;
-    - `grist` : image officielle `gristlabs/grist`, port 8484, volume
-      `./grist-data:/persist`, variables `GRIST_SESSION_SECRET`,
-      `APP_HOME_URL`, `GRIST_DEFAULT_EMAIL`, `GRIST_SINGLE_ORG=humatheque` ;
-    - réseau commun : l'app joint Grist par `http://grist:8484`
-      (`GRIST_URL` dans `.env`) ;
-    - `./data` et `./grist-data` dans `.gitignore`.
-  - **Initialisation de Grist** (documentée dans le `README.md`, manuelle une
-    fois) : créer la table `Statuts_services` dans l'instance locale (`spec-import`),
-    relever l'identifiant du document et créer une clé d'API, puis renseigner
-    `GRIST_DOC_ID`, `GRIST_API_KEY` et `SPEC_SOURCE=grist` ;
-  - en local : `uv run humatheque serve` seul (mode CSV), ou
-    `docker compose up -d` pour l'app et Grist.
+  - `docker-compose.yml` : **un service** `app`, construit depuis le
+    `Dockerfile`, port 8000, volumes `./data` et `./regles` (les règles
+    modifiées depuis l'interface restent dans le dépôt), `env_file: .env`.
+    Grist est retiré (décision du 06/11) ;
+  - en local : `uv run humatheque serve`, ou `docker compose up -d`.
 
 ## 11. Tests et ordre de construction
 
 Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 (réponses d'exemple tirées des README et OpenAPI).
 
-1. **Socle** : `pyproject`, configuration, chargement des règles (`regles/`,
-   `Statuts_services`) et vérificateur, en partant de `reference/moteur-regles/`
-   (décision du 06/11 : les règles quittent Grist). Tests : `check-spec` sur
-   `regles/` ne signale aucune erreur et exactement les 4 cas non couverts du
-   §8.4 ; un fichier de règles fabriqué par défaut du tableau du §8.4 ;
-   chargement Grist de `Statuts_services` testé avec des réponses simulées
-   (`respx`), y compris le repli sur CSV.
+1. **Socle** : `pyproject`, configuration, chargement des règles (`regles/`)
+   et vérificateur, en partant de `reference/moteur-regles/` (décision du
+   06/11 : les règles quittent Grist). Tests : `check-spec` sur `regles/` ne
+   signale aucune erreur et exactement les 4 cas non couverts du §8.4 ; un
+   fichier de règles fabriqué par défaut du tableau du §8.4.
 2. **`texte_unimarc`** : toutes les tables de cas du §4. **Provenance** : table
    de cas (« École pratique des hautes études », « EPHE », « E.P.H.E. Ve
    section » → EPHE ; « Université Paris 1 » → hors EPHE ; vide → absent ;
@@ -777,10 +768,11 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
    reproduction + unknown → indéterminé ; originale + unknown → originale ;
    électronique seule ; aucun retenu + `ambiguous_print_candidate` → ambigu ;
    `thesis_state` absent → incident.
-   Le scénario S08 produit une notice ; le S01 s'arrête avec le PPN Alma (y
-   compris pour `off_profile_match_only`) ; le S06 produit une notice convertie
+   « Thèse EPHE absente du Sudoc » produit une notice ; « Notice déjà dans
+   Alma » s'arrête avec le PPN Alma ; « Thèse EPHE, notice électronique au
+   Sudoc » produit une notice convertie
    identique à la source, avec l'alerte `conversion_non_implementee`, et
-   s'arrête ; une provenance ambiguë arrête en décision puis reprend après
+   s'arrête ; une provenance ambiguë arrête (à reprendre) puis reprend après
    choix manuel.
 6. **Interface** : mode 2 (lot et file d'exceptions) en priorité, puis mode 1,
    puis résolution et historique. Tests de la couche `application/` (sans
@@ -792,10 +784,8 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 6 bis. **Ingestion MinIO** : constitution des documents à partir d'un bucket
    simulé (dossiers TH/MM, multi-images, dossier vide → `document_invalide`),
    sélection manuelle, historique.
-7. **Docker Compose** (app + Grist) : `docker compose up -d` démarre les deux
-   services ; après création de `Statuts_services` dans Grist, `check-spec` en mode `grist`
-   donne le même résultat qu'en mode `csv` sur les mêmes exports, et
-   `spec-export` reproduit les CSV. Puis essai réel sur 5 URL de
+7. **Docker Compose** : `docker compose up -d` démarre l'application (Grist,
+   présent à l'origine, est retiré le 06/11). Puis essai réel sur 5 URL de
    `minio_urls.txt` et sur 5 dossiers du bucket `poc/`. Consigner les écarts dans `docs/ESSAI.md`.
 8. **Détection automatique et planification** (ING-F-003, ING-F-004, arbitrées
    le 05/11) : page d'administration, planificateur, mot de passe prévu.
@@ -825,5 +815,5 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 | ALM-SUD-F-002, conversions Sudoc | §7, §9 | intégrée (conversion = copie de la source en v1 ; décision du 03/11) |
 | Alma : au moins une notice trouvée → arrêt | §6 | intégrée (décision du 03/11) |
 | Provenance déduite de `granting_institution` | §6, §7 | intégrée, modèle de décision optionnel (décision du 03/11) |
-| Conversion « reproduction via 105 $bm, EPHE » | — | coquille du wiki : la règle S07 de `decisions.yaml` fait foi |
-| Mémoire trouvé au Sudoc | §7 | la spec fait foi : conversion si notice électronique (S13) |
+| Conversion « reproduction via 105 $bm, EPHE » | — | coquille du wiki : la règle « Thèse EPHE, reproduction au Sudoc » de `decisions.yaml` fait foi |
+| Mémoire trouvé au Sudoc | §7 | la spec fait foi : conversion si notice électronique (« Mémoire, notice électronique au Sudoc ») |

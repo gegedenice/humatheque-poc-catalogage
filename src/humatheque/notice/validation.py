@@ -17,7 +17,6 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from humatheque.config import reglages
 from humatheque.notice.analyse import analyser
 from humatheque.regles.modeles import Regles
 from humatheque.regles.moteur import LIGNE, productible
@@ -48,13 +47,10 @@ def profil_notice(regles: Regles, profil: str) -> ProfilNotice | None:
     p = regles.profils.get(profil)
     if p is None:
         return None
-    exclus = set(reglages().regles_statuts_exclus)
     prioritaires: dict[str, list[str]] = defaultdict(list)
     sous_zones: dict[str, set[str]] = defaultdict(set)
     etiquettes: set[str] = set()
     for l in p.lignes:
-        if (l.statut or "") in exclus:
-            continue
         etiquettes.add(l.etiquette)
         for gabarit in filter(None, (l.principal, l.repli)):
             m = LIGNE.match(gabarit)

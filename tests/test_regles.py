@@ -18,13 +18,12 @@ def _codes(rapport, gravite=None):
 def test_chargement_regles_reelles(regles):
     assert set(regles.profils) == {"these-originale-imprimee", "these-reproduction-imprimee",
                                    "memoire-original-imprime"}
-    assert regles.decisions[0].id == "S01" and regles.sinon["alors"] == "décision"
+    assert regles.decisions[0].nom == "Notice déjà dans Alma" and regles.sinon["alors"] == "vérification"
     assert regles.variables["auteur"].type == "personne" and regles.variables["directeur"].liste
     assert not regles.variables["numero_nnt"].disponible
     assert len(regles.empreinte) == 12 and regles.version.endswith(regles.empreinte)
-    assert regles.statuts_services and regles.source == "csv"
     ligne = regles.profils["these-originale-imprimee"].lignes[0]
-    assert (ligne.numero, ligne.etiquette, ligne.trace) == (1, "008", "R001")
+    assert (ligne.numero, ligne.etiquette, ligne.trace, ligne.statut) == (1, "008", "008 (ligne 1)", "validée")
 
 
 def test_aucune_erreur_et_quatre_cas_non_couverts(regles):
@@ -34,13 +33,13 @@ def test_aucune_erreur_et_quatre_cas_non_couverts(regles):
     assert len(trous) == 4
     assert any("type = thèse, provenance = EPHE, sudoc = originale imprimée" in t for t in trous)
     assert sum("type = mémoire" in t for t in trous) == 3
-    assert _codes(r, "avertissement").count("statut_ignore") == 2
+    assert len(r.avertissements) == 4  # les cas non couverts, rien d'autre
 
 
 def test_empreinte_stable_et_sensible(regles_fabriquees):
     a, b = regles_fabriquees.charger(), regles_fabriquees.charger()
     assert a.empreinte == b.empreinte
-    regles_fabriquees.modifier_decision("S08", motif="autre motif")
+    regles_fabriquees.modifier_decision("Thèse EPHE absente du Sudoc", motif="autre motif")
     assert regles_fabriquees.charger().empreinte != a.empreinte
 
 
@@ -85,15 +84,14 @@ def test_defauts_de_profil(regles_fabriquees, ligne, code):
     ({"si": 'sudoc == "rien" and'}, "condition_invalide"),
     ({"profil": "profil-fantome"}, "profil_inconnu"),
     ({"alors": "suppression"}, "action_inconnue"),
-    ({"routage": "peut-être"}, "routage_inconnu"),
 ])
 def test_defauts_de_decision(regles_fabriquees, champs, code):
-    regles_fabriquees.modifier_decision("S08", **champs)
+    regles_fabriquees.modifier_decision("Thèse EPHE absente du Sudoc", **champs)
     assert code in _codes(verifier(regles_fabriquees.charger()), "erreur")
 
 
 def test_identifiant_de_decision_en_double(regles_fabriquees):
-    regles_fabriquees.ajouter_decision({"id": "S08", "si": "false", "alors": "décision", "motif": "x"})
+    regles_fabriquees.ajouter_decision({"nom": "Thèse EPHE absente du Sudoc", "si": "false", "alors": "vérification"})
     assert "decision_doublon" in _codes(verifier(regles_fabriquees.charger()), "erreur")
 
 
@@ -102,8 +100,8 @@ def test_avertissements_et_infos(regles_fabriquees):
     p = regles_fabriquees.lire("profils/memoire-original-imprime.yaml")
     p["variables"] = [v for v in p["variables"] if v != "langue"] + ["dewey"]
     regles_fabriquees.ecrire("profils/memoire-original-imprime.yaml", p)
-    regles_fabriquees.modifier_decision("S12", profil="these-originale-imprimee")
-    regles_fabriquees.modifier_decision("S13", profil="these-originale-imprimee")
+    regles_fabriquees.modifier_decision("Mémoire absent du Sudoc", profil="these-originale-imprimee")
+    regles_fabriquees.modifier_decision("Mémoire, notice électronique au Sudoc", profil="these-originale-imprimee")
     r = verifier(regles_fabriquees.charger())
     assert {"variable_non_declaree", "profil_non_atteint"} <= set(_codes(r, "avertissement"))
     assert "variable_inutilisee" in _codes(r, "info")
@@ -111,16 +109,10 @@ def test_avertissements_et_infos(regles_fabriquees):
 
 
 def test_cas_non_couvert_comble(regles_fabriquees):
-    regles_fabriquees.ajouter_decision({"id": "S15", "si": 'type == "mémoire"', "alors": "décision",
-                                        "motif": "mémoire déjà signalé au Sudoc"})
+    regles_fabriquees.ajouter_decision({"nom": "Mémoire déjà au Sudoc", "si": 'type == "mémoire"',
+                                        "alors": "vérification"})
     r = verifier(regles_fabriquees.charger())
     assert sum(c.code == "cas_non_couvert" for c in r.constats) == 1
-
-
-def test_statuts_services_introuvable(regles_fabriquees):
-    (regles_fabriquees.racine / "spec" / "Statuts_services.csv").unlink()
-    with pytest.raises(ReglesInvalides, match="Statuts_services"):
-        regles_fabriquees.charger()
 
 
 # ---------------------------------------------------------------- brouillons (interface)

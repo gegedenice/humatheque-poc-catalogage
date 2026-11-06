@@ -48,8 +48,8 @@ def dossier(type_document="these", images=None):
 def test_s08_produit_une_notice(workflow):
     routes = simuler()
     d = workflow.executer(dossier())
-    assert d.decision.situation == "S08" and d.decision.profil_cible == "these-originale-imprimee"
-    assert d.routage == "auto" and d.etape_arret is None
+    assert d.decision.situation == "Thèse EPHE absente du Sudoc" and d.decision.profil_cible == "these-originale-imprimee"
+    assert d.routage == "terminé" and d.etape_arret is None
     assert all(e.statut in ("ok", "ignoree") for e in d.etapes.values())
     lignes = d.notice_texte.splitlines()
     assert "200 1#$aContribution à l'étude de la démocratie en Afrique$fJean-Daniel DUBOIS" \
@@ -68,7 +68,7 @@ def test_s08_produit_une_notice(workflow):
     types = {e.type for e in d.journal}
     assert {"appel", "transformation", "decision", "zone"} <= types
     assert d.extraction.bruts and d.extraction.prompt.empreinte  # VLM-T-004, VLM-T-005
-    assert d.version_spec and "regle_prioritaire_omise:R002 R003" in d.alertes  # 029 sans NNT
+    assert d.version_spec and "zone 029 obligatoire non produite (ligne 2)" in d.alertes  # 029 sans NNT
 
 
 @respx.mock
@@ -81,9 +81,9 @@ def test_s08_sans_civilite_dans_200g(workflow):
 
 @respx.mock
 @pytest.mark.parametrize("statut, situation, routage", [
-    ("academic_record_found", "S01", "auto"),                 # au-dessus de match_threshold : arrêt sans alerte
-    ("ambiguous_academic_candidate", "S14", "décision"),      # candidat incertain : à trancher
-    ("off_profile_match_only", "S14", "décision"),
+    ("academic_record_found", "Notice déjà dans Alma", "terminé"),                 # au-dessus de match_threshold : arrêt sans alerte
+    ("ambiguous_academic_candidate", "Candidat Alma à vérifier", "à reprendre"),      # candidat incertain : à trancher
+    ("off_profile_match_only", "Candidat Alma à vérifier", "à reprendre"),
 ])
 def test_s01_s14_arret_avec_ppn_alma(workflow, statut, situation, routage):  # ALM-SUD (décision du 05/11)
     routes = simuler(alma=sim.alma(statut, ppn="229969437"))
@@ -99,8 +99,8 @@ def test_s01_s14_arret_avec_ppn_alma(workflow, statut, situation, routage):  # A
 def test_s06_conversion_copie_puis_arret(workflow):
     routes = simuler(sudoc=sim.sudoc([("229969437", 0.95, "electronic")], "electronic_only"))
     d = workflow.executer(dossier())
-    assert d.decision.situation == "S06" and d.decision.suite == "convertir"
-    assert (d.routage, d.etape_arret) == ("auto", "conversion")  # candidat retenu : sans alerte
+    assert d.decision.situation == "Thèse EPHE, notice électronique au Sudoc" and d.decision.suite == "convertir"
+    assert (d.routage, d.etape_arret) == ("terminé", "conversion")  # candidat retenu : sans alerte
     assert d.ppn_source == "229969437"
     assert d.notice_convertie.iso == d.notice_source_iso  # copie de la source (v1)
     assert d.notice_source_iso.startswith("0") and "\x1d" in d.notice_source_iso  # ISO 2709
@@ -112,14 +112,14 @@ def test_s06_conversion_copie_puis_arret(workflow):
     assert not routes["idref"].called and d.notice is None
     # Relance : pas de nouvelle conversion ni d'IdRef
     workflow.executer(d)
-    assert routes["notice"].call_count == 1 and not routes["idref"].called and d.routage == "auto"
+    assert routes["notice"].call_count == 1 and not routes["idref"].called and d.routage == "terminé"
 
 
 @respx.mock
 def test_provenance_ambigue_arret_puis_reprise(workflow):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret) == ("décision", "provenance")
+    assert (d.routage, d.etape_arret) == ("à reprendre", "provenance")
     assert "provenance à confirmer" in d.motif_arret
     assert not routes["alma"].called
     assert d.exceptions[0].etape == "provenance" and not d.exceptions[0].resolue
@@ -127,7 +127,7 @@ def test_provenance_ambigue_arret_puis_reprise(workflow):
     choisir_provenance(d, "EPHE", auteur="catalogueur", commentaire="EPHE, section IV")
     workflow.executer(d)
     assert d.provenance.valeur == "EPHE" and d.provenance.regle == "choix_catalogueur"
-    assert d.decision.situation == "S08" and d.notice is not None and d.routage == "auto"
+    assert d.decision.situation == "Thèse EPHE absente du Sudoc" and d.notice is not None and d.routage == "terminé"
     assert routes["vlm"].call_count == 1  # extraction non rappelée (ING-F-007)
     assert any(e.type == "resolution" and e.auteur == "catalogueur" for e in d.journal)
 
@@ -142,12 +142,12 @@ def test_provenance_choix_invalide():
 def test_faux_positif_alma_reprise(workflow):  # ALM-SUD-006
     routes = simuler(alma=sim.alma("off_profile_match_only", ppn="111"))
     d = workflow.executer(dossier())
-    assert (d.routage, d.decision.situation) == ("décision", "S14")
+    assert (d.routage, d.decision.situation) == ("à reprendre", "Candidat Alma à vérifier")
     with pytest.raises(ResolutionImpossible):
         declarer_faux_positif(d, "alma", "", auteur="cat")
     declarer_faux_positif(d, "alma", "notice d'un autre ouvrage", auteur="cat")
     workflow.executer(d)
-    assert d.etat_alma == "absent" and d.decision.situation == "S08" and d.notice is not None
+    assert d.etat_alma == "absent" and d.decision.situation == "Thèse EPHE absente du Sudoc" and d.notice is not None
     assert routes["alma"].call_count == 1 and routes["sudoc"].call_count == 1
     assert any(e.type == "resolution" and e.detail["avant"] == "incertain" for e in d.journal)
 
@@ -156,11 +156,11 @@ def test_faux_positif_alma_reprise(workflow):  # ALM-SUD-006
 def test_sudoc_indetermine_puis_faux_positif(workflow):
     routes = simuler(sudoc=sim.sudoc([("1", 0.9, "printed_reproduction"), ("2", 0.8, "unknown")], "duplicate_found"))
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret, d.etat_sudoc) == ("décision", "sudoc", "indéterminé")
+    assert (d.routage, d.etape_arret, d.etat_sudoc) == ("à reprendre", "sudoc", "indéterminé")
     assert d.motif_arret == "nature de la notice Sudoc non qualifiable"
     declarer_faux_positif(d, "sudoc", "candidats sans rapport", auteur="cat")
     workflow.executer(d)
-    assert d.etat_sudoc == "rien" and d.decision.situation == "S08"
+    assert d.etat_sudoc == "rien" and d.decision.situation == "Thèse EPHE absente du Sudoc"
     assert routes["sudoc"].call_count == 1
 
 
@@ -177,7 +177,7 @@ def test_relance_automatique_puis_succes(workflow):
     routes = simuler()
     routes["alma"].side_effect = [httpx.Response(503), httpx.Response(200, json=sim.alma())]
     d = workflow.executer(dossier())
-    assert d.routage == "auto" and d.etapes["alma"].tentatives == 2
+    assert d.routage == "terminé" and d.etapes["alma"].tentatives == 2
     assert any(e.type == "relance" for e in d.journal)
 
 
@@ -193,7 +193,7 @@ def test_service_indisponible_puis_relance_manuelle(workflow):  # ING-F-007
     routes["sudoc"].side_effect = None
     routes["sudoc"].return_value = httpx.Response(200, json=sim.sudoc([]))
     workflow.executer(d)
-    assert d.routage == "auto" and d.notice is not None
+    assert d.routage == "terminé" and d.notice is not None
     assert routes["vlm"].call_count == 1 and routes["alma"].call_count == 1
 
 
@@ -237,7 +237,7 @@ def test_image_inaccessible_incident(workflow):
 @pytest.mark.parametrize("images", [[], ["illisible"]])
 def test_document_invalide(workflow, images):  # ING-F-008
     d = workflow.executer(dossier(images=[IMAGES[i] for i in images]))
-    assert (d.routage, d.etape_arret) == ("décision", "extraction")
+    assert (d.routage, d.etape_arret) == ("à reprendre", "extraction")
     assert any(a.startswith("document_invalide") for a in d.alertes)
 
 
@@ -245,7 +245,7 @@ def test_document_invalide(workflow, images):  # ING-F-008
 def test_document_sans_metadonnee(workflow):
     simuler(extraction={"title": None, "advisor": [], "confidence": 0.1})
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret) == ("décision", "extraction")
+    assert (d.routage, d.etape_arret) == ("à reprendre", "extraction")
     assert "document_invalide:aucune métadonnée extraite" in d.alertes
 
 
@@ -253,7 +253,7 @@ def test_document_sans_metadonnee(workflow):
 def test_idref_decision_non_bloquante_avec_repli(workflow):
     simuler(idref_statut="low_confidence")
     d = workflow.executer(dossier())
-    assert d.notice is not None and d.routage == "décision"
+    assert d.notice is not None and d.routage == "à reprendre"
     assert "700 #1$aDubois$bJean-Daniel$4070" in d.notice_texte.splitlines()
     assert {e.etape for e in d.exceptions} == {"idref_personnes"} and len(d.exceptions) == 3
     assert d.exceptions[0].candidats[0]["ppn"] == "026940345"
@@ -280,13 +280,13 @@ def test_memoire_route_et_provenance(workflow):
     d = workflow.executer(dossier(type_document="memoire"))
     assert routes["alma"].calls[0].request.url.path == "/check/dissertation"
     assert routes["sudoc"].calls[0].request.url.path == "/check/dissertation"
-    assert d.provenance.valeur == "mémoire" and d.decision.situation == "S12"
+    assert d.provenance.valeur == "mémoire" and d.decision.situation == "Mémoire absent du Sudoc"
     assert "701 #1$3026940345$4003" in d.notice_texte.splitlines()
 
 
 @respx.mock
 def test_generation_echec(workflow, regles_fabriquees):
-    regles_fabriquees.modifier_decision("S08", profil="profil-fantome")
+    regles_fabriquees.modifier_decision("Thèse EPHE absente du Sudoc", profil="profil-fantome")
     workflow.services.regles = regles_fabriquees.charger()
     simuler()
     d = workflow.executer(dossier())
@@ -324,7 +324,7 @@ def test_erreur_400_non_relancee(workflow):  # essai réel du 04/11 : titre abse
 def test_titre_non_extrait_document_invalide(workflow):  # décision du 05/11
     routes = simuler(extraction=EXTRACTION | {"title": None})
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret) == ("décision", "extraction")
+    assert (d.routage, d.etape_arret) == ("à reprendre", "extraction")
     assert "document_invalide:titre non extrait" in d.alertes and not routes["alma"].called
 
 
@@ -334,5 +334,5 @@ def test_relance_idref_limitee_aux_personnes_en_echec(workflow):  # décision du
     ok = httpx.Response(200, json=sim.idref_personne("accepted"))
     routes["idref"].side_effect = [ok, ok, httpx.ReadTimeout("lent"), ok]  # auteur, directeur, rapporteur
     d = workflow.executer(dossier())
-    assert d.routage == "auto" and d.etapes["idref_personnes"].tentatives == 2
+    assert d.routage == "terminé" and d.etapes["idref_personnes"].tentatives == 2
     assert routes["idref"].call_count == 4  # 3 personnes + 1 relance du seul rapporteur

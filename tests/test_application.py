@@ -21,9 +21,8 @@ from services_simules import EXTRACTION, simuler
 @pytest.fixture
 def app(tmp_path):
     """Racine isolée : spec/ copiée, data/ vide."""
-    shutil.copytree(RACINE / "spec", tmp_path / "spec")
     shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"))
-    reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv"})
+    reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=reglages,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone())
 
@@ -42,8 +41,7 @@ def test_documents_depuis_liste():
 
 def test_accueil_etat_de_la_spec(app):
     a = app.accueil()
-    assert a.spec.source == "csv" and a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 6  # 4 cas non couverts + 2 statuts ignorés
-    assert a.spec.grist_joignable is None
+    assert a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 4  # les 4 cas non couverts
     assert "vlm" in a.fournisseurs and a.lots == []
 
 
@@ -55,7 +53,7 @@ def test_recharger_spec(app):
     apres = app.recharger_spec()
     assert apres.version.split()[1] != avant.version.split()[1]  # empreinte changée
     (erreur,) = [c for c in apres.constats if c.gravite == "erreur"]
-    assert apres.nb_erreurs == 1 and "R005" in erreur.ligne and "langue_x" in erreur.message
+    assert apres.nb_erreurs == 1 and "101" in erreur.ligne and "langue_x" in erreur.message
     # fichier illisible : rechargement refusé, règles en place conservées
     profil.write_text("profil: [\n", encoding="utf-8")
     with pytest.raises(ActionImpossible, match="illisibles"):
@@ -73,7 +71,7 @@ def test_lot_mode2_indicateurs_et_file(app, image):
     assert vue.indicateurs.documents == 3 and vue.indicateurs.passes_seuls == 3
     assert not vue.en_cours and vue.file == []
     assert vue.journal[0].texte.startswith("lot ouvert : 3 document(s)")
-    assert vue.journal[-1].texte.startswith("lot clos : 3 notice(s)")
+    assert vue.journal[-1].texte.startswith("lot clos : 3 terminé(s)")
     assert {e["etape"]: e["faits"] for e in vue.etapes}["generation"] == 3
 
 
@@ -83,10 +81,10 @@ def test_notice_alma_certaine_hors_file(app, image):
     simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     vue = app.vue_lot(lot.id)
-    assert vue.file == [] and vue.indicateurs.par_routage == {"auto": 1} and vue.indicateurs.en_attente == 0
+    assert vue.file == [] and vue.indicateurs.par_routage == {"terminé": 1} and vue.indicateurs.en_attente == 0
     (ligne,) = app.store.lignes_du_lot(lot.id)
     d = app.vue_dossier(ligne.id).dossier
-    assert (d.decision.situation, d.etape_arret) == ("S01", "situation") and "229969437" in d.motif_arret
+    assert (d.decision.situation, d.etape_arret) == ("Notice déjà dans Alma", "situation") and "229969437" in d.motif_arret
 
 
 @respx.mock
@@ -94,12 +92,12 @@ def test_file_d_exceptions_filtres_et_reprise(app, image):
     simuler(alma=sim.alma("ambiguous_academic_candidate", ppn="229969437"))
     lot = app.creer_lot(EntreeLot(documents=[[image], [image]]))
     vue = app.vue_lot(lot.id)
-    assert vue.indicateurs.en_attente == 2 and vue.indicateurs.par_routage == {"décision": 2}
+    assert vue.indicateurs.en_attente == 2 and vue.indicateurs.par_routage == {"à reprendre": 2}
     ligne = vue.file[0]
-    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("décision", "situation", "Situation")
+    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("à reprendre", "situation", "Décision")
     assert "229969437" in ligne.motif
     assert app.vue_lot(lot.id, "incidents").file == []
-    assert len(app.vue_lot(lot.id, "decisions").file) == 2
+    assert len(app.vue_lot(lot.id, "a_reprendre").file) == 2
 
     # Reprise : faux positif Alma sur le premier dossier
     simuler()  # Sudoc et suite répondent normalement
@@ -107,7 +105,7 @@ def test_file_d_exceptions_filtres_et_reprise(app, image):
     vue = app.vue_lot(lot.id)
     assert vue.indicateurs.repris == 1 and vue.indicateurs.en_attente == 1
     d = app.vue_dossier(ligne.dossier_id)
-    assert d.dossier.routage == "auto" and d.dossier.notice_texte
+    assert d.dossier.routage == "terminé" and d.dossier.notice_texte
 
     # Traité hors outil : sort de la file d'attente sans relance
     autre = vue.file[0].dossier_id
@@ -144,7 +142,7 @@ def test_conversion_telechargements_iso(app, image):  # ALM-SUD-F-002
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
     v = app.vue_dossier(ligne.id)
-    assert v.dossier.routage == "auto"  # candidat Sudoc retenu : conversion sans alerte (05/11)
+    assert v.dossier.routage == "terminé"  # candidat Sudoc retenu : conversion sans alerte (05/11)
     assert {"source.iso", "convertie.iso", "convertie.txt"} <= set(v.telechargements.values())
     _, iso, _ = app.telecharger(ligne.id, "source.iso")
     assert iso.endswith(b"\x1d")
@@ -157,7 +155,7 @@ def test_resolutions_idref_et_dewey(app, image):
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
     v = app.vue_dossier(ligne.id)
-    assert v.dossier.routage == "décision" and v.exceptions_ouvertes == 3
+    assert v.dossier.routage == "à reprendre" and v.exceptions_ouvertes == 3
     i = next(i for i, e in enumerate(v.dossier.exceptions) if e.objet.startswith("author"))
     with pytest.raises(ActionImpossible, match="mal formé"):
         app.choisir_ppn(ligne.id, i, "123", auteur="cat")
@@ -168,7 +166,7 @@ def test_resolutions_idref_et_dewey(app, image):
     for j, e in enumerate(v.dossier.exceptions):
         if not e.resolue:
             v = app.choisir_ppn(ligne.id, j, None, auteur="cat")
-    assert v.exceptions_ouvertes == 0 and v.dossier.routage == "auto"
+    assert v.exceptions_ouvertes == 0 and v.dossier.routage == "terminé"
     assert "701 #1$aPetit$bLuc$4958$4555" in v.dossier.notice_texte.splitlines()
 
 
@@ -188,7 +186,7 @@ def test_resolutions_idref_groupees_tout_ou_rien(app, image):
     with pytest.raises(ActionImpossible, match="aucun choix"):
         app.choisir_ppns(ligne.id, {}, auteur="cat")
     v = app.choisir_ppns(ligne.id, {auteur_i: "026940345", **{j: None for j in autres}}, auteur="cat")
-    assert v.exceptions_ouvertes == 0 and v.dossier.routage == "auto"
+    assert v.exceptions_ouvertes == 0 and v.dossier.routage == "terminé"
     assert "700 #1$3026940345$4070" in v.dossier.notice_texte.splitlines()
     resolutions = [e for e in v.dossier.journal if e.type == "resolution"]
     assert len(resolutions) == len(idref) and {e.auteur for e in resolutions} == {"cat"}
@@ -220,7 +218,7 @@ def test_provenance_puis_relance(app, image):
     with pytest.raises(ActionImpossible):
         app.choisir_provenance(ligne.id, "peut-être", auteur="cat")
     v = app.choisir_provenance(ligne.id, "hors EPHE", auteur="cat")
-    assert v.dossier.decision.situation == "S09" and v.dossier.notice_texte
+    assert v.dossier.decision.situation == "Thèse hors EPHE absente du Sudoc" and v.dossier.notice_texte
     app.relancer(ligne.id, depuis="extraction")
     assert routes["vlm"].call_count == 2
     with pytest.raises(ActionImpossible):
@@ -244,7 +242,7 @@ def test_exports_et_historique(app, image):
                                   source="minio"))
     lignes = list(csv.DictReader(io.StringIO(app.export_csv(lot.id))))
     assert [l["document"] for l in lignes] == ["TH/TH-01", "TH/TH-02"]
-    assert lignes[0]["routage"] == "auto" and lignes[0]["situation"] == "S08" and lignes[0]["version_spec"]
+    assert lignes[0]["issue"] == "terminé" and lignes[0]["regle_de_decision"] == "Thèse EPHE absente du Sudoc" and lignes[0]["version_spec"]
     notices = app.export_notices(lot.id)
     assert notices.count("008 $aAax3") == 2
     h = app.historique()

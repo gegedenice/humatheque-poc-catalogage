@@ -1,7 +1,7 @@
 """Ligne de commande `humatheque`.
 
 Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `scan-minio`,
-`spec-export`, `spec-import`, `css`, `cache-reaccentue` (cache du dictionnaire, appelé au
+`css`, `cache-reaccentue` (cache du dictionnaire, appelé au
 build Docker).
 """
 
@@ -23,7 +23,7 @@ from humatheque.regles.verificateur import Rapport, rapport_invalide
 
 
 def _afficher(rapport: Rapport) -> None:
-    print(f"Règles  : {rapport.emplacement} (Statuts_services : {rapport.source})")
+    print(f"Règles  : {rapport.emplacement}")
     print(f"Version : {rapport.version}")
     ordre = {"erreur": 0, "avertissement": 1, "info": 2}
     for c in sorted(rapport.constats, key=lambda c: (ordre[c.gravite], c.table, c.ligne)):
@@ -34,7 +34,7 @@ def _afficher(rapport: Rapport) -> None:
 
 def check_spec(args: argparse.Namespace) -> int:
     try:
-        rapport = verifier(charger_regles(source=args.source, dossier=args.dossier))
+        rapport = verifier(charger_regles(dossier=args.dossier))
     except ReglesInvalides as e:
         rapport = rapport_invalide(e, str(args.dossier or reglages().dossier_regles))
     if args.json:
@@ -145,54 +145,11 @@ def scan_minio(args: argparse.Namespace) -> int:
     return 0
 
 
-def spec_export(args: argparse.Namespace) -> int:
-    """Instantané de Statuts_services (Grist) dans spec/ (+ copie horodatée dans spec/archives/)."""
-    from humatheque.regles.export import exporter
-    from humatheque.regles.grist import GristInjoignable
-
-    try:
-        r = exporter(reglages(), args.dossier)
-    except (GristInjoignable, ReglesInvalides) as e:
-        print(f"ERREUR : {e}", file=sys.stderr)
-        return 2
-    for table, n in r["tables"].items():
-        print(f"  {table:<18} {n} ligne(s)")
-    print(f"Instantané {r['horodatage']} (empreinte {r['empreinte']}) ; archive {r['archive']}")
-    return 0
-
-
-def spec_import(args: argparse.Namespace) -> int:
-    """Crée la table Grist Statuts_services depuis spec/, puis la relit et la compare au CSV."""
-    from humatheque.regles.grist import GristInjoignable
-    from humatheque.regles.import_grist import ImportImpossible, importer
-
-    try:
-        r = importer(reglages(), args.dossier, doc_id=args.doc, nouveau=args.nouveau, org=args.org,
-                     espace=args.espace, remplacer=args.remplacer)
-    except (GristInjoignable, ImportImpossible, ReglesInvalides) as e:
-        print(f"ERREUR : {e}", file=sys.stderr)
-        return 2
-    for table, n in r["tables"].items():
-        print(f"  {table:<18} {n} ligne(s)")
-    print(f"Document Grist : {r['doc_id']}")
-    if r["ecarts"]:
-        print(f"{len(r['ecarts'])} écart(s) entre les CSV et Grist :")
-        for e in r["ecarts"][:30]:
-            print(f"  - {e}")
-        return 1
-    print(f"Relecture identique aux CSV (empreinte {r['empreinte_grist']}).")
-    if args.nouveau:
-        print(f"Dans .env : GRIST_DOC_ID={r['doc_id']} puis SPEC_SOURCE=grist")
-    return 0
-
-
 def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
 
-    c = sous.add_parser("check-spec", help="vérifie les règles (regles/*.yaml et Statuts_services)")
-    c.add_argument("--source", choices=["csv", "grist"], default=None,
-                   help=f"source de Statuts_services (défaut : SPEC_SOURCE={reglages().spec_source})")
+    c = sous.add_parser("check-spec", help="vérifie les règles (regles/*.yaml)")
     c.add_argument("--dossier", type=Path, default=None, help="dossier des règles (défaut : REGLES_DIR=regles)")
     c.add_argument("--json", action="store_true", help="rapport au format JSON")
     c.set_defaults(fonction=check_spec)
@@ -204,20 +161,6 @@ def construire_parseur() -> argparse.ArgumentParser:
     c.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"))
     c.add_argument("--port", type=int, default=8000)
     c.set_defaults(fonction=serve)
-
-    c = sous.add_parser("spec-export", help="écrit un instantané de la table Grist Statuts_services dans spec/")
-    c.add_argument("--dossier", type=Path, default=None, help="dossier cible (défaut : spec/)")
-    c.set_defaults(fonction=spec_export)
-
-    c = sous.add_parser("spec-import", help="crée la table Grist Statuts_services depuis spec/ (colonnes Texte)")
-    c.add_argument("--dossier", type=Path, default=None, help="dossier des CSV (défaut : spec/)")
-    cible = c.add_mutually_exclusive_group()
-    cible.add_argument("--nouveau", metavar="NOM", help="crée un nouveau document Grist portant ce nom")
-    cible.add_argument("--doc", metavar="ID", help="document existant (défaut : GRIST_DOC_ID)")
-    c.add_argument("--org", default="current", help="organisation Grist du nouveau document (défaut : current)")
-    c.add_argument("--espace", type=int, default=None, help="identifiant de l'espace de travail (défaut : le premier)")
-    c.add_argument("--remplacer", action="store_true", help="recrée la table si elle est déjà présente")
-    c.set_defaults(fonction=spec_import)
 
     c = sous.add_parser("scan-minio", help="liste les dossiers du bucket S3 et leur dernier statut")
     c.add_argument("--lancer-nouveaux", action="store_true", help="traite les dossiers jamais traités")
