@@ -53,7 +53,7 @@
             <tr>
               <td class="font-mono text-xs break-words min-w-[14rem]">{{ z.texte() }}</td>
               <td class="text-[11px] text-sourdine w-40">
-                {% for r in z.regles %}<span title="statut {{ r.statut }}">{{ r.id }}{% if r.statut != "seed" %}·{{ r.statut }}{% endif %}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+                {% for r in z.regles %}<span>{{ r.id }}{% if r.statut == "à valider" %} · à valider{% endif %}</span>{% if not loop.last %}, {% endif %}{% endfor %}
                 {% if z.libelle %}<br>{{ z.libelle }}{% endif %}
               </td>
             </tr>

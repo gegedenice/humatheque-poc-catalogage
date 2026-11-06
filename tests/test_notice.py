@@ -68,7 +68,7 @@ def test_notice_generee_sans_marqueur(notice, regles):
 def test_zone_prioritaire_absente(notice, regles):
     texte = "\n".join(l for l in notice.splitlines() if not l.startswith("101 "))
     (m,) = valider(texte, regles, ORIG)
-    assert m.gravite == "erreur" and "zone 101 absente" in m.message and "R005" in m.message
+    assert m.gravite == "erreur" and "zone 101 absente" in m.message and "ligne 4" in m.message
 
 
 def test_zone_et_sous_zone_inconnues_avertissement(notice, regles):
@@ -78,7 +78,7 @@ def test_zone_et_sous_zone_inconnues_avertissement(notice, regles):
     assert {m.gravite for m in marqueurs} == {"avertissement"}
     messages = " ".join(m.message for m in marqueurs)
     assert "zone 999 produite par aucune ligne" in messages and "101$x" in messages
-    assert "610" not in messages  # R042 (actif: false) documente la 610 pour ce profil
+    assert "610" not in messages  # ligne 610 (actif: false) documente la 610 pour ce profil
 
 
 def test_vers_marcxml(notice):

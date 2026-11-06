@@ -67,7 +67,7 @@ def verifier(regles: Regles) -> Rapport:
     for nom, p in regles.profils.items():
         declarees, utilisees = set(p.variables), set()
         for l in p.lignes:
-            lieu = f"ligne {l.numero} ({l.etiquette}{' ' + l.ref if l.ref else ''})"
+            lieu = f"ligne {l.numero} ({l.etiquette})"
             for g in (s.strip() for s in l.ligne.split("||")):
                 if not LIGNE.match(g):
                     signaler("erreur", "zone_illisible", p.fichier, lieu,

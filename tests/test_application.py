@@ -53,7 +53,7 @@ def test_recharger_spec(app):
     apres = app.recharger_spec()
     assert apres.version.split()[1] != avant.version.split()[1]  # empreinte changée
     (erreur,) = [c for c in apres.constats if c.gravite == "erreur"]
-    assert apres.nb_erreurs == 1 and "R005" in erreur.ligne and "langue_x" in erreur.message
+    assert apres.nb_erreurs == 1 and "101" in erreur.ligne and "langue_x" in erreur.message
     # fichier illisible : rechargement refusé, règles en place conservées
     profil.write_text("profil: [\n", encoding="utf-8")
     with pytest.raises(ActionImpossible, match="illisibles"):

@@ -23,7 +23,7 @@ def test_chargement_regles_reelles(regles):
     assert not regles.variables["numero_nnt"].disponible
     assert len(regles.empreinte) == 12 and regles.version.endswith(regles.empreinte)
     ligne = regles.profils["these-originale-imprimee"].lignes[0]
-    assert (ligne.numero, ligne.etiquette, ligne.trace) == (1, "008", "R001")
+    assert (ligne.numero, ligne.etiquette, ligne.trace, ligne.statut) == (1, "008", "008 (ligne 1)", "validée")
 
 
 def test_aucune_erreur_et_quatre_cas_non_couverts(regles):

@@ -182,19 +182,15 @@ def variable_iteree(regles: Regles, l: Ligne) -> str | None:
                  and regles.variables[n].type in types), None)
 
 
-def generer(regles: Regles, profil: str, ctx: dict[str, Any], statuts_exclus: list[str] | None = None) -> Notice:
+def generer(regles: Regles, profil: str, ctx: dict[str, Any]) -> Notice:
     if profil not in regles.profils:
         raise GenerationEchec(f"profil inconnu : {profil}")
     p: Profil = regles.profils[profil]
-    exclus = set(statuts_exclus or [])
-    defaut = conventions().get("statut_par_defaut", "seed")
     notice = Notice(profil=profil, version_spec=regles.version)
     for l in p.lignes:
-        statut = l.statut or defaut
+        statut = l.statut
         if not l.actif:
             notice.non_couvertes.append(RegleNonCouverte(regle=l.trace, zone=l.etiquette, statut=statut))
-            continue
-        if statut in exclus:
             continue
         if l.si:
             try:
@@ -224,6 +220,6 @@ def generer(regles: Regles, profil: str, ctx: dict[str, Any], statuts_exclus: li
                 notice.zones.append(zone)
                 produit = True
         if not produit and l.priorite == 1:
-            notice.alertes.append(f"regle_prioritaire_omise:{l.trace}")
+            notice.alertes.append(f"zone {l.etiquette} obligatoire non produite (ligne {l.numero})")
     notice.trace.append(f"profil {profil} : {len(notice.zones)} zone(s)")
     return notice

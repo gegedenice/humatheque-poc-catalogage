@@ -9,11 +9,11 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import SecretStr, field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _racine_par_defaut() -> Path:
@@ -33,7 +33,6 @@ class Reglages(BaseSettings):
     racine: Path = _racine_par_defaut()
 
     # Spécification
-    regles_statuts_exclus: Annotated[list[str], NoDecode] = ["rejeté"]
     regles_dir: Path = Path("regles")
 
     # Extraction VLM
@@ -102,13 +101,6 @@ class Reglages(BaseSettings):
     @classmethod
     def _vide_none(cls, v: Any) -> Any:
         return None if isinstance(v, str) and not v.strip() else v
-
-    @field_validator("regles_statuts_exclus", mode="before")
-    @classmethod
-    def _liste_separee_par_virgules(cls, v: Any) -> Any:
-        if isinstance(v, str):
-            return [x.strip() for x in v.split(",") if x.strip()]
-        return v
 
     @property
     def dossier_regles(self) -> Path:

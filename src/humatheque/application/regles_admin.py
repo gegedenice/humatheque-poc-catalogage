@@ -34,8 +34,7 @@ class LigneProfilVue(BaseModel):
     numero: int
     ligne: str
     etiquette: str
-    ref: str | None
-    statut: str
+    a_valider: bool
     priorite: int | None
     remarque: str | None
     si: str | None
@@ -97,8 +96,8 @@ class AdministrationRegles:
         r = self.regles
         profils = []
         for nom, p in r.profils.items():
-            lignes = [LigneProfilVue(numero=l.numero, ligne=l.ligne, etiquette=l.etiquette, ref=l.ref,
-                                     statut=l.statut or "seed", priorite=l.priorite, remarque=l.remarque, si=l.si,
+            lignes = [LigneProfilVue(numero=l.numero, ligne=l.ligne, etiquette=l.etiquette,
+                                     a_valider=l.a_valider, priorite=l.priorite, remarque=l.remarque, si=l.si,
                                      joindre=l.joindre, actif=l.actif, productible=productible(r, l),
                                      repetee_sur=variable_iteree(r, l)) for l in p.lignes]
             profils.append(ProfilVue(profil=nom, libelle=p.libelle, fichier=p.fichier, variables=p.variables,
@@ -164,7 +163,7 @@ class AdministrationRegles:
                 raise ActionImpossible(f"exemple de contexte introuvable ({EXEMPLE}) : choisissez un dossier")
             variables = json.loads(chemin.read_text(encoding="utf-8"))
             source = "exemple (reference/moteur-regles/exemple_contexte.json)"
-        n = generer(self.regles, profil, variables, self.reglages.regles_statuts_exclus)
+        n = generer(self.regles, profil, variables)
         return Apercu(profil=profil, source=source, texte=vers_winibw(n), annote=vers_winibw(n, annoter=True),
                       alertes=n.alertes, non_couvertes=[f"{x.zone} [{x.regle}]" for x in n.non_couvertes],
                       variables=variables)

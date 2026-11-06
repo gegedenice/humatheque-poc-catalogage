@@ -26,20 +26,19 @@ class Variable(BaseModel):
 class Ligne(BaseModel):
     """Une ligne de profil : une zone écrite comme dans WinIBW (`ligne || repli`)."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     ligne: str
     si: str | None = None
     priorite: int | None = None
-    statut: str | None = None
     remarque: str | None = None
-    ref: str | None = None
-    actif: bool = True
+    a_valider: bool = Field(False, alias="à_valider", description="ligne encore en discussion")
+    actif: bool = Field(True, description="false : zone documentée mais non produite")
     joindre: dict[str, list[str]] = Field(default_factory=dict,
                                           description="variable liste → [séparateur, dernier séparateur]")
     numero: int = Field(0, description="rang de la ligne dans le profil (1, 2…)")
 
-    @field_validator("ligne", "ref", "statut", "remarque", "si", mode="before")
+    @field_validator("ligne", "remarque", "si", mode="before")
     @classmethod
     def _texte(cls, v: Any) -> Any:
         return None if v is None else str(v)
@@ -66,8 +65,13 @@ class Ligne(BaseModel):
         return self.ligne.strip()[:3]
 
     @property
+    def statut(self) -> str:
+        """« à valider » ou « validée » (annotation des zones produites)."""
+        return "à valider" if self.a_valider else "validée"
+
+    @property
     def trace(self) -> str:
-        return self.ref or f"ligne {self.numero}"
+        return f"{self.etiquette} (ligne {self.numero})"
 
 
 class Profil(BaseModel):

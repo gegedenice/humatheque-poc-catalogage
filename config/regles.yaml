@@ -14,8 +14,6 @@ attributs:
   personne: [forme, nom, prenom, ppn]
   organisme: [forme, ppn]
 
-# Statut d'une ligne de profil sans statut déclaré.
-statut_par_defaut: seed
 
 # Contrôle de complétude du vérificateur (§8.4) : produit des valeurs de ces
 # faits, les autres fixés, en écartant les combinaisons incompatibles.

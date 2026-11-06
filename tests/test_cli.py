@@ -12,10 +12,10 @@ def test_check_spec_sur_spec_actuelle(capsys):
 
 
 def test_check_spec_code_retour_si_erreur(regles_fabriquees, capsys):
-    regles_fabriquees.modifier_ligne("these-originale-imprimee", "R005 R006", ligne="101 0#$a{langue_inconnue}")
+    regles_fabriquees.modifier_ligne("these-originale-imprimee", "101 0#", ligne="101 0#$a{langue_inconnue}")
     assert main(["check-spec", "--dossier", str(regles_fabriquees.dossier)]) == 1
     sortie = capsys.readouterr().out
-    assert "R005" in sortie and "variable inconnue" in sortie
+    assert "(101)" in sortie and "variable inconnue" in sortie
 
 
 def test_check_spec_json(capsys):

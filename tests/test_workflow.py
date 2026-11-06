@@ -68,7 +68,7 @@ def test_s08_produit_une_notice(workflow):
     types = {e.type for e in d.journal}
     assert {"appel", "transformation", "decision", "zone"} <= types
     assert d.extraction.bruts and d.extraction.prompt.empreinte  # VLM-T-004, VLM-T-005
-    assert d.version_spec and "regle_prioritaire_omise:R002 R003" in d.alertes  # 029 sans NNT
+    assert d.version_spec and "zone 029 obligatoire non produite (ligne 2)" in d.alertes  # 029 sans NNT
 
 
 @respx.mock
