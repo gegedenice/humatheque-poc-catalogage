@@ -1,4 +1,4 @@
-"""Instantané des tables Grist dans `spec/` (`humatheque spec-export`, SPEC §8).
+"""Instantané de la table Grist Statuts_services dans `spec/` (`humatheque spec-export`, SPEC §8).
 
 Même format que les exports manuels : un CSV par table, en-têtes = libellés
 des colonnes Grist, références résolues en codes, listes jointes par des
@@ -8,6 +8,8 @@ virgules. Une copie horodatée est écrite dans `spec/archives/<horodatage>/`.
 from __future__ import annotations
 
 import csv
+import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,9 +17,23 @@ from typing import Any
 import httpx
 
 from humatheque.config import Reglages
-from humatheque.spec.chargement import TABLES, construire_spec
-from humatheque.spec.grist import lire_tables_grist
+from humatheque.regles.chargement import TABLE_STATUTS, lire_statuts_csv
+from humatheque.regles.grist import lire_tables_grist
+from humatheque.regles.modeles import StatutService
 
+TABLES = [TABLE_STATUTS]
+
+
+
+def _tables_csv(dossier: Path) -> dict[str, list[dict[str, Any]]]:
+    return {TABLE_STATUTS: lire_statuts_csv(dossier)}
+
+
+def _empreinte_table(tables: dict[str, list[dict[str, Any]]]) -> str:
+    """Empreinte de Statuts_services (lignes validées) : identique entre CSV et Grist."""
+    lignes = [StatutService.model_validate(l).model_dump() for l in tables.get(TABLE_STATUTS, [])
+              if any(str(v or "").strip() for v in l.values())]
+    return hashlib.sha256(json.dumps(lignes, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
 
 def _cellule(v: Any) -> str:
     if v is None:
@@ -47,11 +63,11 @@ def exporter(reglages: Reglages, dossier: Path | None = None, client: httpx.Clie
     dossier = dossier or reglages.dossier_spec
     tables = lire_tables_grist(reglages.grist_url, reglages.grist_doc_id, reglages.grist_api_key.get_secret_value(),
                                list(TABLES), timeout=reglages.http_timeout, client=client)
-    spec = construire_spec(tables, "grist", reglages.grist_url)  # contrôle de lisibilité avant écriture
+    empreinte = _empreinte_table(tables)  # contrôle de lisibilité avant écriture
     horodatage = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     archive = dossier / "archives" / horodatage
     for table, lignes in tables.items():
         _ecrire(dossier / f"{table}.csv", lignes)
         _ecrire(archive / f"{table}.csv", lignes)
-    return {"horodatage": horodatage, "empreinte": spec.empreinte, "archive": str(archive),
+    return {"horodatage": horodatage, "empreinte": empreinte, "archive": str(archive),
             "tables": {t: len(l) for t, l in tables.items()}}

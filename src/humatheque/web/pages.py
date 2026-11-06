@@ -52,11 +52,11 @@ def accueil(request: Request):
 
 
 @routeur.post("/spec/recharger")
-def recharger_spec(request: Request):
+def recharger_spec(request: Request, retour: Annotated[str, Form()] = "/"):
     etat = _app(request).recharger_spec()
     if request.headers.get("HX-Request"):
         return _rendre(request, "_spec.html", spec=etat)
-    return _rediriger("/")
+    return _rediriger(retour if retour.startswith("/") and not retour.startswith("//") else "/")
 
 
 @routeur.post("/lots")

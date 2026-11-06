@@ -1,21 +1,9 @@
-# Moteur de décision (SPEC §7). Les situations et les routages sont dans
-# Situations et Statuts_services ; ce fichier dit seulement comment les lire.
+# Moteur de décision (SPEC §7). Les décisions sont dans regles/decisions.yaml,
+# les routages des services dans Statuts_services ; ce fichier dit seulement
+# comment appliquer les routages.
 
-# Lecture de la colonne `action` de Situations.
-actions:
-  creer: [Créer]            # on continue vers IdRef, Dewey, générateur
-  arreter: [Arrêt]          # arrêt sans conversion, routage de la table
-  prefixe_conversion: Dériver   # conversion de la notice Sudoc puis arrêt
-
-# Routage imposé à une action de conversion, quel que soit celui de la table.
-# null : routage de la table (décision du 05/11 : une notice Sudoc au-dessus de
-# duplicate_threshold arrête le workflow sans alerte, routage `auto`).
-routage_conversion: null
-
-# Situation sans ligne correspondante.
-non_prevue:
-  routage: décision
-  motif: situation non prévue
+# Routage qui crée une exception sans être plus sévère qu'une décision.
+routage_decision: décision
 
 # Sévérité décroissante : routage final du dossier = le plus sévère de ses étapes.
 ordre_routages: [incident, sortie, conversion, décision, auto]

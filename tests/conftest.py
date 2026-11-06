@@ -1,55 +1,83 @@
-"""Fixtures communes : copie de spec/ dans un dossier temporaire, modifiable cellule par cellule."""
+"""Fixtures communes : copie de regles/ et de spec/ dans une racine temporaire,
+modifiable fichier par fichier (règles fabriquées pour le vérificateur)."""
 
 from __future__ import annotations
 
-import csv
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
 
 RACINE = Path(__file__).resolve().parents[1]
-SPEC = RACINE / "spec"
 
 
-class SpecFabriquee:
-    """Copie des CSV de spec/ que l'on altère pour fabriquer des défauts."""
+class ReglesFabriquees:
+    """Copie de regles/ (et spec/Statuts_services.csv) que l'on altère pour fabriquer des défauts."""
 
-    def __init__(self, dossier: Path) -> None:
-        self.dossier = dossier
+    def __init__(self, racine: Path) -> None:
+        self.racine = racine
+        self.dossier = racine / "regles"
 
-    def _lire(self, table: str) -> tuple[list[str], list[dict[str, str]]]:
-        with (self.dossier / f"{table}.csv").open(encoding="utf-8", newline="") as f:
-            r = csv.DictReader(f)
-            return list(r.fieldnames or []), list(r)
+    @property
+    def reglages(self):
+        from humatheque.config import Reglages
 
-    def _ecrire(self, table: str, colonnes: list[str], lignes: list[dict[str, str]]) -> None:
-        with (self.dossier / f"{table}.csv").open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=colonnes, lineterminator="\n")
-            w.writeheader()
-            w.writerows(lignes)
+        return Reglages(_env_file=None, racine=self.racine)
 
-    def modifier(self, table: str, cle: str, valeur_cle: str, **cellules: str) -> None:
-        colonnes, lignes = self._lire(table)
-        cibles = [ligne for ligne in lignes if ligne[cle] == valeur_cle]
-        assert cibles, f"{table} : aucune ligne {cle}={valeur_cle}"
-        for ligne in cibles:
-            ligne.update(cellules)
-        self._ecrire(table, colonnes, lignes)
+    def texte(self, rel: str) -> str:
+        return (self.dossier / rel).read_text(encoding="utf-8")
 
-    def ajouter(self, table: str, **cellules: str) -> None:
-        colonnes, lignes = self._lire(table)
-        lignes.append({c: cellules.get(c, "") for c in colonnes})
-        self._ecrire(table, colonnes, lignes)
+    def ecrire(self, rel: str, contenu: str | dict) -> None:
+        if not isinstance(contenu, str):
+            contenu = yaml.safe_dump(contenu, allow_unicode=True, sort_keys=False)
+        (self.dossier / rel).write_text(contenu, encoding="utf-8")
 
-    def renommer_colonne(self, table: str, ancien: str, nouveau: str) -> None:
-        colonnes, lignes = self._lire(table)
-        self._ecrire(table, [nouveau if c == ancien else c for c in colonnes],
-                     [{(nouveau if k == ancien else k): v for k, v in ligne.items()} for ligne in lignes])
+    def lire(self, rel: str) -> Any:
+        return yaml.safe_load(self.texte(rel))
+
+    def ajouter_ligne(self, profil: str, ligne: str | dict) -> None:
+        p = self.lire(f"profils/{profil}.yaml")
+        p["lignes"].append(ligne)
+        self.ecrire(f"profils/{profil}.yaml", p)
+
+    def modifier_ligne(self, profil: str, ref: str, **champs: Any) -> None:
+        p = self.lire(f"profils/{profil}.yaml")
+        cibles = [l for l in p["lignes"] if isinstance(l, dict) and l.get("ref") == ref]
+        assert cibles, f"{profil} : aucune ligne {ref}"
+        for l in cibles:
+            l.update(champs)
+        self.ecrire(f"profils/{profil}.yaml", p)
+
+    def modifier_decision(self, id_: str, **champs: Any) -> None:
+        d = self.lire("decisions.yaml")
+        cibles = [r for r in d["regles"] if r["id"] == id_]
+        assert cibles, f"aucune décision {id_}"
+        for r in cibles:
+            r.update(champs)
+        self.ecrire("decisions.yaml", d)
+
+    def ajouter_decision(self, regle: dict, position: int | None = None) -> None:
+        d = self.lire("decisions.yaml")
+        d["regles"].insert(len(d["regles"]) if position is None else position, regle)
+        self.ecrire("decisions.yaml", d)
+
+    def charger(self):
+        from humatheque.regles import charger_regles
+
+        return charger_regles(self.reglages)
 
 
 @pytest.fixture
-def spec_fabriquee(tmp_path: Path) -> SpecFabriquee:
-    dossier = tmp_path / "spec"
-    shutil.copytree(SPEC, dossier)
-    return SpecFabriquee(dossier)
+def regles_fabriquees(tmp_path: Path) -> ReglesFabriquees:
+    shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"))
+    shutil.copytree(RACINE / "spec", tmp_path / "spec")
+    return ReglesFabriquees(tmp_path)
+
+
+@pytest.fixture(scope="session")
+def regles():
+    from humatheque.regles import charger_regles
+
+    return charger_regles()

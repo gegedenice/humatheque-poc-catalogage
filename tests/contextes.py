@@ -17,7 +17,7 @@ def _o(forme, ppn=None):
     return {"forme": forme, "ppn": ppn, "statut_idref": "accepted" if ppn else "not_found"}
 
 
-# Thèse originale soutenue à l'EPHE (profil these_originale_imprimee)
+# Thèse originale soutenue à l'EPHE (profil these-originale-imprimee)
 THESE_ORIGINALE_EPHE = {
     "title": "Contribution à l'étude de la démocratie en Afrique",
     "titre_classement": "Contribution à l'étude de la démocratie en Afrique",
@@ -40,11 +40,10 @@ THESE_ORIGINALE_EPHE = {
     "language": "fre",
     "abstract": None,
     "code_etab": "EPHE",
-    "numero_nnt": "XXXX",
-    "dewey_code": "320",
+    "dewey": "320",
 }
 
-# Reproduction d'une thèse soutenue hors EPHE (profil these_reproduction_imprimee)
+# Reproduction d'une thèse soutenue hors EPHE (profil these-reproduction-imprimee)
 REPRODUCTION_HORS_EPHE = copy.deepcopy(THESE_ORIGINALE_EPHE) | {
     "title": "Les coraux tempérés",
     "titre_classement": "Les @coraux tempérés",

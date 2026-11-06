@@ -3,9 +3,6 @@
 # (E.P.H.E. → ephe), autre ponctuation remplacée par une espace.
 # Une forme est reconnue si elle apparaît comme suite de mots entiers.
 
-# Valeurs admises dans Situations.provenance (en plus du joker `*`).
-valeurs_situation: [EPHE, hors EPHE, mémoire]
-
 valeurs:
   ephe: EPHE
   hors_ephe: hors EPHE

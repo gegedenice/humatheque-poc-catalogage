@@ -19,6 +19,7 @@ from services_simules import simuler
 @pytest.fixture
 def app(tmp_path):
     shutil.copytree(RACINE / "spec", tmp_path / "spec")
+    shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"))
     reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv"})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=reglages,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone())
@@ -42,7 +43,7 @@ def test_accueil(client):
     r = client.get("/")
     texte = html.unescape(r.text)
     assert r.status_code == 200
-    assert "Nouveau traitement" in texte and "Spécification chargée" in texte
+    assert "Nouveau traitement" in texte and "Règles chargées" in texte
     assert "aucune erreur bloquante" in texte and "Aucun traitement pour l'instant" in texte
     assert '<script src="/static/vendor/htmx.min.js"' in r.text
 

@@ -22,11 +22,15 @@ lignes:
   - {ligne: "182 ##$P01$cn", priorite: 1, ref: R020}
   - {ligne: "183 ##$P01$anga", priorite: 1, ref: R021}
   - {ligne: "200 1#$a{titre_classement}$e{sous_titre}$f{auteur}$gsous la direction de {directeur}", priorite: 1,
-     statut: à discuter, ref: R022 R024-R026, remarque: "directeurs multiples : un $g par directeur, à trancher"}
-  - {ligne: "214 #1$d{annee} || 214 #1$d19XX", priorite: 1, statut: à discuter, ref: R027}
+     joindre: {directeur: [", ", " et "]}, statut: à discuter, ref: R022 R024-R026,
+     remarque: "un seul $g : « sous la direction de A et B » (décision du 06/11)"}
+  - {ligne: "214 #1$d{annee} || 214 #1$d19..", priorite: 1, statut: à discuter, ref: R027}
   - {ligne: "215 ##$a{volumaison}", priorite: 1, statut: à discuter, ref: R028}
-  - {ligne: "328 #0$zReproduction de$b{diplome}$c{discipline}$e{etablissement}$d{annee} || 328 #0$zReproduction de$b{diplome}$c{discipline}$e{etablissement}$d19XX",
+  - {ligne: "328 #0$zReproduction de$b{diplome}$c{discipline}$e{etablissement}$d{annee}", si: "annee != null",
      priorite: 1, statut: à discuter, ref: R032-R036, remarque: "si l'originale est au Sudoc, reprendre sa 328 ?"}
+  - {ligne: "328 #0$zReproduction de$b{diplome}$c{discipline}$e{etablissement}$d19..", si: "annee == null",
+     priorite: 1, statut: à discuter, ref: R032-R036,
+     remarque: "repli de 328$d sans année (Grist R036 : seule $d a un repli)"}
   - {ligne: "608 ##$3027253139$aThèses et écrits académiques$2rameau", priorite: 1, ref: R041}
   - {ligne: "686 ##$a{dewey}$2TEF", priorite: 1, statut: à discuter, ref: R043, remarque: "granularité TEF à trancher"}
   - {ligne: "700 #1$3{auteur.ppn}$4070 || 700 #1$a{auteur.nom}$b{auteur.prenom}$4070", priorite: 1, ref: R044}
@@ -49,6 +53,6 @@ lignes:
   - {ligne: "330 ##$a{resume}", actif: false, priorite: 2, statut: à discuter, ref: R037}
   - {ligne: "510 ##$a{titre_parallele}$z{langue_titre_parallele}", actif: false, priorite: 1, statut: à discuter, ref: R038}
   - {ligne: "541 ##$a", actif: false, priorite: 2, ref: R039}
-  - {ligne: "600", actif: false, priorite: 1, statut: à discuter, ref: R040, remarque: "indexation Rameau : décision de périmètre"}
+  - {ligne: "600", actif: false, priorite: 1, statut: à discuter, ref: R040, remarque: "aucune zone 600 à 607 produite (décision du 06/11)"}
   - {ligne: "610 ##$a", actif: false, priorite: 2, ref: R042}
   - {ligne: "711 02$3{partenaire.ppn}$4985 || 711 02$a{partenaire}$4985", actif: false, priorite: 2, statut: à discuter, ref: R053}

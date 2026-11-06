@@ -1,11 +1,13 @@
-"""Chargement Grist simulé (respx), résolution des références, repli CSV (SPEC §8)."""
+"""Lecture Grist simulée (respx) : résolution des références par le lecteur générique,
+chargement de Statuts_services depuis Grist et repli sur le CSV (SPEC §8.1)."""
 
 import httpx
 import pytest
 import respx
 
 from humatheque.config import Reglages
-from humatheque.spec import charger_spec, verifier
+from humatheque.regles import charger_regles, verifier
+from humatheque.regles.grist import lire_tables_grist
 
 URL = "http://grist.test"
 DOC = "doc123"
@@ -70,25 +72,30 @@ def _simuler_grist(mock):
 
 
 @respx.mock
-def test_chargement_grist_resout_references_et_listes():
+def test_lecteur_grist_resout_references_et_listes():
     _simuler_grist(respx)
-    spec = charger_spec(_reglages())
-    assert spec.source == "grist" and not spec.avertissements
-    r005, r010 = spec.regles
-    assert r005.id == "R005"
-    assert r005.liste_profils() == ["these_originale_imprimee", "these_reproduction_imprimee"]
-    assert r005.priorite == "1" and r005.sources == "language"
-    assert r010.liste_profils() == ["these_originale_imprimee"] and r010.repli == ""
-    assert spec.situations[0].profil_cible == "these_originale_imprimee"
-    assert spec.situations[1].profil_cible == ""
-    assert spec.sources[0].cardinalite == "1"
-    assert not verifier(spec).bloquant
+    t = lire_tables_grist(URL, DOC, "cle", ["Regles", "Situations"], timeout=2)
+    r005, r010 = t["Regles"]
+    assert r005["id"] == "R005" and r005["profils"] == "these_originale_imprimee, these_reproduction_imprimee"
+    assert r005["sources"] == "language" and r005["priorite"] == 1.0
+    assert r010["profils"] == "these_originale_imprimee"
+    assert t["Situations"][0]["profil_cible"] == "these_originale_imprimee"
+    assert t["Situations"][1]["profil_cible"] == ""
+
+
+@respx.mock
+def test_statuts_services_depuis_grist():
+    _simuler_grist(respx)
+    r = charger_regles(_reglages())
+    assert r.source == "grist" and not r.avertissements
+    assert [s.id for s in r.statuts_services] == ["sudoc-checker / error"]
+    assert r.profils  # les règles viennent toujours de regles/
 
 
 @respx.mock
 def test_chargement_grist_envoie_la_cle_api():
     _simuler_grist(respx)
-    charger_spec(_reglages())
+    charger_regles(_reglages())
     assert all(c.request.headers["Authorization"] == "Bearer cle-de-test" for c in respx.calls)
 
 
@@ -105,15 +112,15 @@ def test_grist_injoignable_repli_sur_csv(panne):
         route.side_effect = panne
     else:
         route.return_value = panne
-    spec = charger_spec(_reglages())
-    assert spec.source == "csv"
-    assert len(spec.avertissements) == 1 and "Grist injoignable" in spec.avertissements[0]
-    assert {r.id for r in spec.regles} >= {"R001", "R053"}
-    rapport = verifier(spec)
+    r = charger_regles(_reglages())
+    assert r.source == "csv"
+    assert len(r.avertissements) == 1 and "Grist injoignable" in r.avertissements[0]
+    assert len(r.statuts_services) > 20
+    rapport = verifier(r)
     assert not rapport.bloquant
     assert any(c.code == "chargement" for c in rapport.avertissements)
 
 
 def test_grist_sans_identifiant_de_document_repli_sur_csv():
-    spec = charger_spec(Reglages(_env_file=None, spec_source="grist", grist_doc_id=""))
-    assert spec.source == "csv" and "GRIST_DOC_ID" in spec.avertissements[0]
+    r = charger_regles(Reglages(_env_file=None, spec_source="grist", grist_doc_id=""))
+    assert r.source == "csv" and "GRIST_DOC_ID" in r.avertissements[0]

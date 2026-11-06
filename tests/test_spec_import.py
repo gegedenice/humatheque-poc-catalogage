@@ -1,4 +1,4 @@
-"""humatheque spec-import : classeur Grist construit depuis spec/*.csv (SPEC §8).
+"""humatheque spec-import : table Grist Statuts_services créée depuis spec/ (SPEC §8.1).
 
 Un faux Grist en mémoire reproduit les routes REST utilisées (espaces, documents,
 tables, colonnes, enregistrements, actions) ; l'aller-retour doit redonner la
@@ -13,9 +13,9 @@ import pytest
 import respx
 
 from humatheque.config import Reglages
-from humatheque.spec import charger_spec
-from humatheque.spec.chargement import lire_tables_csv
-from humatheque.spec.import_grist import ImportImpossible, identifiant_colonne, importer
+from humatheque.regles import charger_regles
+from humatheque.regles.chargement import lire_statuts_csv
+from humatheque.regles.import_grist import ImportImpossible, identifiant_colonne, importer
 
 URL = "http://grist.test"
 
@@ -80,30 +80,25 @@ def grist():
 
 @respx.mock
 def test_import_nouveau_document_aller_retour(grist):
-    r = importer(_reglages(), nouveau="Spécification humatheque")
+    r = importer(_reglages(), nouveau="Statuts des services humatheque")
     assert r["doc_id"] == "docNeuf" and r["ecarts"] == []
-    assert set(grist.docs["docNeuf"]) == {"Regles", "Sources", "Situations", "Statuts_services", "Profils"}
-    csv = lire_tables_csv(_reglages().dossier_spec)
-    assert r["tables"] == {t: len(l) for t, l in csv.items()}
-    # colonnes Texte ; identifiants sûrs, libellés = en-têtes CSV exacts
-    cols = {c["fields"]["label"]: c for c in grist.docs["docNeuf"]["Sources"]["columns"]}
-    assert cols["id"]["id"] == "id_spec" and cols["cardinalité"]["id"] == "cardinalite"
+    assert set(grist.docs["docNeuf"]) == {"Statuts_services"}  # Table1 vide retirée
+    assert r["tables"] == {"Statuts_services": len(lire_statuts_csv(_reglages().dossier_spec))}
+    cols = {c["fields"]["label"]: c for c in grist.docs["docNeuf"]["Statuts_services"]["columns"]}
     assert {c["fields"]["type"] for c in cols.values()} == {"Text"}
-    # valeurs gardées telles quelles (zone « 008 », pas 8)
-    regle = grist.docs["docNeuf"]["Regles"]["records"][0]["fields"]
-    assert regle["zone"] == "008" and regle["id_spec"] == "R001"
-    # même spécification depuis Grist que depuis les CSV
-    assert r["empreinte_grist"] == r["empreinte_csv"] == charger_spec(source="csv").empreinte
-    assert charger_spec(_reglages("docNeuf")).empreinte == r["empreinte_csv"]
+    # même table depuis Grist que depuis le CSV
+    assert r["empreinte_grist"] == r["empreinte_csv"]
+    depuis_grist = charger_regles(_reglages("docNeuf"))
+    assert depuis_grist.source == "grist" and depuis_grist.empreinte == charger_regles().empreinte
 
 
 @respx.mock
 def test_import_document_existant_refuse_puis_remplace(grist):
-    importer(_reglages(), nouveau="spec")
+    importer(_reglages(), nouveau="statuts")
     with pytest.raises(ImportImpossible, match="déjà présentes"):
         importer(_reglages("docNeuf"))
     r = importer(_reglages("docNeuf"), remplacer=True)
-    assert r["ecarts"] == [] and len(grist.docs["docNeuf"]["Regles"]["records"]) == r["tables"]["Regles"]
+    assert r["ecarts"] == [] and len(grist.docs["docNeuf"]["Statuts_services"]["records"]) == r["tables"]["Statuts_services"]
 
 
 @respx.mock

@@ -73,9 +73,10 @@ def create_app(application: Application | None = None, planificateur: bool = Fal
     app.add_middleware(Authentification)
     app.mount("/static", StaticFiles(directory=str(ICI / "static")), name="static")
 
-    from humatheque.web import api, pages
+    from humatheque.web import api, pages, pages_regles
 
     app.include_router(pages.routeur)
+    app.include_router(pages_regles.routeur)
     app.include_router(api.routeur, prefix="/api/v1")
 
     @app.exception_handler(Introuvable)

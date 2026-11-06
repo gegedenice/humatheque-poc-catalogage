@@ -6,5 +6,7 @@ data
 grist-data
 tests
 reference
+!reference/moteur-regles/exemple_contexte.json
+regles/archives
 **/__pycache__
 *.pyc

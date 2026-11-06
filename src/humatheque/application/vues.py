@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from humatheque.ingestion import DocumentDetecte
 from humatheque.notice.validation import Marqueur
 from humatheque.notice.versions import VersionNotice
-from humatheque.spec.verificateur import Constat
+from humatheque.regles.verificateur import Constat
 from humatheque.store import Ingestion, Lot
 from humatheque.workflow.modeles import Dossier
 

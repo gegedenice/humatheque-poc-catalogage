@@ -1,4 +1,4 @@
-"""Construction du classeur Grist depuis `spec/*.csv` (`humatheque spec-import`).
+"""Création de la table Grist Statuts_services depuis `spec/` (`humatheque spec-import`).
 
 Pendant de `spec-export` : chaque CSV devient une table Grist dont les
 colonnes sont toutes de type Texte, pour garder les valeurs telles quelles
@@ -11,6 +11,8 @@ comparées aux CSV : on obtient la même spécification dans les deux sources.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -19,13 +21,27 @@ import httpx
 from unidecode import unidecode
 
 from humatheque.config import Reglages
-from humatheque.spec.chargement import TABLES, construire_spec, lire_tables_csv
-from humatheque.spec.grist import GristInjoignable, lire_tables_grist
+from humatheque.regles.chargement import TABLE_STATUTS, lire_statuts_csv
+from humatheque.regles.grist import GristInjoignable, lire_tables_grist
+from humatheque.regles.modeles import StatutService
+
+TABLES = [TABLE_STATUTS]
 
 # Identifiants de colonne réservés par Grist.
 RESERVES = {"id", "manualsort"}
 LOT_ENREGISTREMENTS = 200
 
+
+
+def _tables_csv(dossier: Path) -> dict[str, list[dict[str, Any]]]:
+    return {TABLE_STATUTS: lire_statuts_csv(dossier)}
+
+
+def _empreinte_table(tables: dict[str, list[dict[str, Any]]]) -> str:
+    """Empreinte de Statuts_services (lignes validées) : identique entre CSV et Grist."""
+    lignes = [StatutService.model_validate(l).model_dump() for l in tables.get(TABLE_STATUTS, [])
+              if any(str(v or "").strip() for v in l.values())]
+    return hashlib.sha256(json.dumps(lignes, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
 
 class ImportImpossible(Exception):
     """Classeur cible inutilisable (tables déjà présentes, document introuvable…)."""
@@ -75,8 +91,8 @@ def importer(reglages: Reglages, dossier: Path | None = None, *, doc_id: str | N
     Renvoie {doc_id, tables: {table: nb lignes}, ecarts: [..], empreinte}.
     """
     dossier = dossier or reglages.dossier_spec
-    csv_tables = lire_tables_csv(dossier)
-    spec_csv = construire_spec(csv_tables, "csv", str(dossier))  # la spec source doit être lisible
+    csv_tables = _tables_csv(dossier)
+    empreinte_csv = _empreinte_table(csv_tables)  # la table source doit être lisible
     racine = reglages.grist_url.rstrip("/")
     propre = client is None
     client = client or httpx.Client(headers={"Authorization": f"Bearer {reglages.grist_api_key.get_secret_value()}"},
@@ -127,9 +143,9 @@ def importer(reglages: Reglages, dossier: Path | None = None, *, doc_id: str | N
             client.close()
 
     ecarts = comparer(csv_tables, relu)
-    spec_grist = construire_spec(relu, "grist", racine)
+    empreinte_grist = _empreinte_table(relu)
     return {"doc_id": doc_id, "tables": {t: len(csv_tables.get(t, [])) for t in TABLES}, "ecarts": ecarts,
-            "empreinte_csv": spec_csv.empreinte, "empreinte_grist": spec_grist.empreinte}
+            "empreinte_csv": empreinte_csv, "empreinte_grist": empreinte_grist}
 
 
 def comparer(a: dict[str, list[dict[str, Any]]], b: dict[str, list[dict[str, Any]]]) -> list[str]:

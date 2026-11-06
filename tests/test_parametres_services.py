@@ -21,6 +21,8 @@ from services_simules import simuler
 @pytest.fixture
 def app(tmp_path):
     shutil.copytree(RACINE / "spec", tmp_path / "spec")
+    shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"),
+                    dirs_exist_ok=True)
     reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv"})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=reglages,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone(), depot=None)

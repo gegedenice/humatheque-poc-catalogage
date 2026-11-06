@@ -101,14 +101,14 @@ def png() -> bytes:
     return buf.getvalue()
 
 
-def services(spec, fournisseur=None):
+def services(regles, fournisseur=None):
     """Services du workflow pointant vers les URL simulées."""
     from humatheque.extraction.fournisseurs import FournisseurOpenAICompatible
     from humatheque.services import ClientService
     from humatheque.workflow import Services
 
     return Services(
-        spec=spec,
+        regles=regles,
         vlm=FournisseurOpenAICompatible(fournisseur or "vlm", VLM, "google/gemma-4-26B-A4B-it", timeout=5),
         alma=ClientService("alma-checker", ALMA_URL),
         sudoc=ClientService("sudoc-checker", SUDOC_URL),

@@ -1,0 +1,20 @@
+{# Rapport du vérificateur (SPEC §8.4) : règles chargées ou brouillon. #}
+{% set ordre = {"erreur": 0, "avertissement": 1, "info": 2} %}
+{% set styles = {"erreur": "bg-sortie-clair text-sortie-fonce", "avertissement": "bg-decision-clair text-decision-fonce", "info": "bg-rail text-sourdine"} %}
+<div class="flex flex-col gap-3" aria-live="polite">
+  <div class="flex flex-wrap items-center gap-2">
+    {% if rapport.erreurs %}<span class="puce bg-sortie-clair text-sortie-fonce">{{ rapport.erreurs | length }} erreur(s) bloquante(s)</span>
+    {% else %}<span class="puce bg-auto-clair text-auto-fonce">✓ aucune erreur bloquante</span>{% endif %}
+    <span class="puce bg-decision-clair text-decision-fonce">{{ rapport.avertissements | length }} avertissement(s)</span>
+    {% if brouillon is defined and brouillon %}<span class="text-xs text-sourdine">brouillon vérifié, rien n'est écrit</span>{% endif %}
+  </div>
+  {% if rapport.constats %}
+  <ul class="flex flex-col gap-1.5 text-[13px]">
+    {% for g in ["erreur", "avertissement", "info"] %}{% for c in rapport.constats if c.gravite == g %}
+    <li class="flex flex-wrap items-baseline gap-2"><span class="puce {{ styles[g] }}">{{ g }}</span>
+      <span class="font-mono text-xs text-sourdine">{{ c.table }}{% if c.ligne %} · {{ c.ligne }}{% endif %}</span>
+      <span>{{ c.message }}</span></li>
+    {% endfor %}{% endfor %}
+  </ul>
+  {% endif %}
+</div>

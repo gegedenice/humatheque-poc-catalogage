@@ -8,20 +8,14 @@ from contextes import THESE_ORIGINALE_EPHE
 from humatheque.generateur import generer, vers_winibw
 from humatheque.notice import analyser, valider, vers_marcxml
 from humatheque.notice import versions as nv
-from humatheque.spec import charger_spec
 
-ORIG = "these_originale_imprimee"
-
-
-@pytest.fixture(scope="module")
-def spec():
-    return charger_spec(source="csv")
+ORIG = "these-originale-imprimee"
 
 
 @pytest.fixture(scope="module")
-def notice(spec):
+def notice(regles):
     """Notice générée, PPN de test remplacés par des PPN bien formés."""
-    texte = vers_winibw(generer(spec, THESE_ORIGINALE_EPHE, ORIG))
+    texte = vers_winibw(generer(regles, THESE_ORIGINALE_EPHE, ORIG))
     for i in (1, 2, 3, 4, 100):
         texte = texte.replace(f"TEST{i:05d}", f"0{i:07d}X"[:9])
     return texte
@@ -66,25 +60,25 @@ def test_notice_vide():
     assert valider("")[0].message == "notice vide"
 
 
-# ---------------------------------------------------------------- règles de la spec
-def test_notice_generee_sans_marqueur(notice, spec):
-    assert valider(notice, spec, ORIG) == []
+# ---------------------------------------------------------------- règles du profil
+def test_notice_generee_sans_marqueur(notice, regles):
+    assert valider(notice, regles, ORIG) == []
 
 
-def test_zone_prioritaire_absente(notice, spec):
+def test_zone_prioritaire_absente(notice, regles):
     texte = "\n".join(l for l in notice.splitlines() if not l.startswith("101 "))
-    (m,) = valider(texte, spec, ORIG)
+    (m,) = valider(texte, regles, ORIG)
     assert m.gravite == "erreur" and "zone 101 absente" in m.message and "R005" in m.message
 
 
-def test_zone_et_sous_zone_inconnues_avertissement(notice, spec):
+def test_zone_et_sous_zone_inconnues_avertissement(notice, regles):
     texte = notice + "\n999 ##$aquelque chose\n610 ##$aMot-clé"
     texte = texte.replace("101 0#$afre", "101 0#$afre$xbizarre")
-    marqueurs = valider(texte, spec, ORIG)
+    marqueurs = valider(texte, regles, ORIG)
     assert {m.gravite for m in marqueurs} == {"avertissement"}
     messages = " ".join(m.message for m in marqueurs)
-    assert "zone 999 produite par aucune règle" in messages and "101$x" in messages
-    assert "610" not in messages  # R042 (Non généré) documente la 610 pour ce profil
+    assert "zone 999 produite par aucune ligne" in messages and "101$x" in messages
+    assert "610" not in messages  # R042 (actif: false) documente la 610 pour ce profil
 
 
 def test_vers_marcxml(notice):
