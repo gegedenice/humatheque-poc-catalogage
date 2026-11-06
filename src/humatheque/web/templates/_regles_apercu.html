@@ -1,0 +1,12 @@
+{# Aperçu d'un profil : notice produite sur le contexte d'un dossier ou de l'exemple. #}
+<div class="flex flex-col gap-3" aria-live="polite">
+  <p class="text-[13px] text-sourdine">Profil <span class="font-mono">{{ apercu.profil }}</span> · contexte : {{ apercu.source }}</p>
+  <pre class="font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words rounded-2xl border border-filet bg-[#fbfbfe] p-4 overflow-x-auto">{{ apercu.texte | colorer_notice }}</pre>
+  {% if apercu.alertes %}<ul class="flex flex-wrap gap-1.5" aria-label="Alertes">{% for a in apercu.alertes %}<li class="puce bg-decision-clair text-decision-fonce font-medium">{{ a }}</li>{% endfor %}</ul>{% endif %}
+  <details><summary class="cursor-pointer text-sm text-sourdine">Notice annotée par ligne de profil</summary>
+    <pre class="code mt-2">{{ apercu.annote }}</pre></details>
+  <details><summary class="cursor-pointer text-sm text-sourdine">Non couvertes ({{ apercu.non_couvertes | length }})</summary>
+    <p class="text-xs font-mono mt-2">{{ apercu.non_couvertes | join(" · ") }}</p></details>
+  <details><summary class="cursor-pointer text-sm text-sourdine">Variables du contexte</summary>
+    <pre class="code mt-2 max-h-72">{{ apercu.variables | tojson(indent=2) }}</pre></details>
+</div>

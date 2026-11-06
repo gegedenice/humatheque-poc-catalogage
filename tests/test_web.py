@@ -43,7 +43,7 @@ def test_accueil(client):
     r = client.get("/")
     texte = html.unescape(r.text)
     assert r.status_code == 200
-    assert "Nouveau traitement" in texte and "Spécification chargée" in texte
+    assert "Nouveau traitement" in texte and "Règles chargées" in texte
     assert "aucune erreur bloquante" in texte and "Aucun traitement pour l'instant" in texte
     assert '<script src="/static/vendor/htmx.min.js"' in r.text
 

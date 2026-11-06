@@ -8,6 +8,7 @@
 <span class="text-[13px] text-sourdine">{% if reglages.maj_le %}Modifié le {{ reglages.maj_le | date("%d/%m/%Y à %H:%M") }} par {{ reglages.auteur }}{% else %}Valeurs initiales lues dans .env et config/{% endif %}</span>
 {% endblock %}
 {% block contenu %}
+{% include "_admin_onglets.html" %}
 <section class="carte mb-6">
   <h2>Santé des services</h2>
   <div id="sante" hx-get="/admin/sante" hx-trigger="load" hx-swap="innerHTML">

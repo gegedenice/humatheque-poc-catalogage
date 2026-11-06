@@ -90,9 +90,10 @@ def documents_depuis_liste(texte: str) -> list[list[str]]:
 
 
 from humatheque.application.administration import Administration  # noqa: E402
+from humatheque.application.regles_admin import AdministrationRegles, ReglesRefusees  # noqa: E402,F401
 
 
-class Application(Administration):
+class Application(Administration, AdministrationRegles):
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
                  regles: Regles | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:

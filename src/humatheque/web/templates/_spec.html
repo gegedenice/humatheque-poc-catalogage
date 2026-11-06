@@ -1,8 +1,8 @@
 {% from "_composants.html" import vide %}
 <section id="etat-spec" class="carte flex flex-col gap-4">
   <div class="flex items-center justify-between gap-3">
-    <h2 class="mb-0">Spécification chargée</h2>
-    <button class="btn-discret btn-sm" hx-post="/spec/recharger" hx-target="#etat-spec" hx-swap="outerHTML">Recharger la spec</button>
+    <h2 class="mb-0">Règles chargées</h2>
+    <button class="btn-discret btn-sm" hx-post="/spec/recharger" hx-target="#etat-spec" hx-swap="outerHTML">Recharger les règles</button>
   </div>
   <div class="flex items-center gap-3">
     {% if spec.nb_erreurs %}
@@ -15,8 +15,10 @@
       <span class="text-[13px] text-sourdine">{{ spec.nb_avertissements }} avertissement(s) du vérificateur</span></div>
   </div>
   <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-    <dt class="text-sourdine">Source</dt>
-    <dd>{{ "Grist" if spec.source == "grist" else "CSV" }} <span class="font-mono text-xs text-sourdine break-all">{{ spec.emplacement }}</span></dd>
+    <dt class="text-sourdine">Règles</dt>
+    <dd><a class="font-mono text-xs break-all" href="/admin/regles">{{ spec.emplacement }}</a></dd>
+    <dt class="text-sourdine">Statuts des services</dt>
+    <dd>{{ "Grist" if spec.source == "grist" else "CSV" }}</dd>
     {% if spec.grist_joignable is not none %}
     <dt class="text-sourdine">Grist</dt>
     <dd>{% if spec.grist_joignable %}<span class="text-auto">joignable</span>{% else %}<span class="text-sortie">injoignable</span>{% endif %}</dd>

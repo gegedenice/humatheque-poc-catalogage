@@ -112,6 +112,35 @@ def resoudre(request: Request, dossier_id: str, type_: Literal["provenance", "fa
     return a.traiter_hors_outil(dossier_id, r.commentaire, r.auteur)
 
 
+# ---------------------------------------------------------------- règles (SPEC §8.1)
+class Faits(BaseModel):
+    faits: dict[str, str | None] = Field(default_factory=dict)
+    dossier: str | None = Field(None, description="reprendre les faits d'un dossier")
+
+
+class DemandeApercu(BaseModel):
+    profil: str
+    dossier: str | None = None
+
+
+@routeur.get("/regles")
+def regles(request: Request) -> dict:
+    """Fichiers de règles tels que chargés, version et rapport du vérificateur."""
+    a = _app(request)
+    return {"version": a.regles.version, "fichiers": a.fichiers_regles(), "rapport": a.etat_spec().model_dump()}
+
+
+@routeur.post("/regles/decision")
+def essayer_decision(request: Request, d: Faits) -> dict:
+    a = _app(request)
+    return a.essayer_decision(a.faits_dossier(d.dossier) if d.dossier else d.faits).model_dump()
+
+
+@routeur.post("/regles/apercu")
+def apercu_profil(request: Request, d: DemandeApercu) -> dict:
+    return _app(request).apercu_profil(d.profil, d.dossier).model_dump()
+
+
 @routeur.get("/historique", response_model=Historique)
 def historique(request: Request) -> Historique:
     return _app(request).historique()
