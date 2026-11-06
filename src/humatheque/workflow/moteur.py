@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
 
+from humatheque import issues
 from humatheque.config import charger_yaml, reglages
 from humatheque.contexte import ResultatsServices, construire, document_vide, normaliser_metadonnees
 from humatheque.conversion import ConversionEchec, convertir, depuis_iso, unimarc_xml_vers_iso, vers_winibw as iso_vers_winibw
@@ -34,8 +35,8 @@ from humatheque.services.sudoc import lien_notice, lire_notice, verifier_sudoc
 from humatheque.regles.modeles import Regles
 from humatheque.workflow.modeles import ETAPES, Dossier, Etape, ExceptionDossier, maintenant
 
-SERVICE_IDREF_PERSONNE = "idref-linker /align/person"
-SERVICE_IDREF_ORGS = "idref-linker /align/thesis-organizations"
+SERVICE_IDREF_PERSONNE = "idref_personne"   # clés de config/services.yaml
+SERVICE_IDREF_ORGS = "idref_organisations"
 
 
 @lru_cache
@@ -79,7 +80,7 @@ class Suite:
     """Résultat d'une étape : continuer, ou s'arrêter avec un routage et un motif."""
 
     continuer: bool = True
-    routage: str = "auto"
+    routage: str = issues.TERMINE
     motif: str | None = None
     statut: str = "ok"
 
@@ -131,7 +132,7 @@ class Workflow:
 
         routages = [e.routage for e in dossier.etapes.values()]
         if any(not e.resolue for e in dossier.exceptions):
-            routages.append(_cfg()["routage_decision"])
+            routages.append(issues.A_REPRENDRE)
         dossier.routage = routage_final(routages)
         return dossier
 
@@ -156,7 +157,7 @@ class Workflow:
                     self.attendre((self.delai or 0) * tentative)
                     continue
                 etape.erreur = inc.motif
-                suite = Suite(False, "incident", inc.motif, inc.statut)
+                suite = Suite(False, issues.INCIDENT, inc.motif, inc.statut)
                 break
         etape.statut, etape.routage = suite.statut, suite.routage
         etape.motif = suite.motif
@@ -184,7 +185,7 @@ class Workflow:
 
     # ================================================================ étapes
     def _etape_extraction(self, d: Dossier) -> Suite:
-        decision = _cfg()["routage_decision"]
+        decision = issues.A_REPRENDRE
         try:
             res = extraire(self.services.vlm, d.document.images, d.document.type_document,
                            lecteur_s3=self.services.lire_s3 if self.services.depot else None)
@@ -199,8 +200,8 @@ class Workflow:
         except ExtractionInvalide as e:
             d.etapes["extraction"].appels += e.appels
             d.etapes["extraction"].reponse = {"bruts": e.bruts}
-            rs = routage_service(self.services.regles, "extraction-vlm", "json_invalide")
-            return self._arret(rs.routage or "incident", str(e), "json_invalide")
+            rs = routage_service("extraction", "json_invalide")
+            return self._arret(rs.routage or issues.INCIDENT, str(e), "json_invalide")
 
         d.extraction = res
         d.etapes["extraction"].appels += res.appels
@@ -234,7 +235,7 @@ class Workflow:
             d.exceptions.append(ExceptionDossier(etape="provenance", objet="provenance",
                                                  motif=f"{motif} ({p.valeur} : « {m.get('granting_institution') or ''} »)",
                                                  candidats=["EPHE", "hors EPHE"]))
-            return self._arret(_cfg()["routage_decision"], f"{motif} ({p.valeur})")
+            return self._arret(issues.A_REPRENDRE, f"{motif} ({p.valeur})")
         return Suite()
 
     def _etape_alma(self, d: Dossier) -> Suite:
@@ -242,7 +243,7 @@ class Workflow:
                           self.services.parametres("alma"))
         d.alma = res
         if res.etat is None:
-            rs = routage_service(self.services.regles, "alma-checker", res.statut)
+            rs = routage_service("alma", res.statut)
             inc = _cfg()["statut_inconnu"]
             return self._arret(rs.routage or inc["routage"], f"alma-checker : {inc['motif']} « {res.statut} »",
                                "service_indisponible")
@@ -267,14 +268,14 @@ class Workflow:
         d.sudoc = q
         d.noter("sudoc", "decision", {"etat": q.etat, "justification": q.justification, "ppn_source": q.ppn_source})
         if q.incident:
-            return self._arret("incident", f"sudoc-checker : {q.justification}", "service_indisponible")
+            return self._arret(issues.INCIDENT, f"sudoc-checker : {q.justification}", "service_indisponible")
         d.etat_sudoc = d.corrections.get("sudoc", q.etat)
         if d.etat_sudoc == charger_yaml("etats_sudoc")["etat_inconnu"]:
             motif = _cfg()["motifs"]["sudoc_indetermine"]
             d.exceptions.append(ExceptionDossier(etape="sudoc", objet="qualification Sudoc",
                                                  motif=f"{motif} : {q.justification}",
                                                  candidats=[c.model_dump() for c in q.candidats if c.retenu]))
-            return self._arret(_cfg()["routage_decision"], motif)
+            return self._arret(issues.A_REPRENDRE, motif)
         return Suite()
 
     def _etape_situation(self, d: Dossier) -> Suite:
@@ -295,10 +296,10 @@ class Workflow:
     def _etape_conversion(self, d: Dossier) -> Suite:
         dec = d.decision
         if dec is None or dec.suite != "convertir":
-            return Suite(routage="auto", statut="ignoree")
+            return Suite(routage=issues.TERMINE, statut="ignoree")
         ppn = d.sudoc.ppn_source if d.sudoc else None
         if not ppn:
-            return self._arret("incident", "conversion : aucune notice source retenue", "conversion_echec")
+            return self._arret(issues.INCIDENT, "conversion : aucune notice source retenue", "conversion_echec")
         try:
             xml, appel = lire_notice(self.services.sudoc, ppn)
             d.etapes["conversion"].appels.append(appel)
@@ -306,7 +307,7 @@ class Workflow:
         except (ServiceIndisponible, ConversionEchec) as e:
             if isinstance(e, ServiceIndisponible):
                 d.etapes["conversion"].appels.append(e.appel)
-            return self._arret("incident", f"conversion : notice source {ppn} illisible ou introuvable ({e})",
+            return self._arret(issues.INCIDENT, f"conversion : notice source {ppn} illisible ou introuvable ({e})",
                                "conversion_echec")
         d.ppn_source, d.notice_source_iso = ppn, iso
         d.notice_source = iso_vers_winibw(depuis_iso(iso))
@@ -342,11 +343,11 @@ class Workflow:
         return Suite()
 
     def _statut_idref(self, d: Dossier, etape: str, service: str, a, objet: str) -> Suite | None:
-        rs = routage_service(self.services.regles, service, a.statut)
+        rs = routage_service(service, a.statut)
         d.alerter(*(f"{objet} : {x}" for x in rs.alertes))
         if rs.bloquant:
-            return self._arret(rs.routage or "incident", f"{service} « {a.statut} » pour {objet}",
-                               "service_indisponible" if rs.routage == "incident" else "arret")
+            return self._arret(rs.routage or issues.INCIDENT, f"{service} « {a.statut} » pour {objet}",
+                               "service_indisponible" if rs.routage == issues.INCIDENT else "arret")
         if rs.exception:
             d.exceptions.append(ExceptionDossier(etape=etape, objet=objet, motif=f"IdRef : {a.statut}",
                                                  candidats=[c.model_dump() for c in a.candidats]))
@@ -375,9 +376,9 @@ class Workflow:
         res = self._appel(d, "dewey", classer, self.services.dewey, d.metadonnees, self.services.seuil_dewey,
                           self.services.parametres("dewey"))
         d.dewey = res
-        rs = routage_service(self.services.regles, "dewey-classifier", res.statut)
+        rs = routage_service("dewey", res.statut)
         if rs.bloquant:
-            return self._arret(rs.routage or "incident", f"dewey-classifier « {res.statut} »")
+            return self._arret(rs.routage or issues.INCIDENT, f"dewey-classifier « {res.statut} »")
         if rs.exception:
             d.exceptions.append(ExceptionDossier(etape="dewey", objet="classe Dewey", motif=f"Dewey : {res.statut}",
                                                  candidats=[c.model_dump() for c in res.classes]))
@@ -389,7 +390,7 @@ class Workflow:
         try:
             notice = Generateur(self.services.regles).generer(ctx.valeurs, profil or "")
         except GenerationEchec as e:
-            return self._arret("incident", f"générateur : {e}", "generation_echec")
+            return self._arret(issues.INCIDENT, f"générateur : {e}", "generation_echec")
         d.notice, d.notice_texte = notice, vers_winibw(notice)
         d.alerter(*notice.alertes)
         for z in notice.zones_triees():

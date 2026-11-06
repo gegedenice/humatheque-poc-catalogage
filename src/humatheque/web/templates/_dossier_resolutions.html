@@ -5,11 +5,11 @@
   <label class="text-xs text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40" name="auteur" value="{{ auteur }}" required></label>
 {%- endmacro %}
 {% set ouvertes = d.exceptions | rejectattr("resolue") | list %}
-{# Faux positif proposé seulement quand le workflow attend une décision : une notice
-   au-dessus du seuil arrête le workflow sans alerte (routage auto, décision du 05/11). #}
-{% set a_decider = d.routage not in (none, "auto") and not d.cloture %}
-{% set faux_alma = a_decider and d.routage == "décision" and d.alma and d.etat_alma not in (none, "absent") %}
-{% set faux_sudoc = a_decider and d.routage == "décision" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
+{# Faux positif proposé seulement quand le document est à reprendre : une notice
+   au-dessus du seuil arrête le workflow sans alerte (terminé, décision du 05/11). #}
+{% set a_decider = d.routage not in (none, "terminé") and not d.cloture %}
+{% set faux_alma = a_decider and d.routage == "à reprendre" and d.alma and d.etat_alma not in (none, "absent") %}
+{% set faux_sudoc = a_decider and d.routage == "à reprendre" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
 {% if ouvertes or a_decider %}
 <div class="flex flex-col gap-3">
   {% set ns_idref = namespace(n=0) %}

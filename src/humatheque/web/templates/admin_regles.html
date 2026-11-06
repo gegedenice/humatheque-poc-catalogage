@@ -32,20 +32,19 @@
   {% if onglet == "decisions" %}
     <p class="text-sm text-sourdine mb-3"><span class="font-mono">decisions.yaml</span> : règles lues dans l'ordre, la première vraie l'emporte ; conditions au format rule-engine.</p>
     <div class="defilant mb-6"><table class="tableau min-w-[760px]">
-      <thead><tr><th>Règle</th><th>Condition (si)</th><th>Action</th><th>Profil ou motif</th><th>Routage</th><th>Statut</th></tr></thead>
+      <thead><tr><th>Règle</th><th>Condition (si)</th><th>Action</th><th>Profil ou motif</th><th>Issue</th></tr></thead>
       <tbody>
       {% for r in vue.decisions %}
         <tr>
-          <td class="font-mono font-semibold">{{ r.id }}</td>
+          <td class="font-semibold">{{ r.nom }}{% if r.a_valider %}<br><span class="puce bg-decision-clair text-decision-fonce font-medium">à valider</span>{% endif %}</td>
           <td class="font-mono text-xs break-words max-w-[28rem]">{{ r.si }}</td>
           <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ r.alors }}</span></td>
           <td>{% if r.profil %}<a class="font-mono text-xs" href="/admin/regles?onglet=profils&profil={{ r.profil }}">{{ r.profil }}</a>{% endif %}{{ r.motif or "" }}</td>
-          <td>{% if r.routage %}{{ badge(r.routage) }}{% else %}<span class="text-xs text-sourdine">par défaut</span>{% endif %}</td>
-          <td class="text-xs">{{ r.statut or "" }}</td>
+          <td>{{ badge(r.issue) }}</td>
         </tr>
       {% endfor %}
-        <tr class="bg-tonal/60"><td class="font-mono font-semibold">sinon</td><td class="text-xs text-sourdine">aucune règle vraie</td>
-          <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ vue.sinon.alors }}</span></td><td>{{ vue.sinon.motif or "" }}</td><td></td><td></td></tr>
+        <tr class="bg-tonal/60"><td class="font-semibold">sinon</td><td class="text-xs text-sourdine">aucune règle vraie</td>
+          <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ vue.sinon.alors }}</span></td><td>{{ vue.sinon.motif or "" }}</td><td>{{ badge(vue.sinon.issue) }}</td></tr>
       </tbody>
     </table></div>
 

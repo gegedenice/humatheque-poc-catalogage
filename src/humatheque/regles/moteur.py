@@ -46,7 +46,7 @@ def regle(condition: str) -> rule_engine.Rule:
 
 # ------------------------------------------------------------------ décision
 class Evaluation(BaseModel):
-    id: str
+    nom: str
     si: str
     vraie: bool | None = Field(None, description="None : non évaluée (règle précédente retenue) ou erreur")
     erreur: str | None = None
@@ -56,17 +56,19 @@ class Choix(BaseModel):
     """Règle retenue pour des faits, et évaluation de chaque condition (banc d'essai)."""
 
     faits: dict[str, Any]
-    regle: dict[str, Any] = Field(description="règle retenue (ou `sinon`, id « sinon »)")
+    regle: dict[str, Any] = Field(description="règle retenue (ou `sinon`, nom « sinon »)")
     action: str
     suite: str
-    routage: str
+    issue: str = Field(description="terminé ou à reprendre")
     profil: str | None = None
     motif: str
     evaluations: list[Evaluation] = Field(default_factory=list)
 
 
 def _action(alors: str) -> dict[str, str]:
-    return conventions()["actions"].get(alors) or {"suite": "arreter", "routage": "décision"}
+    from humatheque import issues
+
+    return conventions()["actions"].get(alors) or {"suite": "arreter", "issue": issues.A_REPRENDRE}
 
 
 def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False) -> Choix:
@@ -75,26 +77,25 @@ def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False
     evaluations = []
     for r in regles.decisions:
         if retenue is not None and not tout_evaluer:
-            evaluations.append(Evaluation(id=r.id, si=r.si))
+            evaluations.append(Evaluation(nom=r.nom, si=r.si))
             continue
         try:
             vraie = regle(r.si).matches(faits)
-            evaluations.append(Evaluation(id=r.id, si=r.si, vraie=vraie))
+            evaluations.append(Evaluation(nom=r.nom, si=r.si, vraie=vraie))
         except rule_engine.errors.EngineError as e:
-            evaluations.append(Evaluation(id=r.id, si=r.si, erreur=getattr(e, "message", str(e))))
+            evaluations.append(Evaluation(nom=r.nom, si=r.si, erreur=getattr(e, "message", str(e))))
             continue
         if vraie and retenue is None:
             retenue = r
     if retenue is None:
-        s = regles.sinon
-        donnees = {"id": "sinon", **s}
+        donnees = {"nom": "sinon", **regles.sinon}
     else:
-        donnees = retenue.model_dump(exclude_none=True)
-    alors = str(donnees.get("alors", "décision"))
+        donnees = retenue.model_dump(exclude_none=True, exclude_defaults=True, by_alias=True)
+        donnees["nom"] = retenue.nom
+    alors = str(donnees.get("alors", "vérification"))
     a = _action(alors)
-    routage = str(donnees.get("routage") or a["routage"])
-    motif = str(donnees.get("motif") or f"{donnees['id']} : {alors}" + (f" ({donnees['profil']})" if donnees.get("profil") else ""))
-    return Choix(faits=faits, regle=donnees, action=alors, suite=a["suite"], routage=routage,
+    motif = str(donnees.get("motif") or donnees["nom"])
+    return Choix(faits=faits, regle=donnees, action=alors, suite=a["suite"], issue=a["issue"],
                  profil=donnees.get("profil"), motif=motif, evaluations=evaluations)
 
 

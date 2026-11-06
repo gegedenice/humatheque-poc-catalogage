@@ -1,5 +1,4 @@
-"""Modèles des règles de catalogage (SPEC §8) : variables, profils, décisions,
-et la table `Statuts_services` (restée en CSV ou Grist, §7).
+"""Modèles des règles de catalogage (SPEC §8) : variables, profils, décisions.
 
 Les fichiers YAML sont validés à la lecture ; les conditions rule-engine sont
 compilées par le moteur (`regles/moteur.py`).
@@ -82,36 +81,21 @@ class Profil(BaseModel):
 
 
 class RegleDecision(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    """Une règle de decisions.yaml, identifiée par son nom en clair."""
 
-    id: str
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    nom: str
     si: str
     alors: str
     profil: str | None = None
     motif: str | None = None
-    routage: str | None = None
-    statut: str | None = None
+    a_valider: bool = Field(False, alias="à_valider", description="règle encore en discussion")
 
-
-class StatutService(BaseModel):
-    """Ligne de Statuts_services (CSV ou Grist) ; cellules texte."""
-
-    model_config = ConfigDict(extra="ignore", frozen=True)
-
-    service: str
-    statut: str
-    signification: str = ""
-    routage: str = ""
-    remarque: str = ""
-
-    @field_validator("*", mode="before")
+    @field_validator("nom", mode="before")
     @classmethod
-    def _texte(cls, v: object) -> object:
-        return "" if v is None else (v.strip() if isinstance(v, str) else v)
-
-    @property
-    def id(self) -> str:
-        return f"{self.service} / {self.statut}"
+    def _nom(cls, v: Any) -> Any:
+        return None if v is None else str(v).strip()
 
 
 class Regles(BaseModel):
@@ -122,13 +106,10 @@ class Regles(BaseModel):
     faits: dict[str, list[str]]
     decisions: list[RegleDecision]
     sinon: dict[str, Any]
-    statuts_services: list[StatutService]
 
-    source: Literal["csv", "grist"] = Field("csv", description="source de Statuts_services")
     emplacement: str = Field(description="dossier des règles")
-    emplacement_statuts: str = ""
     horodatage: datetime
-    empreinte: str = Field(description="SHA-256 (12 caractères) des fichiers de règles et de Statuts_services")
+    empreinte: str = Field(description="SHA-256 (12 caractères) des fichiers de règles")
     avertissements: list[str] = Field(default_factory=list)
     textes: dict[str, str] = Field(default_factory=dict, description="chemin relatif → texte YAML lu")
 

@@ -19,14 +19,15 @@ from humatheque.application import ActionImpossible, Application, Conflit, Intro
 ICI = Path(__file__).parent
 gabarits = Jinja2Templates(directory=str(ICI / "templates"))
 
-COULEURS_ROUTAGE = {"auto": "auto", "décision": "decision", "sortie": "sortie", "conversion": "conversion",
-                    "incident": "incident"}
-LIBELLES_ROUTAGE = {"auto": "auto", "décision": "décision", "sortie": "sortie du pipeline",
-                    "conversion": "conversion", "incident": "incident"}
+# Issue d'un document (humatheque.issues) → jeton de couleur et libellé affiché.
+COULEURS_ROUTAGE = {"terminé": "auto", "à reprendre": "decision", "incident": "sortie"}
+LIBELLES_ROUTAGE = {"terminé": "Terminé", "à reprendre": "À reprendre", "incident": "Incident"}
 
 
 def _classe_routage(routage: str | None) -> str:
-    return COULEURS_ROUTAGE.get(routage or "", "sourdine")
+    from humatheque.issues import normaliser
+
+    return COULEURS_ROUTAGE.get(normaliser(routage) or "", "sourdine")
 
 
 def _colorer_notice(texte: str | None) -> Markup:
@@ -44,7 +45,14 @@ def _colorer_notice(texte: str | None) -> Markup:
 
 
 gabarits.env.filters["colorer_notice"] = _colorer_notice
-gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=lambda r: LIBELLES_ROUTAGE.get(r or "", r or "—"))
+def _libelle_routage(routage: str | None) -> str:
+    from humatheque.issues import normaliser
+
+    r = normaliser(routage)
+    return LIBELLES_ROUTAGE.get(r or "", r or "—")
+
+
+gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=_libelle_routage)
 gabarits.env.filters["date"] = lambda d, f="%d/%m %H:%M": d.astimezone().strftime(f) if d else ""
 
 

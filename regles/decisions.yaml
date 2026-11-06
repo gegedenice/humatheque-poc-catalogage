@@ -1,10 +1,14 @@
 # Règles de décision, lues dans l'ordre : la première règle vraie l'emporte.
+# Chaque règle porte un nom en clair (affiché dans le dossier et le rapport).
 # Conditions au format rule-engine : ==, !=, in [...], and, or, not, <, >, null.
-# Actions : création (profil), conversion (profil cible), arrêt (motif), décision (motif).
-# routage (facultatif) : auto, décision, sortie, conversion, incident ; à défaut auto
-# pour une création, conversion pour une conversion, sortie pour un arrêt, décision
-# pour une décision. Décision du 05/11 : une notice trouvée au-dessus du seuil arrête
-# sans alerte (routage auto) ; seul le cas incertain part en décision (S10, S14).
+#
+# Actions et issue du document :
+#   création      on produit la notice (profil)            → Terminé
+#   conversion    on dérive la notice Sudoc (profil cible) → Terminé
+#   arrêt         rien à produire (motif)                   → Terminé
+#   vérification  un catalogueur doit trancher (motif)      → À reprendre
+# Une panne technique donne « Incident », sans règle.
+# à_valider: true signale une règle encore en discussion.
 # En v1, une conversion reprend la notice Sudoc source telle quelle.
 
 # Valeurs possibles des faits : servent au contrôle de complétude.
@@ -15,31 +19,75 @@ faits:
   sudoc: [originale imprimée, reproduction imprimée, reproduction microfiche, électronique seule, ambigu, indéterminé, rien]
 
 regles:
-  - {id: S01, si: 'alma == "présent"', alors: arrêt, motif: Notice déjà présente dans Alma, routage: auto}
-  - {id: S14, si: 'alma == "incertain"', alors: décision, motif: Candidat Alma incertain à vérifier,
-     statut: à discuter}
-  - {id: P01, si: 'type == "thèse" and provenance == "incertaine"', alors: décision,
-     motif: Provenance à confirmer (établissement absent ou ambigu)}
-  - {id: S10, si: 'sudoc in ["ambigu", "indéterminé"]', alors: décision, motif: Résultat Sudoc à vérifier}
+  - nom: Notice déjà dans Alma
+    si: alma == "présent"
+    alors: arrêt
 
-  - {id: S02, si: 'type == "thèse" and sudoc == "originale imprimée" and provenance == "hors EPHE"',
-     alors: conversion, profil: these-reproduction-imprimee, routage: auto}
-  - {id: S03, si: 'type == "thèse" and sudoc == "électronique seule" and provenance == "hors EPHE"',
-     alors: conversion, profil: these-reproduction-imprimee, routage: auto, statut: à discuter}
-  - {id: S04, si: 'type == "thèse" and sudoc == "reproduction imprimée" and provenance == "hors EPHE"',
-     alors: arrêt, motif: Reproduction imprimée déjà signalée au Sudoc, routage: auto}
-  - {id: S05, si: 'type == "thèse" and sudoc == "reproduction microfiche" and provenance == "hors EPHE"',
-     alors: conversion, profil: these-reproduction-imprimee, routage: auto, statut: à discuter}
-  - {id: S06, si: 'type == "thèse" and sudoc == "électronique seule" and provenance == "EPHE"',
-     alors: conversion, profil: these-originale-imprimee, routage: auto}
-  - {id: S07, si: 'type == "thèse" and sudoc in ["reproduction imprimée", "reproduction microfiche"] and provenance == "EPHE"',
-     alors: conversion, profil: these-originale-imprimee, routage: auto, statut: à discuter}
-  - {id: S08, si: 'type == "thèse" and sudoc == "rien" and provenance == "EPHE"',
-     alors: création, profil: these-originale-imprimee}
-  - {id: S09, si: 'type == "thèse" and sudoc == "rien" and provenance == "hors EPHE"',
-     alors: création, profil: these-reproduction-imprimee}
+  - nom: Candidat Alma à vérifier
+    si: alma == "incertain"
+    alors: vérification
+    à_valider: true
 
-  - {id: S12, si: 'type == "mémoire" and sudoc == "rien"', alors: création, profil: memoire-original-imprime, statut: à discuter}
-  - {id: S13, si: 'type == "mémoire" and sudoc == "électronique seule"', alors: conversion, profil: memoire-original-imprime, routage: auto}
+  - nom: Provenance à confirmer
+    si: type == "thèse" and provenance == "incertaine"
+    alors: vérification
+    motif: établissement de soutenance absent ou ambigu
 
-sinon: {alors: décision, motif: Situation non prévue}
+  - nom: Résultat Sudoc à vérifier
+    si: sudoc in ["ambigu", "indéterminé"]
+    alors: vérification
+
+  - nom: Thèse hors EPHE, originale imprimée au Sudoc
+    si: type == "thèse" and sudoc == "originale imprimée" and provenance == "hors EPHE"
+    alors: conversion
+    profil: these-reproduction-imprimee
+
+  - nom: Thèse hors EPHE, notice électronique au Sudoc
+    si: type == "thèse" and sudoc == "électronique seule" and provenance == "hors EPHE"
+    alors: conversion
+    profil: these-reproduction-imprimee
+    à_valider: true
+
+  - nom: Thèse hors EPHE, reproduction imprimée déjà au Sudoc
+    si: type == "thèse" and sudoc == "reproduction imprimée" and provenance == "hors EPHE"
+    alors: arrêt
+
+  - nom: Thèse hors EPHE, reproduction microfiche au Sudoc
+    si: type == "thèse" and sudoc == "reproduction microfiche" and provenance == "hors EPHE"
+    alors: conversion
+    profil: these-reproduction-imprimee
+    à_valider: true
+
+  - nom: Thèse EPHE, notice électronique au Sudoc
+    si: type == "thèse" and sudoc == "électronique seule" and provenance == "EPHE"
+    alors: conversion
+    profil: these-originale-imprimee
+
+  - nom: Thèse EPHE, reproduction au Sudoc
+    si: type == "thèse" and sudoc in ["reproduction imprimée", "reproduction microfiche"] and provenance == "EPHE"
+    alors: conversion
+    profil: these-originale-imprimee
+    à_valider: true
+
+  - nom: Thèse EPHE absente du Sudoc
+    si: type == "thèse" and sudoc == "rien" and provenance == "EPHE"
+    alors: création
+    profil: these-originale-imprimee
+
+  - nom: Thèse hors EPHE absente du Sudoc
+    si: type == "thèse" and sudoc == "rien" and provenance == "hors EPHE"
+    alors: création
+    profil: these-reproduction-imprimee
+
+  - nom: Mémoire absent du Sudoc
+    si: type == "mémoire" and sudoc == "rien"
+    alors: création
+    profil: memoire-original-imprime
+    à_valider: true
+
+  - nom: Mémoire, notice électronique au Sudoc
+    si: type == "mémoire" and sudoc == "électronique seule"
+    alors: conversion
+    profil: memoire-original-imprime
+
+sinon: {alors: vérification, motif: Situation non prévue}

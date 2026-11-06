@@ -34,10 +34,10 @@ class EntreeLot(BaseModel):
 
 
 class EtatSpec(BaseModel):
-    source: str
+    """État des règles chargées (regles/) et rapport du vérificateur."""
+
     emplacement: str
     version: str
-    grist_joignable: bool | None = Field(None, description="None : mode CSV, Grist non interrogé")
     avertissements: list[str] = Field(default_factory=list)
     constats: list[Constat] = Field(default_factory=list)
     nb_erreurs: int = 0

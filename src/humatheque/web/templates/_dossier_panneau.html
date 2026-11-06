@@ -6,7 +6,7 @@
 
   {# ---------------------------------------------------------------- onglets #}
   {# Reprise (résolutions, SPEC §9.3) : onglet discret, présent seulement s'il y a quelque chose à reprendre. #}
-  {% set a_reprendre = vue.etat == "termine" and ((d.exceptions | rejectattr("resolue") | list) or (d.routage not in (none, "auto") and not d.cloture)) %}
+  {% set a_reprendre = vue.etat == "termine" and ((d.exceptions | rejectattr("resolue") | list) or (d.routage not in (none, "terminé") and not d.cloture)) %}
   {% set onglets = [("notice", "Notice"), ("metadonnees", "Métadonnées"), ("services", "Services"),
                     ("reponses", "Réponses brutes"), ("journal", "Journal (" ~ (d.journal | length) ~ ")")] %}
   {% if a_reprendre %}{% set onglets = onglets + [("reprise", "Reprise" ~ (" (" ~ vue.exceptions_ouvertes ~ ")" if vue.exceptions_ouvertes else ""))] %}{% endif %}

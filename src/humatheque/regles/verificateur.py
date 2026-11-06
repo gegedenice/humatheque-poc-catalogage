@@ -24,13 +24,12 @@ Gravite = Literal["erreur", "avertissement", "info"]
 class Constat(BaseModel):
     gravite: Gravite
     code: str
-    table: str = ""     # fichier (profils/…, decisions.yaml…) ou table Statuts_services
+    table: str = ""     # fichier (profils/…, decisions.yaml…)
     ligne: str = ""     # lieu dans le fichier
     message: str
 
 
 class Rapport(BaseModel):
-    source: str
     emplacement: str
     version: str
     constats: list[Constat]
@@ -105,18 +104,16 @@ def verifier(regles: Regles) -> Rapport:
     # --- décisions
     vus: set[str] = set()
     for r in regles.decisions:
-        lieu = f"règle {r.id}"
-        if r.id in vus:
-            signaler("erreur", "decision_doublon", "decisions.yaml", lieu, f"identifiant {r.id} en double")
-        vus.add(r.id)
+        lieu = f"« {r.nom} »"
+        if r.nom in vus:
+            signaler("erreur", "decision_doublon", "decisions.yaml", lieu, f"nom « {r.nom} » en double")
+        vus.add(r.nom)
         if err := _condition_invalide(r.si):
             signaler("erreur", "condition_invalide", "decisions.yaml", lieu, f"condition invalide ({err})")
         if r.alors not in conv["actions"]:
             signaler("erreur", "action_inconnue", "decisions.yaml", lieu, f"action « {r.alors} » inconnue")
         elif conv["actions"][r.alors]["suite"] in ("creer", "convertir") and r.profil not in regles.profils:
             signaler("erreur", "profil_inconnu", "decisions.yaml", lieu, f"profil inconnu {r.profil}")
-        if r.routage and r.routage not in conv["routages"]:
-            signaler("erreur", "routage_inconnu", "decisions.yaml", lieu, f"routage « {r.routage} » inconnu")
     if regles.sinon.get("alors") and regles.sinon["alors"] not in conv["actions"]:
         signaler("erreur", "action_inconnue", "decisions.yaml", "sinon", f"action « {regles.sinon['alors']} » inconnue")
     atteints = {r.profil for r in regles.decisions}
@@ -130,31 +127,18 @@ def verifier(regles: Regles) -> Rapport:
         faits = {**dict(zip(noms, combo)), **comp.get("fixes", {})}
         if comp.get("incompatibles") and regle(comp["incompatibles"]).matches(faits):
             continue
-        if choisir(regles, faits).regle["id"] == "sinon":
+        if choisir(regles, faits).regle["nom"] == "sinon":
             signaler("avertissement", "cas_non_couvert", "decisions.yaml", "",
                      "cas non couvert : " + ", ".join(f"{k} = {v}" for k, v in faits.items()))
 
-    # --- Statuts_services
     for a in regles.avertissements:
-        signaler("avertissement", "chargement", "Statuts_services", "", a)
-    par_etats = {k: set(v) for k, v in conv["services_routage_par_etats"].items()}
-    ignores: dict[str, list[str]] = {}
-    for st in regles.statuts_services:
-        lus = par_etats.get(st.service)
-        if lus is not None and st.statut not in lus:
-            ignores.setdefault(st.service, []).append(st.statut)
-            continue
-        if st.routage and st.routage not in conv["routages"]:
-            signaler("erreur", "routage_inconnu", "Statuts_services", st.id, f"routage « {st.routage} » inconnu")
-    for service, statuts in ignores.items():
-        signaler("avertissement", "statut_ignore", "Statuts_services", service,
-                 "lignes ignorées (routage par les états du §6 et decisions.yaml) : " + ", ".join(statuts))
+        signaler("avertissement", "chargement", "", "", a)
 
-    return Rapport(source=regles.source, emplacement=regles.emplacement, version=regles.version, constats=constats)
+    return Rapport(emplacement=regles.emplacement, version=regles.version, constats=constats)
 
 
 def rapport_invalide(e: ReglesInvalides, emplacement: str) -> Rapport:
-    return Rapport(source="yaml", emplacement=emplacement, version="—", constats=[
+    return Rapport(emplacement=emplacement, version="—", constats=[
         Constat(gravite="erreur", code="yaml_invalide", table=f, ligne=l, message=m) for f, l, m in e.problemes])
 
 

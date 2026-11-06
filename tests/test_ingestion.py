@@ -57,10 +57,9 @@ def bucket(**kw):
 
 @pytest.fixture
 def app(tmp_path):
-    shutil.copytree(RACINE / "spec", tmp_path / "spec")
     shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"),
                     dirs_exist_ok=True)
-    reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv"})
+    reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=reglages,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone(), depot=bucket())
 
@@ -105,18 +104,18 @@ def test_balayage_selection_et_historique(app):  # ING-F-005, ING-F-006, ING-T-0
     lot = app.lancer_selection(["TH/TH-01", "MM/MM-01", "TH/TH-02"])
     lignes = {l.document_id: l for l in app.store.lignes_du_lot(lot.id)}
     d_th = app.vue_dossier(lignes["TH/TH-01"].id).dossier
-    assert d_th.document.type_document == "these" and d_th.routage == "auto"
+    assert d_th.document.type_document == "these" and d_th.routage == "terminé"
     assert app.depot.lectures[:2] == ["poc/TH/TH-01/001.jpg", "poc/TH/TH-01/002.png"]  # images lues dans le bucket
     d_mm = app.vue_dossier(lignes["MM/MM-01"].id).dossier
     assert d_mm.document.type_document == "memoire" and d_mm.provenance.valeur == "mémoire"
     assert any(c.request.url.path == "/check/dissertation" for c in routes["alma"].calls)
     d_vide = app.vue_dossier(lignes["TH/TH-02"].id).dossier
-    assert (d_vide.routage, d_vide.etape_arret) == ("décision", "extraction")
+    assert (d_vide.routage, d_vide.etape_arret) == ("à reprendre", "extraction")
     assert any(a.startswith("document_invalide") for a in d_vide.alertes)
 
     v = app.balayer()
     statuts = {l.document.id: (l.nouveau, l.routage) for l in v.dossiers}
-    assert statuts == {"MM/MM-01": (False, "auto"), "TH/TH-01": (False, "auto"), "TH/TH-02": (False, "décision")}
+    assert statuts == {"MM/MM-01": (False, "terminé"), "TH/TH-01": (False, "terminé"), "TH/TH-02": (False, "à reprendre")}
     types = [(i.type, i.resultat) for i in app.historique().ingestions]
     assert ("balayage", {"documents": 3, "nouveaux": 0}) in types
     assert ("balayage", {"documents": 3, "nouveaux": 3}) in types
@@ -149,7 +148,7 @@ def test_image_s3_inaccessible_incident(app):
     lot = app.lancer_selection(["TH/TH-01"])
     del app.depot.objets["poc/TH/TH-01/001.jpg"]
     (ligne,) = app.store.lignes_du_lot(lot.id)
-    assert app.vue_dossier(ligne.id).dossier.routage == "décision"  # 002.png illisible → document invalide
+    assert app.vue_dossier(ligne.id).dossier.routage == "à reprendre"  # 002.png illisible → document invalide
     app.relancer(ligne.id, depuis="extraction")
     assert app.vue_dossier(ligne.id).dossier.etapes["extraction"].statut == "image_inaccessible"
 
@@ -237,5 +236,5 @@ def test_depot_de_l_application_prioritaire(app):
     simuler()
     lot = app.lancer_selection(["TH/TH-01"])
     (ligne,) = app.store.lignes_du_lot(lot.id)
-    assert app.vue_dossier(ligne.id).dossier.routage == "auto"
+    assert app.vue_dossier(ligne.id).dossier.routage == "terminé"
     assert app.depot.lectures and not autre.lectures

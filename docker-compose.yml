@@ -1,5 +1,5 @@
-# Démonstrateur + Grist (SPEC §10). docker compose up -d
-# L'application fonctionne sans Grist (règles dans regles/, Statuts_services en CSV).
+# Démonstrateur (SPEC §10). docker compose up -d
+# Les règles de catalogage sont dans regles/ (YAML), monté en volume.
 services:
   app:
     build: .
@@ -7,29 +7,8 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
-    environment:
-      GRIST_URL: http://grist:8484
     volumes:
       - ./data:/app/data
       # Règles modifiées depuis Administration › Règles : écrites dans le dépôt (à commiter)
       - ./regles:/app/regles
-    depends_on:
-      grist:
-        condition: service_started
-        required: false   # l'application démarre même si Grist est absent
-    restart: unless-stopped
-
-  grist:
-    image: gristlabs/grist:latest
-    ports:
-      - "8484:8484"
-    volumes:
-      - ./grist-data:/persist
-    environment:
-      GRIST_SESSION_SECRET: ${GRIST_SESSION_SECRET}
-      APP_HOME_URL: ${APP_HOME_URL:-http://localhost:8484}
-      GRIST_DEFAULT_EMAIL: ${GRIST_DEFAULT_EMAIL}
-      GRIST_SINGLE_ORG: humatheque
-      # Instance locale mono-utilisateur : pas d'assistant /boot au premier démarrage
-      GRIST_IN_SERVICE: "true"
     restart: unless-stopped

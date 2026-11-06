@@ -4,21 +4,21 @@
   <p class="text-[13px] text-sourdine">{{ source }} · <span class="font-mono">{% for k, v in choix.faits.items() %}{{ k }} = {{ v if v is not none else "—" }}{% if not loop.last %}, {% endif %}{% endfor %}</span></p>
   <div class="tuile flex flex-wrap items-center gap-3 bg-tonal border-transparent">
     <span class="text-sm">Règle retenue</span>
-    <span class="font-mono font-semibold text-lg">{{ choix.regle.id }}</span>
+    <span class="font-semibold text-lg">{{ choix.regle.nom }}</span>
     <span class="puce bg-primaire-clair text-primaire-fonce">{{ choix.action }}</span>
-    {{ badge(choix.routage) }}
+    {{ badge(choix.issue) }}
     {% if choix.profil %}<span class="text-sm">profil <span class="font-mono">{{ choix.profil }}</span></span>{% endif %}
     <span class="basis-full text-sm text-sourdine">{{ choix.motif }}</span>
   </div>
   <ol class="flex flex-col gap-1 text-[13px]">
     {% for e in choix.evaluations %}
-    <li class="flex items-baseline gap-2 rounded-lg px-2 py-1 {% if e.id == choix.regle.id %}bg-auto-clair{% endif %}">
+    <li class="flex items-baseline gap-2 rounded-lg px-2 py-1 {% if e.nom == choix.regle.nom %}bg-auto-clair{% endif %}">
       <span class="w-5 text-center font-bold {{ 'text-auto' if e.vraie else ('text-sortie' if e.erreur else 'text-contour') }}">{{ "✓" if e.vraie else ("!" if e.erreur else "✗") }}</span>
-      <span class="font-mono font-semibold w-10">{{ e.id }}</span>
+      <span class="font-semibold w-64 flex-none">{{ e.nom }}</span>
       <span class="font-mono text-xs text-sourdine break-all">{{ e.si }}</span>
       {% if e.erreur %}<span class="text-sortie text-xs">{{ e.erreur }}</span>{% endif %}
     </li>
     {% endfor %}
-    {% if choix.regle.id == "sinon" %}<li class="px-2 py-1 bg-decision-clair rounded-lg">aucune règle vraie : <strong>sinon</strong></li>{% endif %}
+    {% if choix.regle.nom == "sinon" %}<li class="px-2 py-1 bg-decision-clair rounded-lg">aucune règle vraie : <strong>sinon</strong></li>{% endif %}
   </ol>
 </div>

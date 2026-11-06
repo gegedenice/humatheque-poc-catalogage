@@ -18,9 +18,8 @@ from services_simules import simuler
 
 @pytest.fixture
 def app(tmp_path):
-    shutil.copytree(RACINE / "spec", tmp_path / "spec")
     shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"))
-    reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv"})
+    reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=reglages,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone())
 
@@ -84,13 +83,13 @@ def test_mode2_lot_file_filtres_et_exports(client):
     assert r.headers["location"].startswith("/lots/")
     lot = r.headers["location"]
     page = client.get(lot)
-    assert "File d'exceptions à reprendre" in html.unescape(page.text)
+    assert "Documents à reprendre" in html.unescape(page.text)
     assert page.text.count(">Reprendre</a>") == 3 and "229969437" in page.text
     # filtre en fragment HTMX, indicateurs en hx-swap-oob
     frag = client.get(f"{lot}/fragment?filtre=incidents", headers={"HX-Request": "true"})
     assert 'id="lot-dyn"' in frag.text and 'hx-swap-oob="true"' in frag.text
     assert "Aucun document dans cette catégorie" in frag.text
-    assert client.get(f"{lot}/rapport.csv").text.startswith("document,dossier,routage")
+    assert client.get(f"{lot}/rapport.csv").text.startswith("document,dossier,issue,regle_de_decision")
     assert client.get(f"{lot}/notices.txt").status_code == 200
 
 
@@ -183,7 +182,7 @@ def test_apercu_documents_passes_seuls(client, app):
     simuler()
     lot = _televerser(client, n=2).headers["location"]
     page = html.unescape(client.get(lot).text)
-    assert "Documents passés seuls" in page and page.count('/apercu">Voir</a>') == 2
+    assert "Documents terminés" in page and page.count('/apercu">Voir</a>') == 2
     lot_id = lot.rsplit("/", 1)[1]
     dossier_id = app.vue_lot(lot_id).passes[0].dossier_id
     apercu = client.get(f"/dossiers/{dossier_id}/apercu")
@@ -194,7 +193,7 @@ def test_apercu_documents_passes_seuls(client, app):
     assert '<span class="text-primaire font-semibold">700</span>' in apercu.text
     assert "Ouvrir le dossier complet" in texte
     vue = client.get(f"/api/v1/dossiers/{dossier_id}/apercu").json()
-    assert vue["routage"] == "auto" and vue["notice"].splitlines()[0][:3].isdigit()
+    assert vue["routage"] == "terminé" and vue["notice"].splitlines()[0][:3].isdigit()
 
 
 @respx.mock
@@ -236,7 +235,7 @@ def test_api_lot_dossier_resolution(client, tmp_path):
     r = client.post("/api/v1/lots", json={"type_document": "these", "documents": [[str(image)]]})
     assert r.status_code == 201
     lot = client.get(f"/api/v1/lots/{r.json()['id']}").json()
-    assert lot["indicateurs"]["documents"] == 1 and lot["file"][0]["routage"] == "décision"
+    assert lot["indicateurs"]["documents"] == 1 and lot["file"][0]["routage"] == "à reprendre"
     dossier_id = lot["file"][0]["dossier_id"]
     d = client.get(f"/api/v1/dossiers/{dossier_id}").json()
     i = next(i for i, e in enumerate(d["dossier"]["exceptions"]) if e["objet"].startswith("author"))

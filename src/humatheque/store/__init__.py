@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator
 
+from humatheque.issues import normaliser
 from pydantic import BaseModel, Field
 
 from humatheque.notice.versions import VersionNotice
@@ -198,7 +199,7 @@ class Store:
     @staticmethod
     def _ligne(r: sqlite3.Row) -> LigneDossier:
         return LigneDossier(id=r["id"], lot_id=r["lot_id"], rang=r["rang"], document_id=r["document_id"],
-                            etat=r["etat"], routage=r["routage"], maj_le=r["maj_le"])
+                            etat=r["etat"], routage=normaliser(r["routage"]), maj_le=r["maj_le"])
 
     # ------------------------------------------------------------ ingestions
     def noter_ingestion(self, type_: str, declencheur: str, documents: list[str], resultat: dict[str, Any],

@@ -3,6 +3,6 @@
 {% block fil %}<a class="text-sourdine" href="/lots">Lots</a> › <span class="font-mono">{{ vue.lot.id }}</span>{% endblock %}
 {% block entete %}<h1>Lot de {{ vue.lot.nb_documents }} {{ "thèse(s)" if vue.lot.parametres.type_document == "these" else "mémoire(s)" }}</h1>{% endblock %}
 {% block contenu %}
-<p class="sr-only">Reporting du lot : documents passés seuls et file d'exceptions à reprendre.</p>
+<p class="sr-only">Reporting du lot : documents terminés, à reprendre et en incident.</p>
 {% with oob = False %}{% include "_lot_entete.html" %}{% include "_lot_fragment.html" %}{% endwith %}
 {% endblock %}

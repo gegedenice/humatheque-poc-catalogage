@@ -26,7 +26,7 @@
       <span class="text-[13px] text-sourdine">traitement en tâche de fond</span></div>
     <div class="kpi"><span class="kpi-libelle">Documents à reprendre</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.en_attente") | sum }}</span>
       <span class="text-[13px] text-sourdine">dans {{ vue.a_reprendre | length }} lot(s)</span></div>
-    <div class="kpi"><span class="kpi-libelle">Passés seuls</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
+    <div class="kpi"><span class="kpi-libelle">Terminés</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
       <span class="text-[13px] text-sourdine">sans intervention</span></div>
   </section>
 
@@ -62,7 +62,7 @@
 
     {% if vue.lots %}
     <div class="defilant"><table class="tableau min-w-[760px]">
-      <thead><tr><th>Lot</th><th>Documents</th><th>VLM</th><th>Déclencheur</th><th class="w-[30%]">Routages</th><th>À reprendre</th><th><span class="sr-only">Action</span></th></tr></thead>
+      <thead><tr><th>Lot</th><th>Documents</th><th>VLM</th><th>Déclencheur</th><th class="w-[30%]">Issues</th><th>À reprendre</th><th><span class="sr-only">Action</span></th></tr></thead>
       <tbody>
       {% for r in vue.lots %}{% set ind = r.indicateurs %}
         <tr>

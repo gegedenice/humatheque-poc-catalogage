@@ -30,7 +30,7 @@
     <span class="text-[13px] text-sourdine">{{ vue.lots | selectattr("lot.declencheur", "equalto", "manuel") | list | length }} manuel(s)</span></div>
   <div class="kpi"><span class="kpi-libelle">Documents traités</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="lot.nb_documents") | sum }}</span>
     <span class="text-[13px] text-sourdine">thèses et mémoires</span></div>
-  <div class="kpi"><span class="kpi-libelle">Passés seuls</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
+  <div class="kpi"><span class="kpi-libelle">Terminés</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.passes_seuls") | sum }}</span>
     <span class="text-[13px] text-sourdine">sans intervention</span></div>
   <div class="kpi"><span class="kpi-libelle">Balayages du bucket</span><span class="text-4xl font-semibold leading-none">{{ balayages | length }}</span>
     <span class="text-[13px] text-sourdine">{{ balayages | selectattr("resultat.erreur") | list | length }} en échec</span></div>

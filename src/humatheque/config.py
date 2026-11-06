@@ -33,10 +33,6 @@ class Reglages(BaseSettings):
     racine: Path = _racine_par_defaut()
 
     # Spécification
-    spec_source: Literal["csv", "grist"] = "csv"
-    grist_url: str = "http://grist:8484"
-    grist_doc_id: str = ""
-    grist_api_key: SecretStr = SecretStr("")
     regles_statuts_exclus: Annotated[list[str], NoDecode] = ["rejeté"]
     regles_dir: Path = Path("regles")
 
@@ -113,10 +109,6 @@ class Reglages(BaseSettings):
         if isinstance(v, str):
             return [x.strip() for x in v.split(",") if x.strip()]
         return v
-
-    @property
-    def dossier_spec(self) -> Path:
-        return self.racine / "spec"
 
     @property
     def dossier_regles(self) -> Path:

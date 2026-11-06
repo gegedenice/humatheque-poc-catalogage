@@ -29,7 +29,6 @@ RUN --mount=type=secret,id=ca,required=false \
 # Application, configuration, spécification
 COPY src ./src
 COPY config ./config
-COPY spec ./spec
 COPY regles ./regles
 COPY reference/moteur-regles/exemple_contexte.json ./reference/moteur-regles/
 COPY CLAUDE.md ./

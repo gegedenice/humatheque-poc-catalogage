@@ -116,7 +116,7 @@ class Administration:
             ("sudoc-checker", self.reglages.sudoc_checker_api_url),
             ("idref-linker", self.reglages.idref_qualinka_api_url),
             ("dewey-classifier", self.reglages.dewey_classification_api_url))]
-        controles += [self._sante_vlm, self._sante_s3, self._sante_grist, self._sante_spec]
+        controles += [self._sante_vlm, self._sante_s3, self._sante_spec]
         with ThreadPoolExecutor(max_workers=len(controles)) as ex:
             return list(ex.map(lambda f: f(), controles))
 
@@ -166,19 +166,10 @@ class Administration:
                             else f"bucket {self.depot.bucket} introuvable")
         return self._mesurer("stockage S3", self.reglages.minio_endpoint or None, appel)
 
-    def _sante_grist(self: "Application") -> Sante:
-        if self.reglages.spec_source != "grist":
-            return Sante(composant="Grist", url=self.reglages.grist_url, detail="non utilisé (SPEC_SOURCE=csv)")
-
-        def appel():
-            r = httpx.get(f"{self.reglages.grist_url.rstrip('/')}/status", timeout=10)
-            return r.status_code == 200, f"HTTP {r.status_code}"
-        return self._mesurer("Grist", self.reglages.grist_url, appel)
-
     def _sante_spec(self: "Application") -> Sante:
         e = self.etat_spec()
         return Sante(composant="règles", url=e.emplacement, ok=e.nb_erreurs == 0,
-                     detail=f"{e.source} · {e.version} · {e.nb_erreurs} erreur(s), {e.nb_avertissements} avertissement(s)")
+                     detail=f"{e.version} · {e.nb_erreurs} erreur(s), {e.nb_avertissements} avertissement(s)")
 
     # -------------------------------------------------------------- lots automatiques
     def lots_automatiques_depuis(self: "Application", depuis: datetime | None):

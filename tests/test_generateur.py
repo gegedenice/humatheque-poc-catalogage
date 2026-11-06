@@ -134,7 +134,7 @@ def test_ligne_prioritaire_omise_alerte(regles):
 
 
 def test_replis_annee(regles):
-    """Grist fait foi : 100$a 19XX, 214$d et 328$d 19.. (seule $d a un repli en 328)."""
+    """Replis d'année (ancienne spécification) : 100$a 19XX, 214$d et 328$d 19.. (seule $d a un repli en 328)."""
     n = generer(regles, copy.deepcopy(THESE_ORIGINALE_EPHE) | {"defense_year": None}, ORIG)
     assert _lignes(n, "100") == ["100 0#$a19XX"]
     assert _lignes(n, "214") == ["214 #1$d19.."]

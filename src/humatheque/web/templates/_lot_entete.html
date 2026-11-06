@@ -20,10 +20,10 @@
   <a class="btn-principal btn-sm" href="/lots/{{ vue.lot.id }}/notices.txt" hx-boost="false">
     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>Notices produites</a>
 </div>
-{% set attente = [] %}{% for r, n in ind.par_routage.items() %}{% if r != "auto" %}{% set _ = attente.append(n ~ " " ~ libelle_routage(r)) %}{% endif %}{% endfor %}
+{% set attente = [] %}{% for r, n in ind.par_routage.items() %}{% if r != "terminé" %}{% set _ = attente.append(n ~ " " ~ libelle_routage(r)) %}{% endif %}{% endfor %}
 <div id="kpis-lot" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] mb-6" {% if oob %}hx-swap-oob="true"{% endif %}>
   {{ kpi(ind.documents, "Documents", "dans le lot" ~ (" · " ~ ind.en_cours ~ " en cours" if ind.en_cours else ""), "principal") }}
-  {{ kpi(ind.passes_seuls, "Passés seuls", "sans intervention : notice prête ou arrêt sur notice existante", "ok") }}
-  {{ kpi(ind.en_attente, "En attente de reprise", attente | join(" · "), "attente") }}
+  {{ kpi(ind.passes_seuls, "Terminés", "sans intervention : notice prête ou arrêt sur notice existante", "ok") }}
+  {{ kpi(ind.en_attente, "À reprendre", attente | join(" · "), "attente") }}
   {{ kpi(ind.repris, "Repris", "par un catalogueur", "repris") }}
 </div>
