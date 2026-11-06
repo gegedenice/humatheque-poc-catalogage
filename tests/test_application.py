@@ -22,6 +22,7 @@ from services_simules import EXTRACTION, simuler
 def app(tmp_path):
     """Racine isolée : spec/ copiée, data/ vide."""
     shutil.copytree(RACINE / "spec", tmp_path / "spec")
+    shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"))
     reglages = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv"})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=reglages,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone())
@@ -41,18 +42,25 @@ def test_documents_depuis_liste():
 
 def test_accueil_etat_de_la_spec(app):
     a = app.accueil()
-    assert a.spec.source == "csv" and a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 2
+    assert a.spec.source == "csv" and a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 6  # 4 cas non couverts + 2 statuts ignorés
     assert a.spec.grist_joignable is None
     assert "vlm" in a.fournisseurs and a.lots == []
 
 
 def test_recharger_spec(app):
     avant = app.etat_spec()
-    regles = app.reglages.dossier_spec / "Regles.csv"
-    regles.write_text(regles.read_text(encoding="utf-8").replace("105 ##$aa", "105 ##$a"), encoding="utf-8")
+    profil = app.reglages.dossier_regles / "profils" / "these-originale-imprimee.yaml"
+    profil.write_text(profil.read_text(encoding="utf-8").replace("101 0#$a{langue}", "101 0#$a{langue_x}"),
+                      encoding="utf-8")
     apres = app.recharger_spec()
     assert apres.version.split()[1] != avant.version.split()[1]  # empreinte changée
-    assert apres.nb_erreurs == 1 and apres.constats[0].ligne == "R009"
+    (erreur,) = [c for c in apres.constats if c.gravite == "erreur"]
+    assert apres.nb_erreurs == 1 and "R005" in erreur.ligne and "langue_x" in erreur.message
+    # fichier illisible : rechargement refusé, règles en place conservées
+    profil.write_text("profil: [\n", encoding="utf-8")
+    with pytest.raises(ActionImpossible, match="illisibles"):
+        app.recharger_spec()
+    assert app.etat_spec().version == apres.version
 
 
 @respx.mock
@@ -272,7 +280,7 @@ def test_notice_versions_validation_et_regeneration(app, image):
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
     n = app.vue_notice(ligne.id)
-    assert (n.version, n.statut, n.source, n.profil) == (1, "générée", "générée", "these_originale_imprimee")
+    assert (n.version, n.statut, n.source, n.profil) == (1, "générée", "générée", "these-originale-imprimee")
     assert n.marqueurs == []  # repli $a$b : pas de PPN
 
     # validation refusée tant qu'il reste une erreur
@@ -313,7 +321,7 @@ def test_notice_convertie_editable(app, image):
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
     n = app.vue_notice(ligne.id)
-    assert (n.version, n.source, n.profil) == (1, "convertie", "these_originale_imprimee")
+    assert (n.version, n.source, n.profil) == (1, "convertie", "these-originale-imprimee")
     assert "001 229969437" in n.texte
 
 

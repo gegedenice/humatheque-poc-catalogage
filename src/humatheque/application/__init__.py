@@ -29,7 +29,7 @@ from humatheque.config import Reglages, reglages as reglages_par_defaut
 from humatheque.notice import analyse as notice_analyse
 from humatheque.notice import validation as notice_validation
 from humatheque.notice import versions as nv
-from humatheque.spec import Spec, charger_spec, verifier
+from humatheque.regles import Regles, ReglesInvalides, charger_regles, verifier
 from humatheque.store import Lot, Store
 from humatheque.workflow import ETAPES, Document, Dossier, Services, Workflow, services_depuis_reglages
 from humatheque.workflow import resolution as res
@@ -71,7 +71,7 @@ class ExecuteurSynchrone(Executor):
         return f
 
 
-FabriqueServices = Callable[[Spec, str | None], Services]
+FabriqueServices = Callable[[Regles, str | None], Services]
 
 
 def _identifiant(prefixe: str = "") -> str:
@@ -95,20 +95,20 @@ from humatheque.application.administration import Administration  # noqa: E402
 class Application(Administration):
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
-                 spec: Spec | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
+                 regles: Regles | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
         self.reglages = reglages or reglages_par_defaut()
         self.store = store or Store(self.reglages.dossier_data / "humatheque.db")
-        self.fabrique = fabrique or (lambda spec, fournisseur: services_depuis_reglages(spec, fournisseur))
+        self.fabrique = fabrique or (lambda regles, fournisseur: services_depuis_reglages(regles, fournisseur))
         self.executeur = executeur or ThreadPoolExecutor(max_workers=self.reglages.max_workers)
         self._verrou = threading.Lock()
         # depot=True : stockage S3 d'après MINIO_* (None s'il n'est pas configuré)
         self.depot = ingestion.depot_depuis_reglages(self.reglages) if depot is True else (depot or None)
-        self.spec = spec or charger_spec(self.reglages)
-        self._rapport = verifier(self.spec, statuts_exclus=self.reglages.regles_statuts_exclus)
+        self.regles = regles or charger_regles(self.reglages)
+        self._rapport = verifier(self.regles)
 
-    # ============================================================ spécification
+    # ============================================================ règles (SPEC §8)
     def etat_spec(self) -> EtatSpec:
-        s, r = self.spec, self._rapport
+        s, r = self.regles, self._rapport
         grist = None
         if self.reglages.spec_source == "grist":
             grist = not any("Grist injoignable" in a for a in s.avertissements)
@@ -117,10 +117,14 @@ class Application(Administration):
                         nb_erreurs=len(r.erreurs), nb_avertissements=len(r.avertissements))
 
     def recharger_spec(self) -> EtatSpec:
-        spec = charger_spec(self.reglages)
+        """Relit les règles ; des fichiers illisibles laissent en place les règles chargées."""
+        try:
+            regles = charger_regles(self.reglages)
+        except ReglesInvalides as e:
+            raise ActionImpossible(f"règles illisibles, rechargement refusé : {e}") from e
         with self._verrou:
-            self.spec = spec
-            self._rapport = verifier(spec, statuts_exclus=self.reglages.regles_statuts_exclus)
+            self.regles = regles
+            self._rapport = verifier(regles)
         return self.etat_spec()
 
     def accueil(self) -> Accueil:
@@ -231,7 +235,7 @@ class Application(Administration):
         lot = self.store.lot(ligne.lot_id)
         self.store.changer_etat(dossier_id, "en_cours")
         try:
-            services = self.fabrique(self.spec, (lot.parametres if lot else {}).get("fournisseur"))
+            services = self.fabrique(self.regles, (lot.parametres if lot else {}).get("fournisseur"))
             # Le dépôt qui a constitué les documents est celui qui lit leurs images.
             if self.depot is not None:
                 services.depot = self.depot
@@ -561,13 +565,13 @@ class Application(Administration):
         return VueNotice(dossier_id=dossier_id, profil=profil, version=c.numero if c else None,
                          statut=c.statut if c else None, source=c.source if c else None,
                          texte=c.texte if c else "",
-                         marqueurs=notice_validation.valider(c.texte, self.spec, profil) if c else [],
+                         marqueurs=notice_validation.valider(c.texte, self.regles, profil) if c else [],
                          proposition=resume_version(p) if p else None,
                          versions=[resume_version(v) for v in reversed(versions)])
 
     def valider_texte(self, dossier_id: str, texte: str) -> list[notice_validation.Marqueur]:
         d = self._dossier(dossier_id)
-        return notice_validation.valider(texte, self.spec, self._profil(d))
+        return notice_validation.valider(texte, self.regles, self._profil(d))
 
     def _version_ajoutee(self, d: Dossier, v: nv.VersionNotice, quoi: str) -> VueNotice:
         self.store.ajouter_version(v)
@@ -593,7 +597,7 @@ class Application(Administration):
         d = self._dossier(dossier_id)
         versions = self.store.versions(dossier_id)
         c = nv.courante(versions)
-        erreurs = [m for m in notice_validation.valider(c.texte, self.spec, self._profil(d))
+        erreurs = [m for m in notice_validation.valider(c.texte, self.regles, self._profil(d))
                    if m.gravite == "erreur"] if c else []
         try:
             v = nv.valider(versions, dossier_id, auteur.strip(), erreurs)

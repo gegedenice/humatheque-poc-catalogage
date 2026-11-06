@@ -18,9 +18,3 @@ ordre:
 etat_inconnu: indéterminé       # candidat retenu `unknown`
 etat_ambigu: ambigu             # aucun candidat retenu + ambiguous_print_candidate
 etat_rien: rien                 # aucun candidat retenu
-
-# Valeurs admises dans Situations.etat_sudoc (en plus du joker `*`) :
-# ordre + ambigu, rien, indéterminé.
-# Alias acceptés (suffixes descriptifs, SPEC §7) : forme → état.
-alias:
-  originale imprimée seule: originale imprimée

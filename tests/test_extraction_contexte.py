@@ -13,7 +13,6 @@ from humatheque.extraction import ExtractionInvalide, charger_prompt, consolider
 from humatheque.extraction.fournisseurs import FournisseurOpenAICompatible, InferenceIndisponible
 from humatheque.extraction.images import ImageInaccessible
 from humatheque.services.idref import AlignementIdref, AlignementOrganisations
-from humatheque.spec import charger_spec
 
 VLM = "https://vlm.test/v1/chat/completions"
 
@@ -135,10 +134,19 @@ def test_normaliser_metadonnees():
     assert document_vide(normaliser_metadonnees({"confidence": 0.1}))
 
 
-def test_contexte_cles_conformes_a_sources():
+def test_variables_du_profil(regles):
+    """Contexte → variables de regles/variables.yaml (SPEC §5)."""
+    from humatheque.contexte import variables_profil
+
     ctx = construire(normaliser_metadonnees(EXTRACTION), "these")
-    ids = {s.id for s in charger_spec(source="csv").sources}
-    assert set(ctx.valeurs) <= ids
+    v = variables_profil(ctx.valeurs, regles)
+    assert set(v) == {n for n, var in regles.variables.items() if var.disponible}
+    assert v["titre"] == ctx.valeurs["title"] and v["annee"] == "1998"
+    assert v["auteur"]["nom"] == "Dubois"                      # personne seule : premier élément
+    assert [d["nom"] for d in v["directeur"]] == ["La Roche"]  # liste
+    assert v["etablissement"]["forme"] == "École pratique des hautes études"
+    assert (v["code_etab"], v["volumaison"]) == ("EPHE", "1 volume")
+    assert "numero_nnt" not in v and "partenaire" not in v     # disponible: false
 
 
 def test_contexte_valeurs():
@@ -161,7 +169,8 @@ def test_contexte_valeurs():
     assert c["advisor"][0]["nom"] == "La Roche" and c["advisor"][0]["ppn"] is None
     assert [r["ppn"] for r in c["reviewers"]] == [None, "P2"]  # low_confidence : pas de PPN
     assert c["jury_president"] == [] and c["doctoral_school"] is None
-    assert (c["volumaison"], c["code_etab"], c["numero_nnt"], c["dewey_code"]) == ("1 volume", "EPHE", "XXXX", "320")
+    assert (c["volumaison"], c["code_etab"], c["dewey"]) == ("1 volume", "EPHE", "320")
+    assert "numero_nnt" not in c  # variable indisponible : pas de bouchon
 
 
 def test_contexte_alertes_et_journal():
@@ -169,7 +178,7 @@ def test_contexte_alertes_et_journal():
     c = construire(m, "these")
     assert c.valeurs["volumaison"] == "? volumes"
     assert c.valeurs["defense_year"] is None
-    assert {"numero_nnt:bouchon", "defense_year:annee_invalide:vers 1998", "dollar_dans_valeur:title",
+    assert {"defense_year:annee_invalide:vers 1998", "dollar_dans_valeur:title",
             "advisor[1]:particule_a_verifier"} <= set(c.alertes)
     t = next(t for t in c.transformations if t.champ == "discipline")
     assert (t.avant, t.apres, t.fonction) == ("SCIENCE POLITIQUE", "Science politique", "casse_phrase")

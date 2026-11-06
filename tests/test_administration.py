@@ -36,6 +36,8 @@ class Horloge:
 
 def _app(tmp_path, **reglages):
     shutil.copytree(RACINE / "spec", tmp_path / "spec", dirs_exist_ok=True)
+    shutil.copytree(RACINE / "regles", tmp_path / "regles", ignore=shutil.ignore_patterns("archives"),
+                    dirs_exist_ok=True)
     r = Reglages(_env_file=None).model_copy(update={"racine": tmp_path, "spec_source": "csv", **reglages})
     return Application(store=Store(tmp_path / "data" / "t.db"), reglages=r,
                        fabrique=lambda s, f: sim.services(s, f), executeur=ExecuteurSynchrone(), depot=bucket())
@@ -221,7 +223,7 @@ def test_sante(tmp_path):
     s = {x.composant: x for x in a.sante()}
     assert s["alma-checker"].ok and s["sudoc-checker"].ok is False and s["dewey-classifier"].ok is False
     assert s["idref-linker"].ok is None and "non configurée" in s["idref-linker"].detail
-    assert s["VLM (hf)"].ok and s["stockage S3"].ok and s["spécification"].ok
+    assert s["VLM (hf)"].ok and s["stockage S3"].ok and s["règles"].ok
     assert s["Grist"].ok is None
 
 

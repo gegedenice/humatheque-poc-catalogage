@@ -177,7 +177,7 @@ class Administration:
 
     def _sante_spec(self: "Application") -> Sante:
         e = self.etat_spec()
-        return Sante(composant="spécification", url=e.emplacement, ok=e.nb_erreurs == 0,
+        return Sante(composant="règles", url=e.emplacement, ok=e.nb_erreurs == 0,
                      detail=f"{e.source} · {e.version} · {e.nb_erreurs} erreur(s), {e.nb_avertissements} avertissement(s)")
 
     # -------------------------------------------------------------- lots automatiques

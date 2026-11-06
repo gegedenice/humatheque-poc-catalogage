@@ -18,26 +18,25 @@ import urllib.request
 from pathlib import Path
 
 from humatheque.config import reglages
-from humatheque.spec import SpecIntrouvable, charger_spec, verifier
-from humatheque.spec.verificateur import Rapport
+from humatheque.regles import ReglesInvalides, charger_regles, verifier
+from humatheque.regles.verificateur import Rapport, rapport_invalide
 
 
 def _afficher(rapport: Rapport) -> None:
-    print(f"Spécification : {rapport.source} — {rapport.emplacement}")
-    print(f"Version       : {rapport.version}")
-    for c in sorted(rapport.constats, key=lambda c: (c.gravite != "erreur", c.table, c.ligne)):
-        marque = "ERREUR" if c.gravite == "erreur" else "avert."
+    print(f"Règles  : {rapport.emplacement} (Statuts_services : {rapport.source})")
+    print(f"Version : {rapport.version}")
+    ordre = {"erreur": 0, "avertissement": 1, "info": 2}
+    for c in sorted(rapport.constats, key=lambda c: (ordre[c.gravite], c.table, c.ligne)):
+        marque = {"erreur": "ERREUR", "avertissement": "avert.", "info": "info"}[c.gravite]
         print(f"  [{marque}] {c.table} {c.ligne} ({c.code}) : {c.message}")
     print(f"Bilan : {len(rapport.erreurs)} erreur(s) bloquante(s), {len(rapport.avertissements)} avertissement(s)")
 
 
 def check_spec(args: argparse.Namespace) -> int:
     try:
-        spec = charger_spec(source=args.source, dossier=args.dossier)
-    except SpecIntrouvable as e:
-        print(f"ERREUR : {e}", file=sys.stderr)
-        return 2
-    rapport = verifier(spec)
+        rapport = verifier(charger_regles(source=args.source, dossier=args.dossier))
+    except ReglesInvalides as e:
+        rapport = rapport_invalide(e, str(args.dossier or reglages().dossier_regles))
     if args.json:
         print(json.dumps(rapport.model_dump(), ensure_ascii=False, indent=2))
     else:
@@ -147,13 +146,13 @@ def scan_minio(args: argparse.Namespace) -> int:
 
 
 def spec_export(args: argparse.Namespace) -> int:
-    """Instantané des tables Grist dans spec/ (+ copie horodatée dans spec/archives/)."""
-    from humatheque.spec.export import exporter
-    from humatheque.spec.grist import GristInjoignable
+    """Instantané de Statuts_services (Grist) dans spec/ (+ copie horodatée dans spec/archives/)."""
+    from humatheque.regles.export import exporter
+    from humatheque.regles.grist import GristInjoignable
 
     try:
         r = exporter(reglages(), args.dossier)
-    except (GristInjoignable, SpecIntrouvable) as e:
+    except (GristInjoignable, ReglesInvalides) as e:
         print(f"ERREUR : {e}", file=sys.stderr)
         return 2
     for table, n in r["tables"].items():
@@ -163,14 +162,14 @@ def spec_export(args: argparse.Namespace) -> int:
 
 
 def spec_import(args: argparse.Namespace) -> int:
-    """Construit le classeur Grist depuis spec/*.csv, puis le relit et le compare aux CSV."""
-    from humatheque.spec.grist import GristInjoignable
-    from humatheque.spec.import_grist import ImportImpossible, importer
+    """Crée la table Grist Statuts_services depuis spec/, puis la relit et la compare au CSV."""
+    from humatheque.regles.grist import GristInjoignable
+    from humatheque.regles.import_grist import ImportImpossible, importer
 
     try:
         r = importer(reglages(), args.dossier, doc_id=args.doc, nouveau=args.nouveau, org=args.org,
                      espace=args.espace, remplacer=args.remplacer)
-    except (GristInjoignable, ImportImpossible, SpecIntrouvable) as e:
+    except (GristInjoignable, ImportImpossible, ReglesInvalides) as e:
         print(f"ERREUR : {e}", file=sys.stderr)
         return 2
     for table, n in r["tables"].items():
@@ -191,10 +190,10 @@ def construire_parseur() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="humatheque", description="Démonstrateur de catalogage assisté")
     sous = p.add_subparsers(dest="commande", required=True)
 
-    c = sous.add_parser("check-spec", help="vérifie la spécification (Regles, Sources, Situations…)")
+    c = sous.add_parser("check-spec", help="vérifie les règles (regles/*.yaml et Statuts_services)")
     c.add_argument("--source", choices=["csv", "grist"], default=None,
-                   help=f"source de la spec (défaut : SPEC_SOURCE={reglages().spec_source})")
-    c.add_argument("--dossier", type=Path, default=None, help="dossier des CSV (défaut : spec/)")
+                   help=f"source de Statuts_services (défaut : SPEC_SOURCE={reglages().spec_source})")
+    c.add_argument("--dossier", type=Path, default=None, help="dossier des règles (défaut : REGLES_DIR=regles)")
     c.add_argument("--json", action="store_true", help="rapport au format JSON")
     c.set_defaults(fonction=check_spec)
 
@@ -206,18 +205,18 @@ def construire_parseur() -> argparse.ArgumentParser:
     c.add_argument("--port", type=int, default=8000)
     c.set_defaults(fonction=serve)
 
-    c = sous.add_parser("spec-export", help="écrit un instantané des tables Grist dans spec/")
+    c = sous.add_parser("spec-export", help="écrit un instantané de la table Grist Statuts_services dans spec/")
     c.add_argument("--dossier", type=Path, default=None, help="dossier cible (défaut : spec/)")
     c.set_defaults(fonction=spec_export)
 
-    c = sous.add_parser("spec-import", help="construit le classeur Grist depuis spec/*.csv (colonnes Texte)")
+    c = sous.add_parser("spec-import", help="crée la table Grist Statuts_services depuis spec/ (colonnes Texte)")
     c.add_argument("--dossier", type=Path, default=None, help="dossier des CSV (défaut : spec/)")
     cible = c.add_mutually_exclusive_group()
     cible.add_argument("--nouveau", metavar="NOM", help="crée un nouveau document Grist portant ce nom")
     cible.add_argument("--doc", metavar="ID", help="document existant (défaut : GRIST_DOC_ID)")
     c.add_argument("--org", default="current", help="organisation Grist du nouveau document (défaut : current)")
     c.add_argument("--espace", type=int, default=None, help="identifiant de l'espace de travail (défaut : le premier)")
-    c.add_argument("--remplacer", action="store_true", help="recrée les tables de spec déjà présentes")
+    c.add_argument("--remplacer", action="store_true", help="recrée la table si elle est déjà présente")
     c.set_defaults(fonction=spec_import)
 
     c = sous.add_parser("scan-minio", help="liste les dossiers du bucket S3 et leur dernier statut")

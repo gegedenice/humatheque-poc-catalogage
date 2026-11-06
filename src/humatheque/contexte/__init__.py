@@ -1,8 +1,9 @@
 """Adaptateur extraction → Contexte (SPEC §5).
 
-Le contexte est un dict dont les clés sont les `id` de `Sources` ; c'est le
-seul contrat lu par le générateur. Chaque transformation (avant / après,
-fonction appliquée, alertes) est journalisée.
+Le contexte est un dict des valeurs normalisées (clés du schéma d'extraction
+et valeurs calculées) ; `variables_profil` en tire les variables de
+`regles/variables.yaml`, seul contrat lu par le générateur. Chaque
+transformation (avant / après, fonction appliquée, alertes) est journalisée.
 """
 
 from __future__ import annotations
@@ -165,15 +166,35 @@ def construire(metadonnees: dict[str, Any], type_document: str,
     vol = cfg["volumaison"]
     ctx["volumaison"] = vol["sans_volume"] if ctx["volume"] is None else vol["avec_volume"]
     ctx["code_etab"] = reglages().code_etab
-    ctx["numero_nnt"] = cfg["numero_nnt_bouchon"]
-    alertes.append("numero_nnt:bouchon")
-    ctx["dewey_code"] = res.dewey_code
+    ctx["dewey"] = res.dewey_code
 
     # --- Caractère $ dans une valeur (casserait le format WinIBW)
     for champ, chaine in _chaines(ctx):
         if "$" in chaine:
             alertes.append(f"dollar_dans_valeur:{champ}")
     return Contexte(valeurs=ctx, alertes=list(dict.fromkeys(alertes)), transformations=journal)
+
+
+def variables_profil(valeurs: dict[str, Any], regles: Any) -> dict[str, Any]:
+    """Valeurs du contexte → variables de `regles/variables.yaml` (SPEC §5).
+
+    `source: extraction.<champ>` lit le champ du schéma ; une autre source lit la
+    valeur du même nom. Une personne ou un organisme seul (`liste: false`) reçoit
+    le premier élément ; une variable `disponible: false` n'est jamais fournie.
+    """
+    prefixe = "extraction."
+    sortie: dict[str, Any] = {}
+    for nom, v in regles.variables.items():
+        if not v.disponible:
+            continue
+        cle = v.source[len(prefixe):] if v.source.startswith(prefixe) else nom
+        val = valeurs.get(cle)
+        if not v.liste and isinstance(val, list):
+            val = val[0] if val else None
+        elif v.liste and val is not None and not isinstance(val, list):
+            val = [val]
+        sortie[nom] = val
+    return sortie
 
 
 def _chaines(v: Any, chemin: str = "") -> list[tuple[str, str]]:

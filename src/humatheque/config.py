@@ -38,6 +38,7 @@ class Reglages(BaseSettings):
     grist_doc_id: str = ""
     grist_api_key: SecretStr = SecretStr("")
     regles_statuts_exclus: Annotated[list[str], NoDecode] = ["rejeté"]
+    regles_dir: Path = Path("regles")
 
     # Extraction VLM
     vlm_api_url: str = ""
@@ -116,6 +117,11 @@ class Reglages(BaseSettings):
     @property
     def dossier_spec(self) -> Path:
         return self.racine / "spec"
+
+    @property
+    def dossier_regles(self) -> Path:
+        """REGLES_DIR (relatif à la racine du dépôt, ou absolu)."""
+        return self.regles_dir if self.regles_dir.is_absolute() else self.racine / self.regles_dir
 
     @property
     def dossier_config(self) -> Path:

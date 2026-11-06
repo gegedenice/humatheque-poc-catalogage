@@ -18,7 +18,7 @@ from typing import Any
 from humatheque.config import charger_yaml, reglages
 from humatheque.contexte import ResultatsServices, construire, document_vide, normaliser_metadonnees
 from humatheque.conversion import ConversionEchec, convertir, depuis_iso, unimarc_xml_vers_iso, vers_winibw as iso_vers_winibw
-from humatheque.decision.moteur import Cle, decider, routage_final, routage_service
+from humatheque.decision.moteur import decider, faits_du_dossier, routage_final, routage_service
 from humatheque.decision.provenance import provenance as deduire_provenance
 from humatheque.extraction import (
     ExtractionInvalide, ImageIllisible, ImageInaccessible, InferenceIndisponible, extraire,
@@ -31,7 +31,7 @@ from humatheque.services.alma import verifier_alma
 from humatheque.services.dewey import classer
 from humatheque.services.idref import aligner_organisations, aligner_personne
 from humatheque.services.sudoc import lien_notice, lire_notice, verifier_sudoc
-from humatheque.spec.modeles import Spec
+from humatheque.regles.modeles import Regles
 from humatheque.workflow.modeles import ETAPES, Dossier, Etape, ExceptionDossier, maintenant
 
 SERVICE_IDREF_PERSONNE = "idref-linker /align/person"
@@ -52,7 +52,7 @@ def _cfg_contexte() -> dict[str, Any]:
 class Services:
     """Dépendances du workflow (injectées : réelles ou simulées)."""
 
-    spec: Spec
+    regles: Regles
     vlm: FournisseurVLM
     alma: ClientService
     sudoc: ClientService
@@ -110,7 +110,7 @@ class Workflow:
         if depuis:
             dossier.reinitialiser_depuis(depuis)
             dossier.noter(depuis, "relance", f"relance demandée depuis {depuis}")
-        dossier.version_spec = self.services.spec.version
+        dossier.version_spec = self.services.regles.version
         dossier.fournisseur_vlm = f"{self.services.vlm.nom}:{self.services.vlm.modele}"
         dossier.routage = dossier.motif_arret = dossier.etape_arret = None
 
@@ -131,7 +131,7 @@ class Workflow:
 
         routages = [e.routage for e in dossier.etapes.values()]
         if any(not e.resolue for e in dossier.exceptions):
-            routages.append(_cfg()["non_prevue"]["routage"])
+            routages.append(_cfg()["routage_decision"])
         dossier.routage = routage_final(routages)
         return dossier
 
@@ -184,7 +184,7 @@ class Workflow:
 
     # ================================================================ étapes
     def _etape_extraction(self, d: Dossier) -> Suite:
-        decision = _cfg()["non_prevue"]["routage"]
+        decision = _cfg()["routage_decision"]
         try:
             res = extraire(self.services.vlm, d.document.images, d.document.type_document,
                            lecteur_s3=self.services.lire_s3 if self.services.depot else None)
@@ -199,7 +199,7 @@ class Workflow:
         except ExtractionInvalide as e:
             d.etapes["extraction"].appels += e.appels
             d.etapes["extraction"].reponse = {"bruts": e.bruts}
-            rs = routage_service(self.services.spec, "extraction-vlm", "json_invalide")
+            rs = routage_service(self.services.regles, "extraction-vlm", "json_invalide")
             return self._arret(rs.routage or "incident", str(e), "json_invalide")
 
         d.extraction = res
@@ -234,7 +234,7 @@ class Workflow:
             d.exceptions.append(ExceptionDossier(etape="provenance", objet="provenance",
                                                  motif=f"{motif} ({p.valeur} : « {m.get('granting_institution') or ''} »)",
                                                  candidats=["EPHE", "hors EPHE"]))
-            return self._arret(_cfg()["non_prevue"]["routage"], f"{motif} ({p.valeur})")
+            return self._arret(_cfg()["routage_decision"], f"{motif} ({p.valeur})")
         return Suite()
 
     def _etape_alma(self, d: Dossier) -> Suite:
@@ -242,7 +242,7 @@ class Workflow:
                           self.services.parametres("alma"))
         d.alma = res
         if res.etat is None:
-            rs = routage_service(self.services.spec, "alma-checker", res.statut)
+            rs = routage_service(self.services.regles, "alma-checker", res.statut)
             inc = _cfg()["statut_inconnu"]
             return self._arret(rs.routage or inc["routage"], f"alma-checker : {inc['motif']} « {res.statut} »",
                                "service_indisponible")
@@ -274,13 +274,13 @@ class Workflow:
             d.exceptions.append(ExceptionDossier(etape="sudoc", objet="qualification Sudoc",
                                                  motif=f"{motif} : {q.justification}",
                                                  candidats=[c.model_dump() for c in q.candidats if c.retenu]))
-            return self._arret(_cfg()["non_prevue"]["routage"], motif)
+            return self._arret(_cfg()["routage_decision"], motif)
         return Suite()
 
     def _etape_situation(self, d: Dossier) -> Suite:
-        cle = Cle(etat_alma=d.etat_alma or "", etat_sudoc=d.etat_sudoc or "",
-                  provenance=d.provenance.valeur if d.provenance else "")
-        dec = decider(self.services.spec, cle)
+        faits = faits_du_dossier(d.document.type_document, d.provenance.valeur if d.provenance else None,
+                                 d.etat_alma, d.etat_sudoc)
+        dec = decider(self.services.regles, faits)
         d.decision = dec
         d.noter("situation", "decision", dec.model_dump(exclude={"ligne"}))
         if dec.suite == "creer":
@@ -342,7 +342,7 @@ class Workflow:
         return Suite()
 
     def _statut_idref(self, d: Dossier, etape: str, service: str, a, objet: str) -> Suite | None:
-        rs = routage_service(self.services.spec, service, a.statut)
+        rs = routage_service(self.services.regles, service, a.statut)
         d.alerter(*(f"{objet} : {x}" for x in rs.alertes))
         if rs.bloquant:
             return self._arret(rs.routage or "incident", f"{service} « {a.statut} » pour {objet}",
@@ -375,7 +375,7 @@ class Workflow:
         res = self._appel(d, "dewey", classer, self.services.dewey, d.metadonnees, self.services.seuil_dewey,
                           self.services.parametres("dewey"))
         d.dewey = res
-        rs = routage_service(self.services.spec, "dewey-classifier", res.statut)
+        rs = routage_service(self.services.regles, "dewey-classifier", res.statut)
         if rs.bloquant:
             return self._arret(rs.routage or "incident", f"dewey-classifier « {res.statut} »")
         if rs.exception:
@@ -387,7 +387,7 @@ class Workflow:
         ctx = self._contexte(d)
         profil = d.decision.profil_cible if d.decision else None
         try:
-            notice = Generateur(self.services.spec).generer(ctx.valeurs, profil or "")
+            notice = Generateur(self.services.regles).generer(ctx.valeurs, profil or "")
         except GenerationEchec as e:
             return self._arret("incident", f"générateur : {e}", "generation_echec")
         d.notice, d.notice_texte = notice, vers_winibw(notice)
@@ -409,14 +409,14 @@ class Workflow:
         return ctx
 
 
-def services_depuis_reglages(spec: Spec, fournisseur_vlm: str | None = None) -> Services:
+def services_depuis_reglages(regles: Regles, fournisseur_vlm: str | None = None) -> Services:
     """Services réels configurés par `.env`."""
     from humatheque.extraction.fournisseurs import fournisseur
     from humatheque.ingestion import depot_depuis_reglages
 
     r = reglages()
     return Services(
-        spec=spec,
+        regles=regles,
         vlm=fournisseur(fournisseur_vlm or r.vlm_fournisseur, r),
         alma=ClientService("alma-checker", r.alma_checker_api_url, r.alma_api_key.get_secret_value(), r.http_timeout),
         sudoc=ClientService("sudoc-checker", r.sudoc_checker_api_url, "", r.http_timeout),

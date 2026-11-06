@@ -13,19 +13,13 @@ import services_simules as sim
 from services_simules import EXTRACTION, VLM, png, simuler
 from humatheque.extraction.fournisseurs import FournisseurOpenAICompatible
 from humatheque.services import ClientService
-from humatheque.spec import charger_spec
 from humatheque.workflow import (
     Document, Dossier, ResolutionImpossible, Services, Workflow, choisir_provenance, declarer_faux_positif,
 )
 
-@pytest.fixture(scope="module")
-def spec():
-    return charger_spec(source="csv")
-
-
 @pytest.fixture
-def services(spec):
-    return sim.services(spec)
+def services(regles):
+    return sim.services(regles)
 
 
 @pytest.fixture
@@ -54,7 +48,7 @@ def dossier(type_document="these", images=None):
 def test_s08_produit_une_notice(workflow):
     routes = simuler()
     d = workflow.executer(dossier())
-    assert d.decision.situation == "S08" and d.decision.profil_cible == "these_originale_imprimee"
+    assert d.decision.situation == "S08" and d.decision.profil_cible == "these-originale-imprimee"
     assert d.routage == "auto" and d.etape_arret is None
     assert all(e.statut in ("ok", "ignoree") for e in d.etapes.values())
     lignes = d.notice_texte.splitlines()
@@ -64,7 +58,7 @@ def test_s08_produit_une_notice(workflow):
     assert "701 #1$3026940345$4958$4555" in lignes
     assert "711 02$3026375478$4295" in lignes
     assert "686 ##$a900$2TEF" in lignes
-    assert "029 ##$aFR$b1998EPHEXXXX" in lignes
+    assert not [l for l in lignes if l.startswith("029")]  # numero_nnt indisponible : 029 omise
     assert routes["idref"].call_count == 3  # auteur, directeur, rapporteur
     # ordre imposé : Alma avant Sudoc (ALM-SUD-F-001), route selon le type (ING-T-005)
     assert routes["alma"].calls[0].request.url.path == "/check/thesis"
@@ -74,7 +68,7 @@ def test_s08_produit_une_notice(workflow):
     types = {e.type for e in d.journal}
     assert {"appel", "transformation", "decision", "zone"} <= types
     assert d.extraction.bruts and d.extraction.prompt.empreinte  # VLM-T-004, VLM-T-005
-    assert d.version_spec and "numero_nnt:bouchon" in d.alertes
+    assert d.version_spec and "regle_prioritaire_omise:R002 R003" in d.alertes  # 029 sans NNT
 
 
 @respx.mock
@@ -113,7 +107,7 @@ def test_s06_conversion_copie_puis_arret(workflow):
     assert d.notice_convertie.texte == d.notice_source
     assert "029 ##$aFR$b2017EHES0033" in d.notice_source.splitlines()
     assert "conversion_non_implementee" in d.alertes
-    assert d.notice_convertie.profil_cible == "these_originale_imprimee"
+    assert d.notice_convertie.profil_cible == "these-originale-imprimee"
     assert "https://www.sudoc.fr/229969437" in d.motif_arret
     assert not routes["idref"].called and d.notice is None
     # Relance : pas de nouvelle conversion ni d'IdRef
@@ -291,9 +285,9 @@ def test_memoire_route_et_provenance(workflow):
 
 
 @respx.mock
-def test_generation_echec(workflow, spec_fabriquee):
-    spec_fabriquee.modifier("Regles", "id", "R005", gabarit="101 0#$a")
-    workflow.services.spec = charger_spec(source="csv", dossier=spec_fabriquee.dossier)
+def test_generation_echec(workflow, regles_fabriquees):
+    regles_fabriquees.modifier_decision("S08", profil="profil-fantome")
+    workflow.services.regles = regles_fabriquees.charger()
     simuler()
     d = workflow.executer(dossier())
     assert (d.routage, d.etapes["generation"].statut) == ("incident", "generation_echec")

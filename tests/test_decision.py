@@ -1,101 +1,107 @@
-"""Moteur de décision (SPEC §7, §11 étape 4) : une ligne par situation S01 à S14.
+"""Moteur de décision (SPEC §7, §11 étape 4) : une ligne de test par règle de
+regles/decisions.yaml, plus `sinon` et les routages des services.
 
-Décision du 05/11 : une notice trouvée au-dessus du seuil (Alma `présent`, candidat
-Sudoc retenu) arrête le workflow sans alerte (routage `auto`) ; seul le candidat
-incertain part en décision (S10, S14)."""
+Décision du 05/11 : une notice trouvée au-dessus du seuil (Alma présent,
+candidat Sudoc retenu) arrête sans alerte (routage auto) ; seul le cas
+incertain part en décision (S10, S14).
+"""
 
 import pytest
 
-from humatheque.decision.moteur import Cle, decider, routage_final, routage_service
-from humatheque.spec import charger_spec
+from humatheque.decision.moteur import decider, faits_du_dossier, routage_final, routage_service
+from humatheque.regles.moteur import choisir
 
-TO, TR, MO = "these_originale_imprimee", "these_reproduction_imprimee", "memoire_original_imprime"
-
-
-@pytest.fixture(scope="module")
-def spec():
-    return charger_spec(source="csv")
+TO, TR, MO = "these-originale-imprimee", "these-reproduction-imprimee", "memoire-original-imprime"
 
 
-def _d(spec, alma, sudoc, prov):
-    return decider(spec, Cle(etat_alma=alma, etat_sudoc=sudoc, provenance=prov))
+def _faits(type_, provenance, alma, sudoc):
+    return {"type": type_, "provenance": provenance, "alma": alma, "sudoc": sudoc}
 
 
-# (clé) → (situation, suite, profil cible, routage)
-@pytest.mark.parametrize("cle, attendu", [
-    (("présent", "rien", "EPHE"), ("S01", "arreter", None, "auto")),
-    (("présent", "originale imprimée", "hors EPHE"), ("S01", "arreter", None, "auto")),
-    (("présent", "indéterminé", "mémoire"), ("S01", "arreter", None, "auto")),
-    (("absent", "originale imprimée", "hors EPHE"), ("S02", "convertir", TR, "auto")),
-    (("absent", "électronique seule", "hors EPHE"), ("S03", "convertir", TR, "auto")),
-    (("absent", "reproduction imprimée", "hors EPHE"), ("S04", "arreter", None, "auto")),
-    (("absent", "reproduction microfiche", "hors EPHE"), ("S05", "convertir", TR, "auto")),
-    (("absent", "électronique seule", "EPHE"), ("S06", "convertir", TO, "auto")),
-    (("absent", "reproduction imprimée", "EPHE"), ("S07", "convertir", TO, "auto")),
-    (("absent", "reproduction microfiche", "EPHE"), ("S07", "convertir", TO, "auto")),
-    (("absent", "rien", "EPHE"), ("S08", "creer", TO, "auto")),
-    (("absent", "rien", "hors EPHE"), ("S09", "creer", TR, "auto")),
-    (("incertain", "non vérifié", "EPHE"), ("S14", "arreter", None, "décision")),
-    (("incertain", "non vérifié", "mémoire"), ("S14", "arreter", None, "décision")),
-    (("absent", "ambigu", "EPHE"), ("S10", "arreter", None, "décision")),
-    (("absent", "ambigu", "mémoire"), ("S10", "arreter", None, "décision")),
-    (("absent", "rien", "mémoire"), ("S12", "creer", MO, "auto")),
-    (("absent", "électronique seule", "mémoire"), ("S13", "convertir", MO, "auto")),
-])
-def test_situations(spec, cle, attendu):
-    d = _d(spec, *cle)
+# (faits) → (règle, suite, profil cible, routage)
+CAS = [
+    (("thèse", "EPHE", "présent", "non vérifié"), ("S01", "arreter", None, "auto")),
+    (("mémoire", "sans objet", "présent", "non vérifié"), ("S01", "arreter", None, "auto")),
+    (("thèse", "hors EPHE", "incertain", "non vérifié"), ("S14", "arreter", None, "décision")),
+    (("thèse", "incertaine", "absent", "rien"), ("P01", "arreter", None, "décision")),
+    (("thèse", "EPHE", "absent", "ambigu"), ("S10", "arreter", None, "décision")),
+    (("mémoire", "sans objet", "absent", "indéterminé"), ("S10", "arreter", None, "décision")),
+    (("thèse", "hors EPHE", "absent", "originale imprimée"), ("S02", "convertir", TR, "auto")),
+    (("thèse", "hors EPHE", "absent", "électronique seule"), ("S03", "convertir", TR, "auto")),
+    (("thèse", "hors EPHE", "absent", "reproduction imprimée"), ("S04", "arreter", None, "auto")),
+    (("thèse", "hors EPHE", "absent", "reproduction microfiche"), ("S05", "convertir", TR, "auto")),
+    (("thèse", "EPHE", "absent", "électronique seule"), ("S06", "convertir", TO, "auto")),
+    (("thèse", "EPHE", "absent", "reproduction imprimée"), ("S07", "convertir", TO, "auto")),
+    (("thèse", "EPHE", "absent", "reproduction microfiche"), ("S07", "convertir", TO, "auto")),
+    (("thèse", "EPHE", "absent", "rien"), ("S08", "creer", TO, "auto")),
+    (("thèse", "hors EPHE", "absent", "rien"), ("S09", "creer", TR, "auto")),
+    (("mémoire", "sans objet", "absent", "rien"), ("S12", "creer", MO, "auto")),
+    (("mémoire", "sans objet", "absent", "électronique seule"), ("S13", "convertir", MO, "auto")),
+]
+
+
+@pytest.mark.parametrize("faits, attendu", CAS)
+def test_regles_de_decision(regles, faits, attendu):
+    d = decider(regles, _faits(*faits))
     assert (d.situation, d.suite, d.profil_cible, d.routage) == attendu
-    assert d.ligne["id"] == d.situation
+    assert d.ligne["id"] == attendu[0] and d.faits["type"] == faits[0]
 
 
-@pytest.mark.parametrize("cle", [
-    ("absent", "originale imprimée", "EPHE"),
-    ("absent", "originale imprimée", "mémoire"),
-    ("absent", "reproduction imprimée", "mémoire"),
-    ("absent", "indéterminé", "EPHE"),
+def test_toutes_les_regles_sont_testees(regles):
+    assert {r.id for r in regles.decisions} == {a[0] for _, a in CAS}
+
+
+def test_sinon_situation_non_prevue(regles):
+    d = decider(regles, _faits("thèse", "EPHE", "absent", "originale imprimée"))
+    assert (d.situation, d.suite, d.routage) == ("sinon", "arreter", "décision")
+    assert d.motif.startswith("Situation non prévue") and "sudoc = originale imprimée" in d.motif
+
+
+def test_motifs(regles):
+    assert decider(regles, _faits("thèse", "EPHE", "présent", "non vérifié")).motif == \
+        "S01 : Notice déjà présente dans Alma"
+    assert decider(regles, _faits("thèse", "EPHE", "absent", "rien")).motif == "S08 : création (these-originale-imprimee)"
+
+
+def test_routage_par_defaut_de_l_action(regles_fabriquees):
+    """Sans champ routage : arrêt → sortie, conversion → conversion (§7)."""
+    regles_fabriquees.modifier_decision("S04", routage=None)
+    regles_fabriquees.modifier_decision("S06", routage=None)
+    r = regles_fabriquees.charger()
+    assert decider(r, _faits("thèse", "hors EPHE", "absent", "reproduction imprimée")).routage == "sortie"
+    assert decider(r, _faits("thèse", "EPHE", "absent", "électronique seule")).routage == "conversion"
+
+
+def test_premiere_regle_vraie(regles_fabriquees):
+    regles_fabriquees.ajouter_decision({"id": "T0", "si": 'sudoc == "rien"', "alors": "décision", "motif": "test"}, 0)
+    r = regles_fabriquees.charger()
+    assert decider(r, _faits("thèse", "EPHE", "absent", "rien")).situation == "T0"
+    assert decider(r, _faits("thèse", "EPHE", "présent", "non vérifié")).situation == "S01"
+
+
+def test_evaluation_de_chaque_condition(regles):
+    c = choisir(regles, _faits("thèse", "EPHE", "absent", "rien"), tout_evaluer=True)
+    vraies = [e.id for e in c.evaluations if e.vraie]
+    assert c.regle["id"] == "S08" and vraies == ["S08"]
+    assert all(e.vraie is not None for e in c.evaluations)
+    c = choisir(regles, _faits("thèse", "EPHE", "absent", "rien"))
+    assert [e.vraie for e in c.evaluations][-1] is None  # après la règle retenue : non évaluée
+
+
+@pytest.mark.parametrize("type_doc, provenance, attendu", [
+    ("these", "EPHE", ("thèse", "EPHE")), ("these", "hors EPHE", ("thèse", "hors EPHE")),
+    ("these", "absent", ("thèse", "incertaine")), ("these", "ambigu", ("thèse", "incertaine")),
+    ("memoire", "mémoire", ("mémoire", "sans objet")),
 ])
-def test_situation_non_prevue(spec, cle):
-    d = _d(spec, *cle)
-    assert (d.situation, d.suite, d.routage) == (None, "arreter", "décision")
-    assert d.motif == f"situation non prévue ({', '.join(cle)})"
+def test_faits_du_dossier(type_doc, provenance, attendu):
+    f = faits_du_dossier(type_doc, provenance, "absent", "rien")
+    assert (f["type"], f["provenance"]) == attendu and (f["alma"], f["sudoc"]) == ("absent", "rien")
 
 
-def test_deriver_conversion_puis_arret_routage_de_la_table(spec):
-    """routage_conversion: null (config/decision.yaml) : le routage vient de Situations."""
-    d = _d(spec, "absent", "originale imprimée", "hors EPHE")
-    assert d.ligne["routage"] == "auto"              # S02 : routage de la table
-    assert (d.suite, d.routage) == ("convertir", "auto")
-    assert d.action.startswith("Dériver")
-
-
-def test_routage_conversion_impose(spec_fabriquee, monkeypatch):
-    """Un routage_conversion renseigné s'impose encore à toute dérivation."""
-    import humatheque.decision.moteur as moteur
-    cfg = dict(moteur._cfg(), routage_conversion="conversion")
-    monkeypatch.setattr(moteur, "_cfg", lambda: cfg)
-    spec = charger_spec(source="csv", dossier=spec_fabriquee.dossier)
-    assert _d(spec, "absent", "électronique seule", "EPHE").routage == "conversion"
-
-
-def test_premiere_ligne_qui_correspond(spec_fabriquee):
-    spec_fabriquee.ajouter("Situations", id="S99", etat_alma="absent", etat_sudoc="rien",
-                           provenance="*", action="Arrêt", routage="sortie")
-    spec = charger_spec(source="csv", dossier=spec_fabriquee.dossier)
-    assert _d(spec, "absent", "rien", "EPHE").situation == "S08"
-    assert _d(spec, "absent", "rien", "inconnue").situation == "S99"
-
-
-def test_alias_etat_sudoc(spec_fabriquee):
-    spec_fabriquee.modifier("Situations", "id", "S02", etat_sudoc="originale imprimée seule")
-    spec = charger_spec(source="csv", dossier=spec_fabriquee.dossier)
-    assert _d(spec, "absent", "originale imprimée", "hors EPHE").situation == "S02"
-
-
-# --- Statuts de service
-def test_alma_sudoc_seul_error_est_lu(spec):
-    r = routage_service(spec, "sudoc-checker", "duplicate_found")
+def test_alma_sudoc_seul_error_est_lu(regles):
+    r = routage_service(regles, "sudoc-checker", "duplicate_found")
     assert r.routage is None and not r.bloquant
-    r = routage_service(spec, "alma-checker", "error")
+    r = routage_service(regles, "alma-checker", "error")
     assert (r.routage, r.bloquant) == ("incident", True)
 
 
@@ -108,18 +114,18 @@ def test_alma_sudoc_seul_error_est_lu(spec):
     ("extraction-vlm", "json_invalide", "incident", True, False),
     ("extraction-vlm", "confiance_basse", "décision", True, True),
 ])
-def test_routage_service(spec, service, statut, routage, bloquant, exception):
-    r = routage_service(spec, service, statut)
+def test_routage_service(regles, service, statut, routage, bloquant, exception):
+    r = routage_service(regles, service, statut)
     assert (r.routage, r.bloquant, r.exception) == (routage, bloquant, exception)
 
 
-def test_idref_not_found_proto_notice(spec):
-    r = routage_service(spec, "idref-linker /align/person", "not_found")
+def test_idref_not_found_proto_notice(regles):
+    r = routage_service(regles, "idref-linker /align/person", "not_found")
     assert r.alertes == ["proto-notice d'autorité à créer"] and not r.bloquant
 
 
-def test_statut_inconnu_incident(spec):
-    r = routage_service(spec, "dewey-classifier", "statut_fantome")
+def test_statut_inconnu_incident(regles):
+    r = routage_service(regles, "dewey-classifier", "statut_fantome")
     assert (r.routage, r.bloquant) == ("incident", True)
 
 
