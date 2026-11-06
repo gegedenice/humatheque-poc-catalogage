@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from humatheque import issues
 from humatheque.config import charger_yaml
@@ -33,6 +33,20 @@ def _cfg() -> dict[str, Any]:
     return charger_yaml("decision")
 
 
+# Identifiants des règles avant le 06/11 (hérités de Grist) → nom en clair, pour
+# relire les dossiers enregistrés ; les nouvelles décisions portent déjà le nom.
+ANCIENS_NOMS = {
+    "S01": "Notice déjà dans Alma", "S14": "Candidat Alma à vérifier", "P01": "Provenance à confirmer",
+    "S10": "Résultat Sudoc à vérifier", "S02": "Thèse hors EPHE, originale imprimée au Sudoc",
+    "S03": "Thèse hors EPHE, notice électronique au Sudoc",
+    "S04": "Thèse hors EPHE, reproduction imprimée déjà au Sudoc",
+    "S05": "Thèse hors EPHE, reproduction microfiche au Sudoc", "S06": "Thèse EPHE, notice électronique au Sudoc",
+    "S07": "Thèse EPHE, reproduction au Sudoc", "S08": "Thèse EPHE absente du Sudoc",
+    "S09": "Thèse hors EPHE absente du Sudoc", "S12": "Mémoire absent du Sudoc",
+    "S13": "Mémoire, notice électronique au Sudoc",
+}
+
+
 class Decision(BaseModel):
     faits: dict[str, Any] = Field(default_factory=dict)
     situation: str | None = Field(None, description="nom de la règle de decisions.yaml retenue (« sinon » à défaut)")
@@ -42,6 +56,11 @@ class Decision(BaseModel):
     profil_cible: str | None = None
     routage: str
     motif: str
+
+    @field_validator("situation", mode="before")
+    @classmethod
+    def _ancien_nom(cls, v: Any) -> Any:
+        return ANCIENS_NOMS.get(v, v) if isinstance(v, str) else v
 
     def texte_faits(self) -> str:
         return ", ".join(f"{k} = {v}" for k, v in self.faits.items())

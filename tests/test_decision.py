@@ -152,3 +152,10 @@ def test_dossier_enregistre_avant_le_06_11_traduit():
             "etapes": {"alma": {"nom": "alma", "statut": "arret", "routage": "sortie"}}}
     d = Dossier.model_validate(brut)
     assert d.routage == REP and d.etapes["alma"].routage == FIN
+
+
+def test_ancien_identifiant_de_regle_traduit():
+    from humatheque.decision.moteur import Decision
+
+    d = Decision.model_validate({"situation": "S12", "suite": "creer", "routage": "auto", "motif": "S12 : Créer"})
+    assert d.situation == "Mémoire absent du Sudoc"

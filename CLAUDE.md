@@ -5,7 +5,7 @@ images, téléversées, par URL ou depuis le bucket MinIO) et produit une notice
 UNIMARC, ou s'arrête avec un rapport expliquant pourquoi.
 Les règles de catalogage ne sont PAS dans le code : elles sont dans `regles/`
 (YAML : `variables.yaml`, `profils/*.yaml`, `decisions.yaml`, conditions
-rule-engine) ; `Statuts_services` reste en `spec/` (CSV ou API Grist). Spécification fonctionnelle
+rule-engine) ; l'issue des réponses de services est dans `config/services.yaml`. Spécification fonctionnelle
 complète : `docs/SPEC.md`. La lire avant toute modification. Les exigences du
 wiki projet (ING-*, VLM-*, ALM-SUD-*) y sont tracées au §12 : citer leur
 identifiant dans les tests et les messages de commit qui les couvrent.
@@ -14,7 +14,8 @@ identifiant dans les tests et les messages de commit qui les couvrent.
 
 1. **Aucune règle UNIMARC codée en dur.** Les zones, sous-zones, valeurs fixes et
    codes de fonction viennent des profils de `regles/profils/` ; la décision et
-   le routage viennent de `regles/decisions.yaml` et `Statuts_services`. Si une
+   l'issue (terminé, à reprendre, incident) viennent de `regles/decisions.yaml`
+   et de `config/services.yaml`. Si une
    règle manque, on la signale (vérificateur, `check-spec`), on ne l'invente pas.
 2. **Ne jamais inventer un PPN, un code ou une valeur.** Une donnée absente donne
    une zone omise + une alerte, jamais une valeur plausible.
@@ -43,7 +44,7 @@ identifiant dans les tests et les messages de commit qui les couvrent.
   écrans.
 - `uv sync` · `uv run pytest` · `uv run humatheque serve` (port 8000)
   · `uv run humatheque check-spec` · `uv run humatheque css --watch`
-  · `docker compose up -d` (app + Grist).
+  · `docker compose up -d`.
 - Code et commentaires en français, identifiants en français ou anglais mais
   cohérents par module. Pas de dépendance lourde sans justification.
 

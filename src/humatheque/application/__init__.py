@@ -37,7 +37,7 @@ from humatheque.workflow import resolution as res
 
 LIBELLES_ETAPES = {
     "extraction": "Extraction VLM", "provenance": "Provenance", "alma": "Vérification Alma",
-    "sudoc": "Vérification Sudoc", "situation": "Situation", "conversion": "Conversion",
+    "sudoc": "Vérification Sudoc", "situation": "Décision", "conversion": "Conversion",
     "idref_personnes": "IdRef — personnes", "idref_organisations": "IdRef — organismes",
     "dewey": "Classification Dewey", "generation": "Générateur UNIMARC",
 }

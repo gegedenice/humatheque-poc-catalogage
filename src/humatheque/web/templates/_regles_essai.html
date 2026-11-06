@@ -8,7 +8,7 @@
     <span class="puce bg-primaire-clair text-primaire-fonce">{{ choix.action }}</span>
     {{ badge(choix.issue) }}
     {% if choix.profil %}<span class="text-sm">profil <span class="font-mono">{{ choix.profil }}</span></span>{% endif %}
-    <span class="basis-full text-sm text-sourdine">{{ choix.motif }}</span>
+    {% if choix.motif != choix.regle.nom %}<span class="basis-full text-sm text-sourdine">{{ choix.motif }}</span>{% endif %}
   </div>
   <ol class="flex flex-col gap-1 text-[13px]">
     {% for e in choix.evaluations %}

@@ -94,7 +94,7 @@ def test_file_d_exceptions_filtres_et_reprise(app, image):
     vue = app.vue_lot(lot.id)
     assert vue.indicateurs.en_attente == 2 and vue.indicateurs.par_routage == {"à reprendre": 2}
     ligne = vue.file[0]
-    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("à reprendre", "situation", "Situation")
+    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("à reprendre", "situation", "Décision")
     assert "229969437" in ligne.motif
     assert app.vue_lot(lot.id, "incidents").file == []
     assert len(app.vue_lot(lot.id, "a_reprendre").file) == 2

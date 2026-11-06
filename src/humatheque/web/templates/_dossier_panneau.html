@@ -117,13 +117,13 @@
         {% endif %}
         {% if d.decision %}
         <p class="text-sm">Faits <span class="font-mono text-xs">{{ d.decision.texte_faits() if d.decision.faits else "—" }}</span>
-          → règle <span class="font-semibold">{{ d.decision.situation or "sinon" }}</span> {{ badge(d.decision.routage) }}</p>
+          → <span class="font-semibold">{{ d.decision.situation or "sinon" }}</span> {{ badge(d.decision.routage) }}</p>
         {% if d.decision.ligne %}
         <dl class="text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 bg-white rounded-xl p-3">
           {% if d.decision.ligne.si %}<dt class="text-sourdine">Condition</dt><dd class="font-mono break-words">{{ d.decision.ligne.si }}</dd>{% endif %}
           <dt class="text-sourdine">Action</dt><dd>{{ d.decision.ligne.alors or d.decision.action }}{% if d.decision.ligne.profil %} · profil {{ d.decision.ligne.profil }}{% endif %}</dd>
           {% if d.decision.ligne.motif %}<dt class="text-sourdine">Motif</dt><dd>{{ d.decision.ligne.motif }}</dd>{% endif %}
-          {% if d.decision.ligne.statut %}<dt class="text-sourdine">Statut</dt><dd>{{ d.decision.ligne.statut }}</dd>{% endif %}
+          {% if d.decision.ligne.get("à_valider") %}<dt class="text-sourdine">Règle</dt><dd><span class="puce bg-decision-clair text-decision-fonce">à valider</span></dd>{% endif %}
         </dl>
         {% endif %}
         {% endif %}
