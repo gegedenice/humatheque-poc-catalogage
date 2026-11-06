@@ -25,8 +25,13 @@ lignes:
   - {ligne: "200 1#$a{titre_classement}$e{sous_titre}$f{auteur}$gsous la direction de {directeur}", priorite: 1,
      joindre: {directeur: [", ", " et "]}, à_valider: true,
      remarque: "un seul $g : « sous la direction de A et B » (décision du 06/11)"}
+<<<<<<< Updated upstream
   - {ligne: "214 #1$d{annee} || 214 #1$d19..", priorite: 1, à_valider: true}
   - {ligne: "215 ##$a{volumaison}", priorite: 1, à_valider: true}
+=======
+  - {ligne: "214 #1$d{annee} || 214 #1$d19XX", priorite: 1, statut: à discuter, ref: R027}
+  - {ligne: "215 ##$a{volumaison}", priorite: 1, statut: à discuter, ref: R028}
+>>>>>>> Stashed changes
   - {ligne: "328 #0$zReproduction de$b{diplome}$c{discipline}$e{etablissement}$d{annee}", si: "annee != null",
      priorite: 1, à_valider: true, remarque: "si l'originale est au Sudoc, reprendre sa 328 ?"}
   - {ligne: "328 #0$zReproduction de$b{diplome}$c{discipline}$e{etablissement}$d19..", si: "annee == null",
@@ -50,6 +55,7 @@ lignes:
   - {ligne: "215 ##$c", actif: false, priorite: 3}
   - {ligne: "215 ##$d", actif: false, priorite: 2, à_valider: true,
      remarque: "valeur fixe par type, établissement ou période ?"}
+<<<<<<< Updated upstream
   - {ligne: "320 ##$a", actif: false, priorite: 2, à_valider: true, remarque: "à harmoniser avec 105 $ba"}
   - {ligne: "330 ##$a{resume}", actif: false, priorite: 2, à_valider: true}
   - {ligne: "510 ##$a{titre_parallele}$z{langue_titre_parallele}", actif: false, priorite: 1, à_valider: true}
@@ -57,3 +63,10 @@ lignes:
   - {ligne: "600", actif: false, priorite: 1, à_valider: true, remarque: "aucune zone 600 à 607 produite (décision du 06/11)"}
   - {ligne: "610 ##$a", actif: false, priorite: 2}
   - {ligne: "711 02$3{partenaire.ppn}$4985 || 711 02$a{partenaire}$4985", actif: false, priorite: 2, à_valider: true}
+=======
+  - {ligne: "320 ##$a", actif: false, priorite: 2, statut: à discuter, ref: R031, remarque: "à harmoniser avec 105 $ba"}
+  - {ligne: "330 ##$a{resume}", actif: false, priorite: 2, statut: à discuter, ref: R037}
+  - {ligne: "510 ##$a{titre_parallele}$z{langue_titre_parallele}", actif: false, priorite: 1, statut: à discuter, ref: R038}
+  - {ligne: "541 ##$a", actif: false, priorite: 2, ref: R039}
+  - {ligne: "711 02$3{partenaire.ppn}$4985 || 711 02$a{partenaire}$4985", actif: false, priorite: 2, statut: à discuter, ref: R053}
+>>>>>>> Stashed changes
