@@ -1,5 +1,6 @@
 # Dictionnaire des variables utilisables dans les profils.
-#   source      : d'où vient la valeur (extraction.<champ du schéma>, calcul, service, constante)
+#   source      : d'où vient la valeur (extraction.<champ du schéma>, calcul, service.<service>, constante) ;
+#                 hors extraction, la valeur porte le nom de la variable dans le contexte
 #   type        : texte (défaut), personne ({x.forme} {x.nom} {x.prenom} {x.ppn}), organisme ({x.forme} {x.ppn})
 #   liste       : true si plusieurs valeurs possibles
 #   disponible  : false si le pipeline ne produit pas encore la valeur (sous-zone toujours omise)
@@ -27,5 +28,6 @@ langue_resume:      {source: extraction.abstract_lang, disponible: false, descri
 titre_parallele:    {source: extraction.parallel_title, disponible: false, description: "Titre parallèle"}
 langue_titre_parallele: {source: extraction.parallel_title_lang, disponible: false, description: "Langue du titre parallèle"}
 partenaire:         {source: extraction.partner_institutions, type: organisme, liste: true, disponible: false, description: "Établissements partenaires"}
+code_etab:          {source: constante, description: "Code établissement ABES du NNT (CODE_ETAB, EPHE)"}
 numero_nnt:         {source: calcul, disponible: false, description: "Numéro incrémental du NNT (fichier des numéros à définir)"}
 dewey:              {source: service.dewey-classifier, description: "Code domaine TEF retenu"}

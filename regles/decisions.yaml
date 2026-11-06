@@ -1,39 +1,45 @@
 # Règles de décision, lues dans l'ordre : la première règle vraie l'emporte.
 # Conditions au format rule-engine : ==, !=, in [...], and, or, not, <, >, null.
 # Actions : création (profil), conversion (profil cible), arrêt (motif), décision (motif).
+# routage (facultatif) : auto, décision, sortie, conversion, incident ; à défaut auto
+# pour une création, conversion pour une conversion, sortie pour un arrêt, décision
+# pour une décision. Décision du 05/11 : une notice trouvée au-dessus du seuil arrête
+# sans alerte (routage auto) ; seul le cas incertain part en décision (S10, S14).
 # En v1, une conversion reprend la notice Sudoc source telle quelle.
 
 # Valeurs possibles des faits : servent au contrôle de complétude.
 faits:
   type: [thèse, mémoire]
   provenance: [EPHE, hors EPHE, incertaine, sans objet]
-  alma: [présent, absent]
+  alma: [présent, incertain, absent]
   sudoc: [originale imprimée, reproduction imprimée, reproduction microfiche, électronique seule, ambigu, indéterminé, rien]
 
 regles:
-  - {id: S01, si: 'alma == "présent"', alors: arrêt, motif: Notice déjà présente dans Alma}
+  - {id: S01, si: 'alma == "présent"', alors: arrêt, motif: Notice déjà présente dans Alma, routage: auto}
+  - {id: S14, si: 'alma == "incertain"', alors: décision, motif: Candidat Alma incertain à vérifier,
+     statut: à discuter}
   - {id: P01, si: 'type == "thèse" and provenance == "incertaine"', alors: décision,
      motif: Provenance à confirmer (établissement absent ou ambigu)}
   - {id: S10, si: 'sudoc in ["ambigu", "indéterminé"]', alors: décision, motif: Résultat Sudoc à vérifier}
 
   - {id: S02, si: 'type == "thèse" and sudoc == "originale imprimée" and provenance == "hors EPHE"',
-     alors: conversion, profil: these-reproduction-imprimee}
+     alors: conversion, profil: these-reproduction-imprimee, routage: auto}
   - {id: S03, si: 'type == "thèse" and sudoc == "électronique seule" and provenance == "hors EPHE"',
-     alors: conversion, profil: these-reproduction-imprimee, statut: à discuter}
+     alors: conversion, profil: these-reproduction-imprimee, routage: auto, statut: à discuter}
   - {id: S04, si: 'type == "thèse" and sudoc == "reproduction imprimée" and provenance == "hors EPHE"',
-     alors: arrêt, motif: Reproduction imprimée déjà signalée au Sudoc}
+     alors: arrêt, motif: Reproduction imprimée déjà signalée au Sudoc, routage: auto}
   - {id: S05, si: 'type == "thèse" and sudoc == "reproduction microfiche" and provenance == "hors EPHE"',
-     alors: conversion, profil: these-reproduction-imprimee, statut: à discuter}
+     alors: conversion, profil: these-reproduction-imprimee, routage: auto, statut: à discuter}
   - {id: S06, si: 'type == "thèse" and sudoc == "électronique seule" and provenance == "EPHE"',
-     alors: conversion, profil: these-originale-imprimee}
+     alors: conversion, profil: these-originale-imprimee, routage: auto}
   - {id: S07, si: 'type == "thèse" and sudoc in ["reproduction imprimée", "reproduction microfiche"] and provenance == "EPHE"',
-     alors: conversion, profil: these-originale-imprimee, statut: à discuter}
+     alors: conversion, profil: these-originale-imprimee, routage: auto, statut: à discuter}
   - {id: S08, si: 'type == "thèse" and sudoc == "rien" and provenance == "EPHE"',
      alors: création, profil: these-originale-imprimee}
   - {id: S09, si: 'type == "thèse" and sudoc == "rien" and provenance == "hors EPHE"',
      alors: création, profil: these-reproduction-imprimee}
 
   - {id: S12, si: 'type == "mémoire" and sudoc == "rien"', alors: création, profil: memoire-original-imprime, statut: à discuter}
-  - {id: S13, si: 'type == "mémoire" and sudoc == "électronique seule"', alors: conversion, profil: memoire-original-imprime}
+  - {id: S13, si: 'type == "mémoire" and sudoc == "électronique seule"', alors: conversion, profil: memoire-original-imprime, routage: auto}
 
 sinon: {alors: décision, motif: Situation non prévue}
