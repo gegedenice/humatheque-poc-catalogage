@@ -1,7 +1,7 @@
 # Moteur de décision (SPEC §7). Les décisions sont dans regles/decisions.yaml ;
-# l'issue des réponses de services dans config/services.yaml (`statuts`).
+# les faits et les sorties des services dans regles/decisions.yaml et regles/services.yaml.
 
-# Statut de service absent de config/services.yaml : incident.
+# Code de service absent de regles/ : incident.
 statut_inconnu:
   motif: statut de service inconnu
 

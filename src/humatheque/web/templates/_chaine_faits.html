@@ -1,0 +1,18 @@
+{# Chaîne « code de l'API → valeur du fait » (banc d'essai : choix.traductions ; dossier : chaine). #}
+{% set lignes = chaine if chaine is defined else choix.traductions %}
+<table class="tableau text-[13px] bg-white rounded-xl">
+  <thead><tr><th>Fait</th><th>Code reçu</th><th></th><th>Valeur retenue</th></tr></thead>
+  <tbody>
+  {% for t in lignes %}
+    <tr>
+      <td class="font-mono font-semibold">{{ t.fait }}</td>
+      <td class="font-mono text-xs">{% if t.code is none or t.code == "" %}<span class="text-sourdine">—</span>{% else %}{{ t.code }}{% endif %}</td>
+      <td class="text-contour">→</td>
+      <td>{% if t.valeur is none %}<span class="puce bg-sortie-clair text-sortie-fonce">code inconnu</span>
+          {% else %}<span class="font-semibold">{{ t.valeur }}</span>{% endif %}
+          {% if t.corrige %}<span class="puce bg-decision-clair text-decision-fonce ml-1">corrigée par un catalogueur</span>{% endif %}
+          {% if t.connue is defined and not t.connue and t.valeur is not none %}<span class="text-xs text-sourdine ml-1">(code non listé)</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>

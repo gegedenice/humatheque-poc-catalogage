@@ -19,7 +19,7 @@ def test_secrets_masques(monkeypatch):
 
 
 def test_yaml_de_configuration_present():
-    assert charger_yaml("etats_sudoc")["correspondance"]["printed_original"] == "originale imprimée"
+    assert charger_yaml("services")["alma"]["routes"]["these"] == "/check/thesis"
 
 
 def test_seuils_vides_none(monkeypatch):

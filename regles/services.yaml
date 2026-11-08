@@ -1,0 +1,86 @@
+# Sorties des services d'enrichissement : pour chaque code renvoyé, son libellé
+# en clair, l'issue du document (terminé, à reprendre, incident) et l'alerte
+# éventuelle. Alma et Sudoc ne sont pas ici : leurs codes deviennent des faits
+# de décision (decisions.yaml, `faits`).
+#
+# Une erreur HTTP, un service injoignable ou un code non listé donne
+# « incident ». `bloquant: false` : une sortie « à reprendre » n'arrête pas la
+# génération (la zone est produite sans le PPN ou la classe, et une exception
+# est ouverte pour le catalogueur).
+
+extraction:
+  libelle: Extraction des métadonnées
+  source: VLM (prompt d'extraction), validation du JSON par le démonstrateur
+  sorties:
+    - libelle: JSON valide
+      codes: [json_valide]
+      issue: terminé
+    - libelle: JSON invalide
+      codes: [json_invalide]
+      issue: incident
+
+idref_personne:
+  libelle: IdRef — personnes
+  source: idref-linker /align/person, champ status (auteur, directeurs, membres du jury…)
+  bloquant: false
+  sorties:
+    - libelle: alignée
+      codes: [accepted]
+      issue: terminé
+      effet: PPN repris dans la notice ($3)
+    - libelle: confiance faible
+      codes: [low_confidence]
+      issue: à reprendre
+      effet: zone produite sans $3 ; candidats proposés au catalogueur
+    - libelle: ambiguë
+      codes: [ambiguous]
+      issue: à reprendre
+      effet: zone produite sans $3 ; candidats proposés au catalogueur
+    - libelle: introuvable
+      codes: [not_found]
+      issue: à reprendre
+      alerte: proto-notice d'autorité à créer
+      effet: zone produite sans $3
+
+idref_organisations:
+  libelle: IdRef — structures
+  source: idref-linker /align/thesis-organizations, champ status (établissement, école doctorale, cotutelles)
+  bloquant: false
+  sorties:
+    - libelle: alignée
+      codes: [accepted]
+      issue: terminé
+      effet: PPN repris dans la notice ($3)
+    - libelle: confiance faible
+      codes: [low_confidence]
+      issue: à reprendre
+      effet: zone produite sans $3 ; candidats proposés au catalogueur
+    - libelle: ambiguë
+      codes: [ambiguous]
+      issue: à reprendre
+      effet: zone produite sans $3 ; candidats proposés au catalogueur
+    - libelle: introuvable
+      codes: [not_found]
+      issue: à reprendre
+      alerte: proto-notice d'autorité à créer
+      effet: zone produite sans $3
+
+dewey:
+  libelle: Dewey
+  source: >-
+    dewey-classifier /classify ; l'API ne renvoie pas de statut : le démonstrateur
+    compare le score de la première classe à DEWEY_SEUIL
+  bloquant: false
+  sorties:
+    - libelle: classe retenue
+      codes: [au_dessus_seuil]
+      issue: terminé
+      effet: classe reprise dans la notice (686)
+    - libelle: sous le seuil
+      codes: [sous_seuil]
+      issue: à reprendre
+      effet: zone omise ; classes proposées au catalogueur
+    - libelle: aucune classe
+      codes: [aucune_classe]
+      issue: à reprendre
+      effet: zone omise

@@ -1,6 +1,7 @@
 """Moteur de décision (SPEC §7, §11 étape 4) : un test par règle de
-regles/decisions.yaml, plus `sinon`, l'issue des réponses de services
-(config/services.yaml) et l'issue d'un dossier.
+regles/decisions.yaml, plus `sinon`, le dictionnaire des faits (codes d'API →
+valeurs), l'issue des réponses de services (regles/services.yaml : IdRef
+personnes et structures, Dewey, extraction) et l'issue d'un dossier.
 
 Issues : terminé (rien à faire), à reprendre (un catalogueur tranche),
 incident (panne technique). Décision du 05/11 : une notice trouvée au-dessus
@@ -92,37 +93,70 @@ def test_evaluation_de_chaque_condition(regles):
     ("these", "absent", ("thèse", "incertaine")), ("these", "ambigu", ("thèse", "incertaine")),
     ("memoire", "mémoire", ("mémoire", "sans objet")),
 ])
-def test_faits_du_dossier(type_doc, provenance, attendu):
-    f = faits_du_dossier(type_doc, provenance, "absent", "rien")
+def test_faits_du_dossier(regles, type_doc, provenance, attendu):
+    f = faits_du_dossier(regles, type_doc, provenance, "absent", "rien")
     assert (f["type"], f["provenance"]) == attendu and (f["alma"], f["sudoc"]) == ("absent", "rien")
 
 
+# ---------------------------------------------------------------- dictionnaire des faits
+@pytest.mark.parametrize("fait, code, valeur", [
+    ("alma", "academic_record_found", "présent"), ("alma", "ambiguous_academic_candidate", "incertain"),
+    ("alma", "off_profile_match_only", "incertain"), ("alma", "no_academic_record_found", "absent"),
+    ("alma", "statut_fantome", None),  # pas de code_inconnu : incident
+    ("sudoc", "printed_original", "originale imprimée"), ("sudoc", "electronic", "électronique seule"),
+    ("sudoc", "ambiguous_print_candidate", "ambigu"), ("sudoc", "etat_fantome", "indéterminé"),
+    ("sudoc", None, "rien"), ("type", "these", "thèse"), ("provenance", "mémoire", "sans objet"),
+    ("sudoc", "rien", "rien"),  # un libellé est accepté tel quel
+])
+def test_dictionnaire_des_faits(regles, fait, code, valeur):
+    assert regles.faits[fait].traduire(code) == valeur
+
+
+def test_quand_et_codes_bruts(regles):
+    """Les règles s'écrivent `quand: {fait: valeur}` ; le banc d'essai accepte les codes bruts."""
+    r = next(r for r in regles.decisions if r.nom == "Thèse EPHE, reproduction au Sudoc")
+    assert r.admises("sudoc") == ["reproduction imprimée", "reproduction microfiche"] and r.si is None
+    assert r.texte_condition == "type : thèse ; provenance : EPHE ; sudoc : reproduction imprimée ou reproduction microfiche"
+    c = choisir(regles, {}, codes={"type": "these", "provenance": "EPHE", "alma": "no_academic_record_found",
+                                   "sudoc": "microfiche_reproduction"})
+    assert c.regle["nom"] == "Thèse EPHE, reproduction au Sudoc"
+    assert [(t.fait, t.code, t.valeur) for t in c.traductions][-1] == ("sudoc", "microfiche_reproduction",
+                                                                      "reproduction microfiche")
+
+
 # ---------------------------------------------------------------- réponses des services
-def test_alma_et_sudoc_juges_par_les_etats():
-    r = routage_service("sudoc", "duplicate_found")
-    assert r.routage is None and not r.bloquant
+def test_alma_et_sudoc_juges_par_les_faits(regles):
+    r = routage_service(regles, "sudoc", "printed_original")
+    assert r.routage is None and not r.bloquant and r.libelle == "originale imprimée"
+
+
+@pytest.mark.parametrize("service", ["idref_personne", "idref_organisations"])
+@pytest.mark.parametrize("statut, libelle, issue, exception", [
+    ("accepted", "alignée", FIN, False), ("low_confidence", "confiance faible", REP, True),
+    ("ambiguous", "ambiguë", REP, True), ("not_found", "introuvable", REP, True),
+])
+def test_sorties_idref(regles, service, statut, libelle, issue, exception):
+    """Les 4 statuts d'idref-linker, personnes et structures : jamais bloquants."""
+    r = routage_service(regles, service, statut)
+    assert (r.libelle, r.routage, r.bloquant, r.exception) == (libelle, issue, False, exception)
+    assert r.alertes == (["proto-notice d'autorité à créer"] if statut == "not_found" else [])
 
 
 @pytest.mark.parametrize("service, statut, issue, bloquant, exception", [
-    ("idref_personne", "accepted", FIN, False, False),
-    ("idref_personne", "ambiguous", REP, False, True),
-    ("idref_organisations", "low_confidence", REP, False, True),
+    ("dewey", "au_dessus_seuil", FIN, False, False),
     ("dewey", "sous_seuil", REP, False, True),
+    ("dewey", "aucune_classe", REP, False, True),
+    ("extraction", "json_valide", FIN, False, False),
     ("extraction", "json_invalide", "incident", True, False),
-    ("extraction", "confiance_basse", REP, True, True),
 ])
-def test_routage_service(service, statut, issue, bloquant, exception):
-    r = routage_service(service, statut)
+def test_routage_service(regles, service, statut, issue, bloquant, exception):
+    r = routage_service(regles, service, statut)
     assert (r.routage, r.bloquant, r.exception) == (issue, bloquant, exception)
 
 
-def test_idref_not_found_proto_notice():
-    r = routage_service("idref_personne", "not_found")
-    assert r.alertes == ["proto-notice d'autorité à créer"] and not r.bloquant
-
-
-def test_statut_inconnu_incident():
-    r = routage_service("dewey", "statut_fantome")
+@pytest.mark.parametrize("service, statut", [("dewey", "statut_fantome"), ("service_fantome", "accepted")])
+def test_statut_inconnu_incident(regles, service, statut):
+    r = routage_service(regles, service, statut)
     assert (r.routage, r.bloquant) == ("incident", True)
 
 

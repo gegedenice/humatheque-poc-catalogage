@@ -31,7 +31,7 @@
   .btn-discret { @apply btn border-0 px-3 text-primaire hover:bg-primaire/5; }
   .btn-sm { @apply h-9 px-4 text-[13px]; }
   .btn-grand { @apply h-12 px-7 text-[15px]; }
-  .btn-icone { @apply inline-flex items-center justify-center w-10 h-10 rounded-full text-sourdine hover:bg-encre/5 cursor-pointer; }
+  .btn-icone { @apply inline-flex items-center justify-center w-10 h-10 rounded-full text-sourdine hover:bg-encre/5 cursor-pointer disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent; }
 
   /* puces */
   .pastille { @apply inline-flex items-center gap-1 rounded-md border border-current px-2 py-px text-[11px] font-medium whitespace-nowrap; }

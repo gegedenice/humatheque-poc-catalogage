@@ -40,6 +40,12 @@ def choisir_provenance(d: Dossier, valeur: str, auteur: str, commentaire: str = 
     return d
 
 
+def _sans_code_sudoc() -> str | None:
+    from humatheque.regles import charger_regles
+
+    return charger_regles().faits["sudoc"].sans_code
+
+
 def declarer_faux_positif(d: Dossier, service: str, commentaire: str, auteur: str) -> Dossier:
     """Vérification Alma ou Sudoc jugée non pertinente (ALM-SUD-006) : état corrigé
     (`absent` pour Alma, `rien` pour Sudoc) puis reprise à l'étape suivante."""
@@ -48,9 +54,9 @@ def declarer_faux_positif(d: Dossier, service: str, commentaire: str, auteur: st
             raise ResolutionImpossible("aucune notice Alma trouvée : rien à déclarer")
         corrige, reprise = "absent", "sudoc"
     elif service == "sudoc":
-        if not d.sudoc or d.etat_sudoc in (None, charger_yaml("etats_sudoc")["etat_rien"]):
+        if not d.sudoc or d.etat_sudoc in (None, _sans_code_sudoc()):
             raise ResolutionImpossible("aucun candidat Sudoc retenu : rien à déclarer")
-        corrige, reprise = charger_yaml("etats_sudoc")["etat_rien"], "situation"
+        corrige, reprise = _sans_code_sudoc(), "situation"
     else:
         raise ResolutionImpossible(f"service « {service} » : alma ou sudoc attendu")
     if not commentaire.strip():

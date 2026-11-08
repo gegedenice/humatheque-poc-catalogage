@@ -108,8 +108,19 @@ def verifier(regles: Regles) -> Rapport:
         if r.nom in vus:
             signaler("erreur", "decision_doublon", "decisions.yaml", lieu, f"nom « {r.nom} » en double")
         vus.add(r.nom)
-        if err := _condition_invalide(r.si):
+        for fait in r.quand:
+            if fait not in regles.faits:
+                signaler("erreur", "fait_inconnu", "decisions.yaml", lieu, f"fait « {fait} » absent du dictionnaire")
+                continue
+            for v in r.admises(fait):
+                if v not in regles.faits[fait].valeurs:
+                    signaler("erreur", "valeur_inconnue", "decisions.yaml", lieu,
+                             f"{fait} : valeur « {v} » inconnue (valeurs : {', '.join(regles.faits[fait].valeurs)})")
+        if r.si and (err := _condition_invalide(r.si)):
             signaler("erreur", "condition_invalide", "decisions.yaml", lieu, f"condition invalide ({err})")
+        if not r.quand and not r.si:
+            signaler("avertissement", "regle_toujours_vraie", "decisions.yaml", lieu,
+                     "ni « quand » ni « si » : la règle s'applique toujours")
         if r.alors not in conv["actions"]:
             signaler("erreur", "action_inconnue", "decisions.yaml", lieu, f"action « {r.alors} » inconnue")
         elif conv["actions"][r.alors]["suite"] in ("creer", "convertir") and r.profil not in regles.profils:
@@ -120,10 +131,39 @@ def verifier(regles: Regles) -> Rapport:
     for p in sorted(set(regles.profils) - atteints):
         signaler("avertissement", "profil_non_atteint", regles.profils[p].fichier, "", f"profil {p} atteint par aucune décision")
 
+    # --- dictionnaire des faits : un code ne mène qu'à une valeur
+    for nom, f in regles.faits.items():
+        vus_codes: dict[str, str] = {}
+        for valeur, codes in f.valeurs.items():
+            for c in codes:
+                if c in vus_codes and vus_codes[c] != valeur:
+                    signaler("erreur", "code_ambigu", "decisions.yaml", f"fait {nom}",
+                             f"code « {c} » listé pour « {vus_codes[c]} » et « {valeur} »")
+                vus_codes[c] = valeur
+        for cle in ("code_inconnu", "sans_code"):
+            v = getattr(f, cle)
+            if v is not None and v not in f.valeurs:
+                signaler("erreur", "valeur_inconnue", "decisions.yaml", f"fait {nom}", f"{cle} : « {v} » n'est pas une valeur")
+
+    # --- sorties des services
+    from humatheque import issues
+
+    for nom, svc in regles.services.items():
+        vus_codes = {}
+        for so in svc.sorties:
+            if so.issue not in issues.ORDRE:
+                signaler("erreur", "issue_inconnue", "services.yaml", f"{nom} / {so.libelle}",
+                         f"issue « {so.issue} » inconnue ({', '.join(issues.ORDRE)})")
+            for c in so.codes:
+                if c in vus_codes:
+                    signaler("erreur", "code_ambigu", "services.yaml", nom,
+                             f"code « {c} » listé pour « {vus_codes[c]} » et « {so.libelle} »")
+                vus_codes[c] = so.libelle
+
     # --- complétude
     comp = conv["completude"]
     noms = [n for n in comp["faits"] if n in regles.faits]
-    for combo in itertools.product(*(regles.faits[n] for n in noms)):
+    for combo in itertools.product(*(list(regles.faits[n].valeurs) for n in noms)):
         faits = {**dict(zip(noms, combo)), **comp.get("fixes", {})}
         if comp.get("incompatibles") and regle(comp["incompatibles"]).matches(faits):
             continue
