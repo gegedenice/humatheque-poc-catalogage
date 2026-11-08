@@ -1,0 +1,52 @@
+variante: these-reproduction-imprimee
+libelle: Thèse de reproduction imprimée
+remplacer:
+- id: '105'
+  zone: '105'
+  libelle: 'Données codées : monographie'
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    constante: a
+  - code: b
+    constante: v
+  - code: b
+    constante: a
+  - code: c
+    constante: '0'
+  - code: d
+    constante: '0'
+  - code: e
+    constante: '0'
+  - code: f
+    constante: y
+  - code: g
+    constante: y
+  priorite: 1
+  à_valider: true
+  remarque: valeurs par défaut de $a, $e et $g à confirmer
+- id: '328'
+  zone: '328'
+  libelle: Note de thèse
+  indicateurs: '#0'
+  sous_zones:
+  - code: z
+    libelle: Texte introductif
+    constante: Reproduction de
+  - code: b
+    libelle: Diplôme
+    variable: diplome
+  - code: c
+    libelle: Discipline
+    variable: discipline
+  - code: e
+    libelle: Établissement
+    variable: etablissement
+  - code: d
+    libelle: Année
+    variable: annee
+    si_absente: repli
+    repli: 19..
+  priorite: 1
+  à_valider: true
+  remarque: si l'originale est au Sudoc, reprendre sa 328 ?

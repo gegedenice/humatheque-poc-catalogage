@@ -1,1 +1,1 @@
-"""Décision : provenance, règles de decisions.yaml (rule-engine) + Statuts_services (SPEC §6, §7)."""
+"""Décision : provenance, tableau de décision de decisions.yaml, sorties des services (SPEC §6, §7)."""

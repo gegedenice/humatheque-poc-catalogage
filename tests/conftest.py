@@ -37,20 +37,34 @@ class ReglesFabriquees:
     def lire(self, rel: str) -> Any:
         return yaml.safe_load(self.texte(rel))
 
-    def ajouter_ligne(self, profil: str, ligne: str | dict) -> None:
-        p = self.lire(f"profils/{profil}.yaml")
-        p["lignes"].append(ligne)
-        self.ecrire(f"profils/{profil}.yaml", p)
+    def ajouter_zone(self, ou: str, zone: dict) -> None:
+        """Ajoute une zone au socle (`ou` = « socle ») ou à une variante (`ajouter`)."""
+        if ou == "socle":
+            p = self.lire("notice/socle.yaml")
+            p["zones"].append(zone)
+            self.ecrire("notice/socle.yaml", p)
+        else:
+            p = self.lire(f"notice/variantes/{ou}.yaml")
+            p.setdefault("ajouter", []).append(zone)
+            self.ecrire(f"notice/variantes/{ou}.yaml", p)
 
-    def modifier_ligne(self, profil: str, debut: str, **champs: Any) -> None:
-        """Modifie les lignes du profil qui commencent par `debut` (ex. « 101 0# »)."""
-        p = self.lire(f"profils/{profil}.yaml")
-        p["lignes"] = [l if isinstance(l, dict) else {"ligne": l} for l in p["lignes"]]
-        cibles = [l for l in p["lignes"] if l["ligne"].startswith(debut)]
-        assert cibles, f"{profil} : aucune ligne « {debut} »"
-        for l in cibles:
-            l.update(champs)
-        self.ecrire(f"profils/{profil}.yaml", p)
+    def modifier_zone(self, id_: str, **champs: Any) -> None:
+        """Modifie une zone du socle."""
+        p = self.lire("notice/socle.yaml")
+        cibles = [z for z in p["zones"] if str(z["id"]) == id_]
+        assert cibles, f"aucune zone « {id_} » dans le socle"
+        for z in cibles:
+            z.update(champs)
+        self.ecrire("notice/socle.yaml", p)
+
+    def modifier_sous_zone(self, id_: str, code: str, **champs: Any) -> None:
+        p = self.lire("notice/socle.yaml")
+        (z,) = [z for z in p["zones"] if str(z["id"]) == id_]
+        cibles = [sz for sz in z["sous_zones"] if str(sz["code"]) == code]
+        assert cibles, f"zone {id_} : aucune sous-zone ${code}"
+        for sz in cibles:
+            sz.update(champs)
+        self.ecrire("notice/socle.yaml", p)
 
     def modifier_decision(self, id_: str, **champs: Any) -> None:  # id_ : nom de la règle
         d = self.lire("decisions.yaml")

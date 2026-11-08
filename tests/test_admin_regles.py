@@ -11,12 +11,12 @@ from humatheque.application import ActionImpossible, ReglesRefusees
 from services_simules import simuler
 from test_web import _televerser, app, client  # noqa: F401  (fixtures)
 
-PROFIL = "profils/these-originale-imprimee.yaml"
+PROFIL = "notice/socle.yaml"
 
 
 def test_page_regles_onglets(client):
-    for onglet, attendu in [("decisions", "Banc d'essai"), ("profils", "Aperçu de la notice"),
-                            ("variables", "extraction.defense_year"), ("modifier", 'id="editeur-regles"')]:
+    for onglet, attendu in [("decisions", "Banc d'essai"), ("notice", "Choisissez une zone"),
+                            ("donnees", "extraction.defense_year"), ("modifier", 'id="editeur-regles"')]:
         r = client.get(f"/admin/regles?onglet={onglet}")
         assert r.status_code == 200 and attendu in html.unescape(r.text), onglet
     page = html.unescape(client.get("/admin/regles").text)
@@ -54,7 +54,7 @@ def test_apercu_sur_l_exemple(client):
 
 
 def test_verifier_un_brouillon(client, app):
-    texte = app.texte_regles(PROFIL).replace("101 0#$a{langue}", "101 0#$a{langue_x}")
+    texte = app.texte_regles(PROFIL).replace("variable: langue\n", "variable: langue_x\n", 1)
     r = client.post("/admin/regles/verifier", data={"fichier": PROFIL, "texte": texte})
     assert r.status_code == 200 and "erreur(s) bloquante(s)" in r.text and "langue_x" in r.text
     assert "langue_x" not in app.texte_regles(PROFIL)  # rien d'écrit
@@ -63,7 +63,7 @@ def test_verifier_un_brouillon(client, app):
 def test_enregistrer_archive_journalise_recharge(client, app):
     avant = app.regles.version
     ancien = app.texte_regles(PROFIL)
-    texte = ancien.replace('remarque: "repli à harmoniser avec 214 et 328"', 'remarque: "modifié par le test"')
+    texte = ancien.replace("remarque: repli à harmoniser avec 214 et 328", "remarque: modifié par le test")
     assert texte != ancien
     r = client.post("/admin/regles/enregistrer", data={"fichier": PROFIL, "texte": texte, "auteur": "Camille"})
     assert r.status_code == 303 and "enregistre=archives/" in r.headers["location"]
@@ -77,17 +77,17 @@ def test_enregistrer_archive_journalise_recharge(client, app):
 
 def test_enregistrer_refuse_un_brouillon_en_erreur(client, app):
     ancien = app.texte_regles("decisions.yaml")
-    texte = ancien.replace("quand: {alma: présent}", "si: alma ==")
+    texte = ancien.replace("quand: {alma: présent}", "quand: {alma: présente}")
     r = client.post("/admin/regles/enregistrer", data={"fichier": "decisions.yaml", "texte": texte, "auteur": "C"})
     assert r.status_code == 422 and "Modification refusée" in html.unescape(r.text)
-    assert "si: alma ==" in html.unescape(r.text)  # le brouillon est conservé dans le formulaire
+    assert "quand: {alma: présente}" in html.unescape(r.text)  # le brouillon est conservé dans le formulaire
     assert app.texte_regles("decisions.yaml") == ancien and app.journal_regles() == []
     with pytest.raises(ReglesRefusees):
         app.enregistrer_regles("decisions.yaml", "regles: [\n", "C")
 
 
 def test_fichier_hors_regles_refuse(app):
-    for f in ["../spec/Statuts_services.csv", "profils/nouveau.yaml", "/etc/passwd"]:
+    for f in ["../spec/Statuts_services.csv", "notice/variantes/nouvelle.yaml", "/etc/passwd"]:
         with pytest.raises(ActionImpossible, match="inconnu"):
             app.texte_regles(f)
     with pytest.raises(ActionImpossible, match="aucune modification"):
@@ -107,7 +107,7 @@ def test_api_regles(client):
 
 # ---------------------------------------------------------------- dictionnaire et tableau de décision
 def test_onglet_faits_et_sorties(client):
-    page = html.unescape(client.get("/admin/regles?onglet=faits").text)
+    page = html.unescape(client.get("/admin/regles?onglet=donnees").text)
     for attendu in ["academic_record_found", "printed_original", "tout code non listé", "aucun code retenu",
                     "IdRef — personnes", "IdRef — structures", "low_confidence", "not_found",
                     "proto-notice d'autorité à créer", "au_dessus_seuil", "aucune_classe", "non bloquant"]:
@@ -193,7 +193,7 @@ TO_ = "these-originale-imprimee"
 
 
 def test_variables_source_et_exemple(client):
-    page = html.unescape(client.get("/admin/regles?onglet=variables").text)
+    page = html.unescape(client.get("/admin/regles?onglet=donnees").text)
     assert "<th>Exemple</th>" in page and "Biologie marine" in page and "forme Marie Durand" in page
-    profil = html.unescape(client.get("/admin/regles?onglet=profils&profil=these-originale-imprimee").text)
-    assert 'title="discipline — source : ' in profil and "exemple : Biologie marine" in profil
+    zone = html.unescape(client.get("/admin/regles/notice/zone", params={"variante": "socle", "id": "328"}).text)
+    assert "extraction.discipline</span> · exemple : Biologie marine" in zone

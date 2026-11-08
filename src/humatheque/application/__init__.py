@@ -91,9 +91,16 @@ def documents_depuis_liste(texte: str) -> list[list[str]]:
 
 from humatheque.application.administration import Administration  # noqa: E402
 from humatheque.application.regles_admin import AdministrationRegles, ReglesRefusees  # noqa: E402,F401
+from humatheque.application.studio import Studio  # noqa: E402
 
 
 class _ConditionDecision:
+    def _verification_en_attente(self, d):
+        """État de vérification proposé tant que le document attend un catalogueur."""
+        if not d.decision or not d.decision.verification or d.cloture or d.routage != issues.A_REPRENDRE:
+            return None
+        return self.regles.verifications.get(d.decision.verification)
+
     def _condition_decision(self, d) -> str | None:
         """Condition en clair de la règle retenue (lue dans la règle enregistrée au dossier)."""
         from humatheque.regles.modeles import RegleDecision
@@ -107,7 +114,7 @@ class _ConditionDecision:
             return None
 
 
-class Application(Administration, AdministrationRegles, _ConditionDecision):
+class Application(Administration, AdministrationRegles, Studio, _ConditionDecision):
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
                  regles: Regles | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
@@ -418,7 +425,8 @@ class Application(Administration, AdministrationRegles, _ConditionDecision):
                           etapes=etapes, images=images, champs=champs,
                           exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel,
                           chaine_decision=d.decision.chaine(self.regles) if d.decision else [],
-                          condition_decision=self._condition_decision(d))
+                          condition_decision=self._condition_decision(d),
+                          verification=self._verification_en_attente(d))
 
     def vue_apercu(self, dossier_id: str) -> VueApercu:
         """Images et notice finale, sans édition : version courante (validée, éditée ou
@@ -504,6 +512,11 @@ class Application(Administration, AdministrationRegles, _ConditionDecision):
 
     def choisir_provenance(self, dossier_id: str, valeur: str, auteur: str, commentaire: str = "") -> VueDossier:
         return self._resolution(dossier_id, lambda d: res.choisir_provenance(d, valeur, auteur, commentaire), True)
+
+    def choisir_verification(self, dossier_id: str, index: int, auteur: str, commentaire: str = "") -> VueDossier:
+        """État de vérification : choix configuré (regles/verifications.yaml), puis reprise."""
+        return self._resolution(dossier_id, lambda d: res.appliquer_choix(d, self.regles, index, auteur, commentaire),
+                                True)
 
     def declarer_faux_positif(self, dossier_id: str, service: str, commentaire: str, auteur: str) -> VueDossier:
         return self._resolution(dossier_id, lambda d: res.declarer_faux_positif(d, service, commentaire, auteur), True)

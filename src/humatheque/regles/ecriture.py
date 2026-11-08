@@ -25,11 +25,11 @@ def ecrire_regle(r: RegleDecision) -> str:
     lignes = [f"  - nom: {_scalaire(r.nom)}"]
     if r.quand:
         lignes.append(f"    quand: {_flux(r.quand)}")
-    if r.si:
-        lignes.append(f"    si: {_scalaire(r.si)}")
     lignes.append(f"    alors: {_scalaire(r.alors)}")
     if r.profil:
         lignes.append(f"    profil: {_scalaire(r.profil)}")
+    if r.verification:
+        lignes.append(f"    verification: {_scalaire(r.verification)}")
     if r.motif:
         lignes.append(f"    motif: {_scalaire(r.motif)}")
     if r.a_valider:

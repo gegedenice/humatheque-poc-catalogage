@@ -2,9 +2,10 @@
 
 - `faits_du_dossier` : type, provenance, alma, sudoc, traduits par le dictionnaire
   des faits (`regles/decisions.yaml`) ;
-- `decider` : faits → première règle de `regles/decisions.yaml` dont la condition
-  rule-engine est vraie (sinon `sinon`) → suite du traitement (créer, convertir,
-  arrêter) et issue (terminé, à reprendre) ;
+- `decider` : faits → première règle de `regles/decisions.yaml` qui correspond
+  (`quand`, sinon `sinon`) → suite du traitement (créer, convertir, arrêter),
+  issue (terminé, à reprendre) et état de vérification éventuel ;
+- `decision_imposee` : action choisie par un catalogueur (état de vérification) ;
 - `routage_service` : `(service, code)` → issue par `regles/services.yaml` ;
   alma et sudoc sont jugés par leurs faits et `decisions.yaml` ;
 - `routage_final` : l'issue la plus sévère des étapes (`humatheque.issues`).
@@ -58,6 +59,7 @@ class Decision(BaseModel):
     profil_cible: str | None = None
     routage: str
     motif: str
+    verification: str | None = Field(None, description="état de vérification proposé (regles/verifications.yaml)")
 
     @field_validator("situation", mode="before")
     @classmethod
@@ -107,7 +109,20 @@ def decider(regles: Regles, faits: dict[str, Any], codes: dict[str, Any] | None 
         motif = nom + (f" : {c.regle['motif']}" if c.regle.get("motif") and c.regle["motif"] != nom else "")
     return Decision(faits=faits, codes=dict(codes or {}), situation=nom, ligne=c.regle, action=c.action, suite=c.suite,
                     profil_cible=c.profil if c.suite in ("creer", "convertir") else None,
-                    routage=c.issue, motif=motif)
+                    routage=c.issue, motif=motif,
+                    verification=c.regle.get("verification") if c.action == "vérification" else None)
+
+
+def decision_imposee(regles: Regles, faits: dict[str, Any], codes: dict[str, Any], action: str,
+                     profil: str | None, motif: str) -> Decision:
+    """Action choisie par un catalogueur dans un état de vérification (pas de règle)."""
+    from humatheque.regles.moteur import _action
+
+    a = _action(action)
+    return Decision(faits=faits, codes=codes, situation="Choix du catalogueur", ligne={"nom": "Choix du catalogueur",
+                    "alors": action, **({"profil": profil} if profil else {}), "motif": motif},
+                    action=action, suite=a["suite"], routage=a["issue"], motif=f"Choix du catalogueur : {motif}",
+                    profil_cible=profil if a["suite"] in ("creer", "convertir") else None)
 
 
 def routage_service(regles: Regles, service: str, statut: str) -> RoutageService:

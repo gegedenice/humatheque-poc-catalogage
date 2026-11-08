@@ -68,7 +68,7 @@ def test_s08_produit_une_notice(workflow):
     types = {e.type for e in d.journal}
     assert {"appel", "transformation", "decision", "zone"} <= types
     assert d.extraction.bruts and d.extraction.prompt.empreinte  # VLM-T-004, VLM-T-005
-    assert d.version_spec and "zone 029 obligatoire non produite (ligne 2)" in d.alertes  # 029 sans NNT
+    assert d.version_spec and "zone 029 obligatoire non produite (029 (these-originale-imprimee))" in d.alertes  # 029 sans NNT
 
 
 @respx.mock
@@ -119,10 +119,9 @@ def test_s06_conversion_copie_puis_arret(workflow):
 def test_provenance_ambigue_arret_puis_reprise(workflow):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret) == ("à reprendre", "provenance")
-    assert "provenance à confirmer" in d.motif_arret
-    assert not routes["alma"].called
-    assert d.exceptions[0].etape == "provenance" and not d.exceptions[0].resolue
+    # Pas d'arrêt anticipé : la décision mène à l'état de vérification « provenance »
+    assert (d.routage, d.etape_arret, d.decision.verification) == ("à reprendre", "situation", "provenance")
+    assert d.decision.situation == "Provenance à confirmer"
 
     choisir_provenance(d, "EPHE", auteur="catalogueur", commentaire="EPHE, section IV")
     workflow.executer(d)
@@ -156,8 +155,8 @@ def test_faux_positif_alma_reprise(workflow):  # ALM-SUD-006
 def test_sudoc_indetermine_puis_faux_positif(workflow):
     routes = simuler(sudoc=sim.sudoc([("1", 0.9, "printed_reproduction"), ("2", 0.8, "unknown")], "duplicate_found"))
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret, d.etat_sudoc) == ("à reprendre", "sudoc", "indéterminé")
-    assert d.motif_arret == "nature de la notice Sudoc non qualifiable"
+    assert (d.routage, d.etape_arret, d.etat_sudoc) == ("à reprendre", "situation", "indéterminé")
+    assert d.decision.situation == "Résultat Sudoc à vérifier" and d.decision.verification == "sudoc_a_qualifier"
     declarer_faux_positif(d, "sudoc", "candidats sans rapport", auteur="cat")
     workflow.executer(d)
     assert d.etat_sudoc == "rien" and d.decision.situation == "Thèse EPHE absente du Sudoc"

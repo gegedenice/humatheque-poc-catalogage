@@ -4,9 +4,11 @@ Application web qui prend un document de thèse ou de mémoire (une ou plusieurs
 images, téléversées, par URL ou depuis le bucket MinIO) et produit une notice
 UNIMARC, ou s'arrête avec un rapport expliquant pourquoi.
 Les règles de catalogage ne sont PAS dans le code : elles sont dans `regles/`
-(YAML : `variables.yaml`, `profils/*.yaml`, `decisions.yaml` avec le
-dictionnaire des faits — codes d'API → valeurs — et des règles `quand`,
-`services.yaml` pour les sorties d'IdRef, Dewey et de l'extraction). Spécification fonctionnelle
+(YAML écrits par le studio de catalogage : `variables.yaml` ; `decisions.yaml`
+avec le dictionnaire des faits — codes d'API → valeurs — et le tableau de
+décision `quand` ; `verifications.yaml`, états de vérification humaine ;
+`services.yaml`, sorties d'IdRef, Dewey et de l'extraction ; `notice/`, socle
+et variantes de la notice en zones et sous-zones structurées). Spécification fonctionnelle
 complète : `docs/SPEC.md`. La lire avant toute modification. Les exigences du
 wiki projet (ING-*, VLM-*, ALM-SUD-*) y sont tracées au §12 : citer leur
 identifiant dans les tests et les messages de commit qui les couvrent.
@@ -14,7 +16,7 @@ identifiant dans les tests et les messages de commit qui les couvrent.
 ## Principes non négociables
 
 1. **Aucune règle UNIMARC codée en dur.** Les zones, sous-zones, valeurs fixes et
-   codes de fonction viennent des profils de `regles/profils/` ; la décision et
+   codes de fonction viennent de `regles/notice/` (socle + variantes) ; la décision et
    l'issue (terminé, à reprendre, incident) viennent de `regles/decisions.yaml`
    et de `regles/services.yaml`. Si une
    règle manque, on la signale (vérificateur, `check-spec`), on ne l'invente pas.
@@ -36,7 +38,8 @@ identifiant dans les tests et les messages de commit qui les couvrent.
   **Tailwind CSS** via l'exécutable autonome (pas de Node), îlots JavaScript
   limités à l'éditeur de notice **Monaco** et à la visionneuse **OpenSeadragon**
   (vendorisés, sans build), SQLite (`data/humatheque.db`), `httpx`,
-  `pydantic` v2, `pymarc`, PyYAML + `rule-engine`, `pytest` + `respx`.
+  `pydantic` v2, `pymarc`, PyYAML, `pytest` + `respx`. Pas d'expressions dans
+  les règles : tables de décision et objets de zone, interprétés en Python.
 - **Couche de services** (`application/`) : toute logique passe par elle ; les
   pages HTML et l'API JSON `/api/v1` l'appellent toutes les deux. Rien de
   métier dans les routes ni les gabarits.

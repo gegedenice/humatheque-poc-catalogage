@@ -1,5 +1,5 @@
-"""Générateur (SPEC §8.3, §11 étape 3) : profils de regles/ sur des contextes
-écrits à la main, et tests de reference/moteur-regles/tests/."""
+"""Générateur (SPEC §8.3, §11 étape 3) : notice structurée de regles/notice/ (socle +
+variantes) sur des contextes écrits à la main, et tests de reference/moteur-regles/tests/."""
 
 import copy
 import json
@@ -10,7 +10,7 @@ import pytest
 
 from contextes import REPRODUCTION_HORS_EPHE, THESE_ORIGINALE_EPHE
 from humatheque.generateur import GenerationEchec, Generateur, generer, vers_marcxml, vers_winibw
-from humatheque.regles.moteur import generer as remplir
+from humatheque.regles.notice import generer as remplir
 
 ORIG, REPRO, MEM = "these-originale-imprimee", "these-reproduction-imprimee", "memoire-original-imprime"
 EXEMPLE = json.loads((Path(__file__).resolve().parents[1] / "reference" / "moteur-regles"
@@ -47,7 +47,7 @@ def test_328_reproduction_de_en_tete(originale, reproduction):
 def test_une_701_par_rapporteur_et_repli_sans_ppn(originale):
     rapporteurs = [z for z in originale.zones_de("701") if z.libelle == "rapporteur"]
     assert [z.texte() for z in rapporteurs] == ["701 #1$3TEST00004$4958$4555", "701 #1$aDurand$bClaire$4958$4555"]
-    assert "701 (ligne 22)" in originale.replis
+    assert "701-rapporteur (socle)" in originale.replis
 
 
 def test_200g_unique_a_et_b(originale, regles):
@@ -93,7 +93,7 @@ def test_notice_originale_complete(originale):
         "711 02$aÉcole doctorale de l'EPHE$4996",
     ]
     # numero_nnt indisponible : 029 omise (§8.3 règle 4), alerte de priorité 1 (pas de bouchon)
-    assert originale.alertes == ["zone 029 obligatoire non produite (ligne 2)"]
+    assert originale.alertes == ["zone 029 obligatoire non produite (029 (these-originale-imprimee))"]
 
 
 def test_profil_reproduction_sans_029_et_avec_cotutelles(reproduction):
@@ -113,23 +113,23 @@ def test_sous_titre_repete_dans_la_meme_200(originale):
 
 def test_zones_annotees_par_ligne(originale):
     (z105,) = originale.zones_de("105")
-    assert [(r.id, r.statut) for r in z105.regles] == [("105 (ligne 7)", "à valider")]
+    assert [(r.id, r.statut) for r in z105.regles] == [("105 (socle)", "à valider")]
     (z102,) = originale.zones_de("102")
-    assert [(r.id, r.statut) for r in z102.regles] == [("102 (ligne 5)", "validée")]
-    assert "105 (ligne 7) [à valider]" in vers_winibw(originale, annoter=True)
+    assert [(r.id, r.statut) for r in z102.regles] == [("102 (socle)", "validée")]
+    assert "105 (socle) [à valider]" in vers_winibw(originale, annoter=True)
 
 
 def test_inactives_listees_comme_non_couvertes(originale):
     non = {r.regle for r in originale.non_couvertes}
-    assert {"200 (ligne 27)", "330 (ligne 31)", "600 (ligne 34)"} <= non
+    assert {"200-2 (socle)", "330 (socle)", "600 (socle)"} <= non
     assert not originale.zones_de("330") and not originale.zones_de("600")
 
 
 def test_ligne_prioritaire_omise_alerte(regles):
     ctx = copy.deepcopy(THESE_ORIGINALE_EPHE) | {"titre_classement": None, "dewey": None, "author": []}
     n = generer(regles, ctx, ORIG)
-    assert "zone 700 obligatoire non produite (ligne 19)" in n.alertes  # 700 sans auteur
-    assert not n.zones_de("686") and "zone 686 obligatoire non produite (ligne 18)" in n.alertes
+    assert "zone 700 obligatoire non produite (700-auteur (socle))" in n.alertes  # 700 sans auteur
+    assert not n.zones_de("686") and "zone 686 obligatoire non produite (686 (socle))" in n.alertes
     assert n.zones_de("200")[0].texte().startswith("200 1#$ele cas du Sénégal")  # $a omis
 
 
@@ -151,9 +151,9 @@ def test_personne_sans_ppn_ni_nom_omise(regles):
 
 
 def test_ligne_inactive_non_produite(regles_fabriquees):
-    regles_fabriquees.modifier_ligne(ORIG, "105 ##", actif=False)
+    regles_fabriquees.modifier_zone("105", actif=False)
     n = Generateur(regles_fabriquees.charger()).generer(THESE_ORIGINALE_EPHE, ORIG)
-    assert not n.zones_de("105") and n.zones_de("102") and "105 (ligne 7)" in {r.regle for r in n.non_couvertes}
+    assert not n.zones_de("105") and n.zones_de("102") and "105 (socle)" in {r.regle for r in n.non_couvertes}
 
 
 def test_profil_inconnu(regles):
@@ -161,12 +161,24 @@ def test_profil_inconnu(regles):
         generer(regles, THESE_ORIGINALE_EPHE, "profil-fantome")
 
 
-def test_condition_si_et_condition_invalide(regles_fabriquees):
-    regles_fabriquees.ajouter_ligne(ORIG, {"ligne": "330 ##$a{resume}", "si": 'langue == "eng"', "ref": "T1"})
-    regles_fabriquees.ajouter_ligne(ORIG, {"ligne": "541 ##$a{titre}", "si": 'langue == "fre"', "ref": "T2"})
+def test_verification_humaine_si_absente(regles_fabriquees):
+    """Sous-zone « demander une vérification humaine » : omise, vérification demandée."""
+    regles_fabriquees.modifier_sous_zone("328", "c", si_absente="verification")
     r = regles_fabriquees.charger()
-    n = generer(r, THESE_ORIGINALE_EPHE | {"abstract": "Résumé"}, ORIG)
-    assert not n.zones_de("330") and _lignes(n, "541") == ["541 ##$aContribution à l'étude de la démocratie en Afrique"]
+    n = generer(r, copy.deepcopy(THESE_ORIGINALE_EPHE) | {"discipline": None}, ORIG)
+    assert _lignes(n, "328") == ["328 #0$bThèse de doctorat$eÉcole pratique des hautes études$d1998"]
+    assert n.verifications == ["zone 328 $c (Discipline) : valeur absente, à vérifier [328 (socle)]"]
+    assert not generer(r, THESE_ORIGINALE_EPHE, ORIG).verifications
+
+
+def test_composition_et_rendu(regles_fabriquees):
+    """Composition de parties (029 $b) et mode de rendu d'autorité forcé dans une sous-zone."""
+    regles_fabriquees.modifier_sous_zone("700-auteur", "3", rendu="nom_prenom")
+    regles_fabriquees.ajouter_zone("socle", {"id": "330-essai", "zone": "330", "indicateurs": "##", "sous_zones": [
+        {"code": "a", "parties": [{"texte": "Thèse ("}, {"variable": "annee"}, {"texte": ")"}]}]})
+    n = generer(regles_fabriquees.charger(), THESE_ORIGINALE_EPHE, ORIG)
+    assert _lignes(n, "700") == ["700 #1$aDubois$bJean-Daniel$4070"]
+    assert _lignes(n, "330") == ["330 ##$aThèse (1998)"]
 
 
 def test_memoire_directeur_003(regles):

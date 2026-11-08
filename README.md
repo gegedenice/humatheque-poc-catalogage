@@ -4,7 +4,8 @@ Démonstrateur du workflow de catalogage assisté des thèses et mémoires : à
 partir d'une ou plusieurs images d'un document, il produit une notice UNIMARC
 éditable, ou s'arrête avec un rapport expliquant pourquoi. Les règles de
 catalogage ne sont pas dans le code : elles sont dans `regles/` (fichiers YAML
-lisibles et modifiables depuis l'interface, conditions au format rule-engine).
+écrits par le **studio de catalogage** de l'interface : tableau de décision,
+vérifications humaines, notice structurée en zones et sous-zones).
 
 - Spécification fonctionnelle : [`docs/SPEC.md`](docs/SPEC.md)
 - Consignes de développement : [`CLAUDE.md`](CLAUDE.md)
@@ -67,8 +68,10 @@ l'avance.
 
 | Fichier | Contenu |
 |---|---|
-| `regles/variables.yaml` | variables utilisables dans les profils (source, type, liste, disponible) |
-| `regles/profils/*.yaml` | notice-modèle de chaque profil : une ligne = une zone écrite comme dans WinIBW (`ligne \|\| repli`, `si`, `joindre`…) |
+| `regles/variables.yaml` | données utilisables dans la notice (source, type, liste, disponible) |
+| `regles/notice/socle.yaml` | zones communes de la notice : sous-zones configurables (constante, donnée, composition, autorité ; repli ou vérification si absente), rendu des autorités |
+| `regles/notice/variantes/*.yaml` | thèse originale, thèse de reproduction, mémoire : zones ajoutées, remplacées, retirées |
+| `regles/verifications.yaml` | vérifications humaines : états d'attente, question, choix (corriger un fait ou imposer une action) |
 | `regles/decisions.yaml` | dictionnaire des faits (valeurs en clair ← codes de l'API), règles de décision (`quand: {fait: valeur}`, première qui correspond), `sinon` |
 | `regles/services.yaml` | sorties d'IdRef (personnes, structures), Dewey et de l'extraction : code → libellé, issue, alerte |
 
@@ -82,15 +85,14 @@ de la règle de décision retenue (`création`, `conversion`, `arrêt` → termi
 `vérification` → à reprendre) et des réponses des services, dont l'issue par
 code est dans `regles/services.yaml`.
 
-**Administration › Règles** (`/admin/regles`) : tableau de décision modifiable
-par formulaire (ajout, modification, ordre, suppression) et banc d'essai
-(valeurs en clair ou codes bruts de l'API, saisis ou repris d'un dossier :
-traduction, règle retenue, évaluation de chaque règle), dictionnaire des faits
-et sorties des services, profils ligne à ligne (source et exemple des
-variables au survol) avec aperçu de la notice, variables, et
-modification des fichiers YAML dans l'éditeur (texte et commentaires
-conservés). « Vérifier » lance le vérificateur sans rien écrire ; « Enregistrer »
-refuse toute erreur bloquante, archive la version précédente dans
+**Studio de catalogage** (`/admin/regles`) : **Décisions** (tableau de décision
+par formulaire, codes d'API au survol), **Vérifications** (états d'attente et
+leurs choix), **Notice UNIMARC** (socle et variantes, éditeur de zones et de
+sous-zones avec aperçu immédiat), **Données** (faits, sorties des services,
+variables), **Banc d'essai** (un document → décisions, données préparées,
+notice avec provenance ; non-régression sur les notices déjà produites) et
+**Fichiers** (YAML, experts). Chaque enregistrement refuse toute erreur
+bloquante du vérificateur, archive la version précédente dans
 `regles/archives/` (non versionné), journalise (`data/journal_regles.jsonl`) et
 recharge les règles. Les fichiers modifiés sont ceux du dépôt (volume
 `./regles` en Docker) : pensez à les commiter.
@@ -127,7 +129,7 @@ docker compose up -d      # application : http://localhost:8000
 ```
 src/humatheque/
   config.py          réglages (.env)            cli.py        ligne de commande
-  regles/            chargement des règles YAML, moteur (décision, génération), vérificateur
+  regles/            chargement des règles YAML, décision (tables), notice structurée, vérificateur
   texte_unimarc/     module NOR : réaccentuation, casse, personnes, titre de classement
   extraction/        VLM multi-images, fournisseurs interchangeables
   contexte/          extraction → Contexte (clés = Sources)
@@ -135,7 +137,7 @@ src/humatheque/
   qualification/     agrégation des thesis_state
   decision/          provenance, faits et décision (decisions.yaml), issue des réponses de services
   conversion/        notice Sudoc existante (copie en v1, ISO 2709)
-  generateur/        remplissage des profils, WinIBW et MARCXML
+  generateur/        notice d'un dossier (socle + variante), WinIBW et MARCXML
   workflow/          orchestrateur : un document → un dossier, reprises
   ingestion/         stockage S3, constitution des documents
   notice/            notice éditable : analyse, validation, versions

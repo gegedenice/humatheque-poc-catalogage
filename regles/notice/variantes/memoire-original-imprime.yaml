@@ -1,0 +1,42 @@
+variante: memoire-original-imprime
+libelle: Mémoire original imprimé
+remplacer:
+- id: '105'
+  zone: '105'
+  libelle: 'Données codées : monographie'
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    constante: a
+  - code: b
+    constante: m
+  - code: b
+    constante: a
+  - code: c
+    constante: '0'
+  - code: d
+    constante: '0'
+  - code: e
+    constante: '0'
+  - code: f
+    constante: y
+  - code: g
+    constante: y
+  priorite: 1
+  à_valider: true
+  remarque: cas des mémoires non spécifié
+- id: 701-directeur
+  zone: '701'
+  libelle: 'Responsabilité secondaire (personne) : directeur'
+  indicateurs: '#1'
+  sous_zones:
+  - code: '3'
+    autorite: directeur
+    libelle: Directeur
+  - code: '4'
+    constante: '003'
+  priorite: 2
+retirer:
+- '686'
+- 711-cotutelle
+- 711-ecole-doctorale

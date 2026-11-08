@@ -73,7 +73,7 @@ def test_motif_et_regle_a_valider(regles):
 
 
 def test_premiere_regle_vraie(regles_fabriquees):
-    regles_fabriquees.ajouter_decision({"nom": "Test", "si": 'sudoc == "rien"', "alors": "vérification"}, 0)
+    regles_fabriquees.ajouter_decision({"nom": "Test", "quand": {"sudoc": "rien"}, "alors": "vérification"}, 0)
     r = regles_fabriquees.charger()
     assert decider(r, _faits("thèse", "EPHE", "absent", "rien")).situation == "Test"
     assert decider(r, _faits("thèse", "EPHE", "présent", "non vérifié")).situation == "Notice déjà dans Alma"
@@ -115,7 +115,7 @@ def test_dictionnaire_des_faits(regles, fait, code, valeur):
 def test_quand_et_codes_bruts(regles):
     """Les règles s'écrivent `quand: {fait: valeur}` ; le banc d'essai accepte les codes bruts."""
     r = next(r for r in regles.decisions if r.nom == "Thèse EPHE, reproduction au Sudoc")
-    assert r.admises("sudoc") == ["reproduction imprimée", "reproduction microfiche"] and r.si is None
+    assert r.admises("sudoc") == ["reproduction imprimée", "reproduction microfiche"]
     assert r.texte_condition == "type : thèse ; provenance : EPHE ; sudoc : reproduction imprimée ou reproduction microfiche"
     c = choisir(regles, {}, codes={"type": "these", "provenance": "EPHE", "alma": "no_academic_record_found",
                                    "sudoc": "microfiche_reproduction"})

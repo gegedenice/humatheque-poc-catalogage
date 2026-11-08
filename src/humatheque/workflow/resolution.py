@@ -10,7 +10,8 @@ import re
 
 from humatheque.config import charger_yaml
 from humatheque.services.idref import AlignementIdref, AlignementOrganisations
-from humatheque.workflow.modeles import Cloture, Dossier, Etape
+from humatheque.regles.modeles import Regles
+from humatheque.workflow.modeles import ETAPES, Cloture, Dossier, Etape
 
 # Statut d'un alignement ou d'une classe tranchés par un catalogueur
 # (config/contexte.yaml : statuts_idref_ppn).
@@ -75,6 +76,46 @@ def declarer_faux_positif(d: Dossier, service: str, commentaire: str, auteur: st
     if etape.statut == "arret":  # arrêt sur la vérification elle-même : pas de nouvel appel
         etape.statut, etape.routage, etape.motif = "ok", issues.TERMINE, f"faux positif déclaré : {commentaire}"
     d.decision = None
+    return d
+
+
+# Étape à reprendre après correction d'un fait (la première concernée) ; Alma et
+# Sudoc ne sont pas rappelés (leurs résultats sont gardés, l'état est corrigé).
+REPRISE_FAIT = {"alma": "alma", "sudoc": "sudoc"}
+
+
+def appliquer_choix(d: Dossier, regles: Regles, index: int, auteur: str, commentaire: str = "") -> Dossier:
+    """État de vérification (regles/verifications.yaml) : le catalogueur choisit une suite.
+    Faits corrigés → nouvelle décision ; action imposée → décision sans règle."""
+    if not d.decision or not d.decision.verification:
+        raise ResolutionImpossible("aucune vérification en attente pour ce document")
+    etat = regles.verifications.get(d.decision.verification)
+    if etat is None:
+        raise ResolutionImpossible(f"état de vérification « {d.decision.verification} » inconnu")
+    if not 0 <= index < len(etat.choix):
+        raise ResolutionImpossible(f"choix {index} introuvable pour « {etat.libelle} »")
+    c = etat.choix[index]
+    reprise = "situation"
+    for fait, valeur in c.faits.items():
+        if fait == "provenance":
+            d.provenance_manuelle = valeur
+            if d.provenance:  # la décision relit la provenance : pas besoin de refaire les vérifications
+                d.provenance = d.provenance.model_copy(update={"valeur": valeur, "regle": "choix_catalogueur"})
+        else:
+            d.corrections[fait] = valeur
+        if fait in REPRISE_FAIT and ETAPES.index(REPRISE_FAIT[fait]) < ETAPES.index(reprise):
+            reprise = REPRISE_FAIT[fait]
+    if c.action:
+        d.corrections["action"] = c.action
+        d.corrections["profil"] = c.profil or ""
+        d.corrections["choix"] = c.libelle
+    for e in d.exceptions:
+        e.resolue = True
+    d.noter("situation", "resolution", {"verification": etat.nom, "question": etat.question, "choix": c.libelle,
+                                        "faits": c.faits, "action": c.action, "profil": c.profil,
+                                        "commentaire": commentaire}, auteur)
+    d.decision = None
+    d.reinitialiser_depuis(reprise)
     return d
 
 

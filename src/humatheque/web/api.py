@@ -84,6 +84,7 @@ class Resolution(BaseModel):
     exception: int | None = None
     ppn: str | None = None
     code: str | None = None
+    choix: int | None = Field(None, description="vérification : rang du choix (0, 1…)")
 
 
 class ChoixPpn(BaseModel):
@@ -98,9 +99,11 @@ def resoudre_ppns(request: Request, dossier_id: str, r: ChoixPpn) -> VueDossier:
 
 
 @routeur.post("/dossiers/{dossier_id}/resolutions/{type_}", response_model=VueDossier)
-def resoudre(request: Request, dossier_id: str, type_: Literal["provenance", "faux-positif", "ppn", "dewey",
-                                                              "hors-outil"], r: Resolution) -> VueDossier:
+def resoudre(request: Request, dossier_id: str, type_: Literal["verification", "provenance", "faux-positif", "ppn",
+                                                              "dewey", "hors-outil"], r: Resolution) -> VueDossier:
     a = _app(request)
+    if type_ == "verification":
+        return a.choisir_verification(dossier_id, r.choix if r.choix is not None else -1, r.auteur, r.commentaire)
     if type_ == "provenance":
         return a.choisir_provenance(dossier_id, r.provenance or "", r.auteur, r.commentaire)
     if type_ == "faux-positif":

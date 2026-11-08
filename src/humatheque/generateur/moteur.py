@@ -1,7 +1,7 @@
-"""Générateur (SPEC §8) : contexte du document + profil de `regles/profils/` → notice.
+"""Générateur (SPEC §8) : contexte du document + notice-modèle (socle + variante de `regles/notice/`) → notice.
 
 Le générateur ne lit que le contexte : `variables_profil` en tire les variables
-de `regles/variables.yaml`, puis `regles.moteur.generer` remplit le profil.
+de `regles/variables.yaml`, puis `regles.notice.generer` remplit les zones.
 Aucune zone ni valeur UNIMARC ici.
 """
 
@@ -12,7 +12,7 @@ from typing import Any
 from humatheque.contexte import variables_profil
 from humatheque.generateur.modeles import Notice
 from humatheque.regles.modeles import Regles
-from humatheque.regles.moteur import GenerationEchec, generer as remplir
+from humatheque.regles.notice import GenerationEchec, generer as remplir
 
 __all__ = ["GenerationEchec", "Generateur", "generer"]
 

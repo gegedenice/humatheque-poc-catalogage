@@ -19,7 +19,7 @@
     </div>
 
     <fieldset class="flex flex-col gap-3">
-      <legend class="etiquette">Quand… (cocher les valeurs admises ; rien de coché : fait indifférent)</legend>
+      <legend class="etiquette">Quand… (cocher les valeurs admises ; rien de coché : fait indifférent ; codes d'API au survol)</legend>
       <div class="grid gap-3 md:grid-cols-2">
       {% for f, fait in vue.faits.items() %}
         {% set admises = regle.admises(f) if regle else [] %}
@@ -27,7 +27,7 @@
           <p class="text-sm mb-2"><span class="font-mono font-semibold">{{ f }}</span> <span class="text-sourdine text-xs">{{ fait.question }}</span></p>
           <div class="flex flex-wrap gap-2">
           {% for v, codes in fait.valeurs.items() %}
-            <label class="filtre has-[:checked]:bg-primaire-clair has-[:checked]:text-primaire-fonce has-[:checked]:border-transparent" title="{{ codes | join(', ') or 'calculée par le démonstrateur' }}">
+            <label class="filtre has-[:checked]:bg-primaire-clair has-[:checked]:text-primaire-fonce has-[:checked]:border-transparent" title="{{ ('codes : ' ~ codes | join(', ')) if codes else 'aucun code : valeur calculée ou de repli' }}">
               <input type="checkbox" class="accent-primaire" name="quand.{{ f }}" value="{{ v }}" {% if v in admises %}checked{% endif %}> {{ v }}</label>
           {% endfor %}
           </div>
@@ -35,10 +35,6 @@
       {% endfor %}
       </div>
     </fieldset>
-    <details {% if regle and regle.si %}open{% endif %}>
-      <summary class="cursor-pointer text-sm text-sourdine">Condition avancée (rule-engine), ajoutée par « et »</summary>
-      <input class="champ champ-sm font-mono mt-2" name="si" value="{{ regle.si if regle and regle.si else '' }}" placeholder='ex. type == "thèse" and sudoc != "rien"'>
-    </details>
     {% endif %}
 
     <div class="grid gap-3 sm:grid-cols-3">
@@ -56,6 +52,11 @@
       {% endif %}
       <label class="block {% if sinon %}sm:col-span-2{% endif %}"><span class="etiquette">Motif (facultatif)</span>
         <input class="champ champ-sm" name="motif" value="{{ (regle.motif or '') if regle else '' }}"></label>
+      <label class="block sm:col-span-3"><span class="etiquette">Vérification proposée au catalogueur (action « vérification »)</span>
+        <select class="champ champ-sm" name="verification">
+          <option value="">— aucune (arrêt sans choix guidé) —</option>
+          {% for e in vue.verifications %}<option value="{{ e.nom }}" {% if regle and regle.verification == e.nom %}selected{% endif %}>{{ e.libelle }}</option>{% endfor %}
+        </select></label>
     </div>
 
     <div class="flex flex-wrap items-center gap-3">

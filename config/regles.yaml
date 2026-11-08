@@ -20,4 +20,8 @@ attributs:
 completude:
   faits: [type, provenance, sudoc]
   fixes: {alma: absent}
-  incompatibles: '(type == "mémoire") != (provenance == "sans objet") or sudoc == "non vérifié"'
+  # combinaisons impossibles (même forme que `quand` des règles)
+  incompatibles:
+    - {type: mémoire, provenance: [EPHE, hors EPHE, incertaine]}
+    - {type: thèse, provenance: sans objet}
+    - {sudoc: non vérifié}

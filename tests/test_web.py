@@ -107,11 +107,12 @@ def test_notice_alma_certaine_sans_a_trancher(client):
 def test_resolution_par_formulaire(client, app):
     simuler(alma=sim.alma("off_profile_match_only", ppn="111111111"))
     dossier = _televerser(client).headers["location"]
-    page = client.get(dossier)
-    assert "Déclarer un faux positif" in page.text and "Traité hors outil" in page.text
+    page = html.unescape(client.get(dossier).text)
+    # état de vérification configuré (regles/verifications.yaml) au lieu du faux positif codé en dur
+    assert "Alma : candidat incertain" in page and "Non, faux positif" in page and "Traité hors outil" in page
     simuler()
-    r = client.post(f"{dossier}/faux-positif", data={"service": "alma", "commentaire": "autre ouvrage",
-                                                     "auteur": "Camille"})
+    r = client.post(f"{dossier}/verification", data={"choix": "1", "commentaire": "autre ouvrage",
+                                                      "auteur": "Camille"})
     assert r.status_code == 303 and r.cookies.get("catalogueur") == "Camille"
     client.cookies.set("catalogueur", "Camille")
     page = client.get(dossier)

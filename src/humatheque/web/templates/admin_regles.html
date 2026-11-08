@@ -1,14 +1,19 @@
 {% extends "base.html" %}
 {% from "_composants.html" import badge, vide %}
-{% block titre %}Règles de catalogage{% endblock %}
-{% block fil %}Administration · règles de catalogage (SPEC §8){% endblock %}
-{% block entete %}<h1>Règles de catalogage</h1>{% endblock %}
+{% block titre %}Studio de catalogage{% endblock %}
+{% block fil %}Administration · studio de catalogage (SPEC §8, §9.3){% endblock %}
+{% block entete %}<h1>Studio de catalogage</h1>{% endblock %}
 {% block entete_droite %}
-<span class="text-[13px] text-sourdine">Version <span class="font-mono">{{ vue.version }}</span> · <span class="font-mono">{{ vue.emplacement }}</span></span>
+<span class="text-[13px] text-sourdine">Version <span class="font-mono">{{ vue.version }}</span></span>
 {% endblock %}
 {% block contenu %}
 {% include "_admin_onglets.html" %}
-{% set onglets = [("decisions", "Décisions"), ("faits", "Faits et sorties"), ("profils", "Profils (gabarits)"), ("variables", "Variables"), ("modifier", "Modifier")] %}
+{% set onglets = [("decisions", "Décisions", "Quand poursuivre, vérifier, convertir ou arrêter"),
+                  ("verifications", "Vérifications", "Interventions humaines et leurs suites"),
+                  ("notice", "Notice UNIMARC", "Zones, sous-zones, replis"),
+                  ("donnees", "Données", "Faits, sorties des services, variables"),
+                  ("essai", "Banc d'essai", "Décisions, données et notice sur un document"),
+                  ("modifier", "Fichiers", "YAML, pour experts")] %}
 
 <section class="carte mb-6">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -20,19 +25,26 @@
 </section>
 
 <section class="bg-carte rounded-carte shadow-carte overflow-hidden">
-  <nav class="onglets px-4" aria-label="Sections des règles">
-    {% for cle, libelle in onglets %}
-    <a href="/admin/regles?onglet={{ cle }}" class="onglet flex items-center no-underline" aria-selected="{{ 'true' if onglet == cle else 'false' }}"
+  <nav class="onglets px-4" aria-label="Vues du studio">
+    {% for cle, libelle, aide in onglets %}
+    <a href="/admin/regles?onglet={{ cle }}" class="onglet flex items-center no-underline" title="{{ aide }}" aria-selected="{{ 'true' if onglet == cle else 'false' }}"
        {% if onglet == cle %}aria-current="page"{% endif %}>{{ libelle }}</a>
     {% endfor %}
   </nav>
 
   <div class="p-5">
+  {% if enregistre and onglet != "decisions" and onglet != "modifier" %}
+  <p class="avis bg-auto-clair text-auto-fonce mb-4">✓ Enregistré et rechargé (version <span class="font-mono">{{ vue.version }}</span>). Version précédente archivée : <span class="font-mono">regles/{{ enregistre }}</span></p>
+  {% endif %}
+  {% if refus is defined and refus and onglet not in ("decisions", "modifier") %}
+  <div class="carte-alerte mb-4"><h3 class="mb-2">Modification refusée : erreurs bloquantes</h3>
+    {% with rapport = refus %}{% include "_regles_rapport.html" %}{% endwith %}</div>
+  {% endif %}
   {# ============================================================ décisions #}
   {% if onglet == "decisions" %}
     {% set faits = vue.faits.keys() | list %}
     <div class="flex flex-wrap items-center gap-3 mb-3">
-      <p class="text-sm text-sourdine flex-1 min-w-[260px]">Tableau de décision (<span class="font-mono">decisions.yaml</span>) : lu de haut en bas, la première règle dont tous les faits correspondent l'emporte. Une case vide : fait indifférent. Les valeurs des faits et leurs codes d'API sont dans l'onglet <a href="/admin/regles?onglet=faits">Faits et sorties</a>.</p>
+      <p class="text-sm text-sourdine flex-1 min-w-[260px]">Tableau de décision (<span class="font-mono">decisions.yaml</span>) : lu de haut en bas, la première règle dont tous les faits correspondent l'emporte. Une case vide : fait indifférent. Survolez une valeur pour voir les codes d'API qui y mènent (dictionnaire : onglet <a href="/admin/regles?onglet=donnees">Données</a>) ; testez dans le <a href="/admin/regles?onglet=essai">banc d'essai</a>.</p>
       <button class="btn-principal btn-sm" hx-get="/admin/regles/decision" hx-target="#formulaire-decision" hx-swap="innerHTML">+ Ajouter une règle</button>
     </div>
     {% if enregistre %}
@@ -52,12 +64,14 @@
         <tr>
           <td class="font-mono text-xs text-sourdine">{{ loop.index }}</td>
           <td class="font-semibold">{{ r.nom }}{% if r.a_valider %}<br><span class="puce bg-decision-clair text-decision-fonce font-medium">à valider</span>{% endif %}
-            {% if r.si %}<br><span class="text-xs font-normal text-sourdine">et si</span> <span class="font-mono text-xs font-normal text-conversion">{{ r.si }}</span>{% endif %}</td>
+</td>
           {% for f in faits %}
-          <td>{% for v in r.admises[f] %}<span class="puce bg-tonal text-encre mr-1 mb-1 inline-block">{{ v }}</span>{% else %}<span class="text-contour" title="indifférent">—</span>{% endfor %}</td>
+          <td>{% for v in r.admises[f] %}{% set codes = vue.faits[f].valeurs.get(v) or [] %}<span class="puce bg-tonal text-encre mr-1 mb-1 inline-block cursor-help" title="{{ ('codes : ' ~ codes | join(', ')) if codes else ('« ' ~ v ~ ' » : ' ~ ('tout code non listé' if v == vue.faits[f].code_inconnu else 'aucun code retenu' if v == vue.faits[f].sans_code else 'calculée par le démonstrateur')) }}">{{ v }}</span>{% else %}<span class="text-contour" title="indifférent">—</span>{% endfor %}</td>
           {% endfor %}
           <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ r.alors }}</span></td>
-          <td>{% if r.profil %}<a class="font-mono text-xs" href="/admin/regles?onglet=profils&profil={{ r.profil }}">{{ r.profil }}</a>{% endif %}{{ r.motif or "" }}</td>
+          <td>{% if r.profil %}<a class="font-mono text-xs" href="/admin/regles?onglet=notice&variante={{ r.profil }}">{{ r.profil }}</a>{% endif %}
+            {% if r.verification %}<a class="puce bg-decision-clair text-decision-fonce no-underline" href="/admin/regles?onglet=verifications&etat={{ r.verification }}" title="état proposé au catalogueur">⧗ {{ (vue.verifications | selectattr("nom", "equalto", r.verification) | map(attribute="libelle") | first) or r.verification }}</a>{% endif %}
+            {% if r.motif %}<span class="block text-[13px]">{{ r.motif }}</span>{% endif %}</td>
           <td>{{ badge(r.issue) }}</td>
           <td class="whitespace-nowrap text-right">
             <form method="post" action="/admin/regles/decision/deplacer" hx-boost="false" class="inline">
@@ -70,43 +84,50 @@
         </tr>
       {% endfor %}
         <tr class="bg-tonal/60"><td></td><td class="font-semibold">sinon</td><td colspan="{{ faits | length }}" class="text-xs text-sourdine">aucune règle ne correspond</td>
-          <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ vue.sinon.alors }}</span></td><td>{{ vue.sinon.motif or "" }}</td><td>{{ badge(vue.sinon.issue) }}</td>
+          <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ vue.sinon.alors }}</span></td><td>{{ vue.sinon.motif or "" }}{% if vue.sinon.verification %} <a class="puce bg-decision-clair text-decision-fonce no-underline" href="/admin/regles?onglet=verifications&etat={{ vue.sinon.verification }}">⧗ {{ vue.sinon.verification }}</a>{% endif %}</td><td>{{ badge(vue.sinon.issue) }}</td>
           <td class="text-right"><button class="btn-icone" title="Modifier" aria-label="Modifier « sinon »" hx-get="/admin/regles/decision?nom=sinon" hx-target="#formulaire-decision" hx-swap="innerHTML">✎</button></td></tr>
       </tbody>
     </table></div>
     {% if not auteur %}<p class="text-xs text-sourdine -mt-4 mb-6">Monter / descendre : indiquez d'abord votre nom dans un formulaire (« Modifier »), il est ensuite retenu.</p>{% endif %}
 
-    <div class="flex flex-wrap gap-6 items-start">
-      <form class="sous-carte flex-[1_1_360px] flex flex-col gap-3" hx-post="/admin/regles/essai" hx-target="#resultat-essai" hx-swap="innerHTML">
-        <h3>Banc d'essai</h3>
-        <p class="text-xs text-sourdine">Pour chaque fait, une valeur en clair ou le code brut renvoyé par l'API (ex. <span class="font-mono">academic_record_found</span>, <span class="font-mono">printed_original</span>) : il est traduit par le dictionnaire.</p>
-        <div class="grid gap-3 sm:grid-cols-2">
-          {% for nom, f in vue.faits.items() %}
-          <label class="block"><span class="etiquette">{{ nom }}</span>
-            <input class="champ champ-sm" name="{{ nom }}" list="valeurs-{{ nom }}" autocomplete="off"
-                   value="{{ defauts.get(nom) or (f.valeurs | list | first) }}" placeholder="(vide)">
-            <datalist id="valeurs-{{ nom }}">
-              {% for v, codes in f.valeurs.items() %}<option value="{{ v }}">{% for c in codes %}<option value="{{ c }}" label="code → {{ v }}">{% endfor %}{% endfor %}
-            </datalist></label>
-          {% endfor %}
+
+  {# ============================================================ vérifications #}
+  {% elif onglet == "verifications" %}
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <p class="text-sm text-sourdine flex-1 min-w-[260px]">Une vérification est un <strong>état</strong> : le traitement s'arrête, le catalogueur répond à une question dans l'onglet « Reprise » du dossier, et le moteur reprend selon son choix — correction de faits (puis nouvelle décision) ou action imposée. Les règles de décision y mènent par l'action « vérification ».</p>
+      <button class="btn-principal btn-sm" hx-get="/admin/regles/verification" hx-target="#formulaire-verification" hx-swap="innerHTML">+ Ajouter un état</button>
+    </div>
+    <div id="formulaire-verification" class="mb-4" {% if etat_ouvert %}hx-get="/admin/regles/verification?nom={{ etat_ouvert | urlencode }}" hx-trigger="load"{% endif %}></div>
+    <div class="grid gap-4 lg:grid-cols-2">
+      {% for e in vue.verifications %}
+      <section class="sous-carte flex flex-col gap-2" id="etat-{{ e.nom }}">
+        <div class="flex items-start gap-2">
+          <div class="flex-1"><h3 class="flex items-center gap-2"><span class="puce bg-decision-clair text-decision-fonce">⧗</span> {{ e.libelle }}</h3>
+            <p class="text-xs text-sourdine font-mono">{{ e.nom }}</p></div>
+          <button class="btn-icone" title="Modifier" aria-label="Modifier « {{ e.libelle }} »" hx-get="/admin/regles/verification?nom={{ e.nom | urlencode }}" hx-target="#formulaire-verification" hx-swap="innerHTML">✎</button>
         </div>
-        {% if dossiers %}
-        <label class="block"><span class="etiquette">ou reprendre les codes d'un dossier</span>
-          <select class="champ champ-sm" name="dossier">
-            <option value="">— faits saisis ci-dessus —</option>
-            {% for d in dossiers %}<option value="{{ d.id }}">{{ d.document }}{% if d.regle %} · {{ d.regle }}{% endif %}{% if d.titre %} · {{ d.titre }}{% endif %}</option>{% endfor %}
-          </select></label>
-        {% endif %}
-        <button class="btn-principal btn-sm self-start">Essayer</button>
-      </form>
-      <div class="flex-[1_1_420px] min-w-0" id="resultat-essai">
-        <p class="vide">Choisissez des faits puis « Essayer » : la traduction des codes, la règle retenue et l'évaluation de chaque règle s'affichent ici.</p>
-      </div>
+        {% if e.question %}<p class="text-sm">{{ e.question }}</p>{% endif %}
+        {% if e.montrer %}<p class="text-xs text-sourdine">Montre les candidats {{ e.montrer }}</p>{% endif %}
+        <ul class="flex flex-col gap-1.5">
+          {% for c in e.choix %}
+          <li class="bg-white rounded-xl px-3 py-2 text-sm flex flex-wrap items-baseline gap-2"><span class="font-medium flex-1">{{ c.libelle }}</span>
+            {% if c.faits %}<span class="text-xs text-sourdine">corrige {% for f, v in c.faits.items() %}<span class="font-mono">{{ f }}</span> = {{ v }}{% if not loop.last %}, {% endif %}{% endfor %} puis décide</span>
+            {% else %}<span class="text-xs text-sourdine">impose <span class="puce bg-primaire-clair text-primaire-fonce">{{ c.action }}</span>{% if c.profil %} <span class="font-mono">{{ c.profil }}</span>{% endif %}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% set menant = vue.decisions | selectattr("verification", "equalto", e.nom) | map(attribute="nom") | list %}
+        <p class="text-xs text-sourdine">Atteint par : {{ (menant + (["sinon"] if vue.sinon.verification == e.nom else [])) | join(", ") or "aucune règle" }}</p>
+      </section>
+      {% else %}{{ vide("Aucun état de vérification.") }}{% endfor %}
     </div>
 
-  {# ============================================================ faits #}
-  {% elif onglet == "faits" %}
-    <p class="text-sm text-sourdine mb-4">Dictionnaire : pour chaque fait de décision (<span class="font-mono">decisions.yaml</span>) et chaque service d'enrichissement (<span class="font-mono">services.yaml</span>), les codes renvoyés par l'API et ce qu'ils deviennent. <a href="/admin/regles?onglet=modifier&fichier=decisions.yaml">Modifier les faits</a> · <a href="/admin/regles?onglet=modifier&fichier=services.yaml">modifier les sorties</a></p>
+  {# ============================================================ notice #}
+  {% elif onglet == "notice" %}
+    {% include "_notice_liste.html" %}
+
+  {# ============================================================ données #}
+  {% elif onglet == "donnees" %}
+    <p class="text-sm text-sourdine mb-4">Dictionnaire : pour chaque fait de décision (<span class="font-mono">decisions.yaml</span>) et chaque service d'enrichissement (<span class="font-mono">services.yaml</span>), les codes renvoyés par l'API et ce qu'ils deviennent. </p>
     <h3 class="mb-2">Faits de décision</h3>
     <div class="grid gap-4 lg:grid-cols-2 mb-6">
       {% for nom, f in vue.faits.items() %}
@@ -154,60 +175,8 @@
       {% endfor %}
     </div>
 
-  {# ============================================================ profils #}
-  {% elif onglet == "profils" %}
-    {% set courant = (vue.profils | selectattr("profil", "equalto", profil) | first) or vue.profils[0] %}
-    <nav class="flex flex-wrap gap-2 mb-4" aria-label="Profils">
-      {% for p in vue.profils %}
-      <a class="filtre {% if p.profil == courant.profil %}filtre-actif{% endif %}" href="/admin/regles?onglet=profils&profil={{ p.profil }}">{{ p.libelle or p.profil }}</a>
-      {% endfor %}
-    </nav>
-    <p class="text-sm text-sourdine mb-4"><span class="font-mono">{{ courant.fichier }}</span> · atteint par {{ courant.decisions | join(", ") or "aucune décision" }} ·
-      <a href="/admin/regles?onglet=modifier&fichier={{ courant.fichier }}">modifier</a></p>
-    {% set infos = {} %}{% for v in vue.variables %}{% set _ = infos.update({v.nom: v}) %}{% endfor %}
-    <p class="text-xs text-sourdine mb-2">Survolez une variable <span class="font-mono">{…}</span> pour voir sa source et sa valeur dans l'exemple de la référence.</p>
-    <div class="flex flex-wrap gap-6 items-start">
-      <div class="flex-[999_1_560px] min-w-0 defilant"><table class="tableau">
-        <thead><tr><th>#</th><th>Ligne (|| repli)</th><th>À valider</th><th>Prio.</th></tr></thead>
-        <tbody>
-        {% for l in courant.lignes %}
-          <tr class="{% if not l.actif %}text-sourdine{% endif %}">
-            <td class="font-mono text-xs">{{ l.numero }}</td>
-            <td class="font-mono text-xs break-words">
-              {% set parties = l.ligne.split("||") %}
-              <span class="{% if not l.actif %}line-through{% endif %}">{{ parties[0] | trim | colorer_notice | survol_variables(infos) }}</span>
-              {% if parties | length > 1 %}<br><span class="text-sourdine">repli :</span> {{ parties[1] | trim | colorer_notice | survol_variables(infos) }}{% endif %}
-              {% if l.si %}<br><span class="text-sourdine">si</span> <span class="text-conversion">{{ l.si }}</span>{% endif %}
-              {% if l.joindre %}<br><span class="text-sourdine">joindre</span> {% for v, seps in l.joindre.items() %}{{ v }} {{ seps | map("tojson") | join(" / ") }}{% endfor %}{% endif %}
-              {% if l.repetee_sur %}<br><span class="text-sourdine">une zone par {{ l.repetee_sur }}</span>{% endif %}
-              {% if not l.actif %}<br><span class="puce bg-rail text-sourdine">inactive</span>{% elif not l.productible %}<br><span class="puce bg-decision-clair text-decision-fonce">jamais produite : variable indisponible</span>{% endif %}
-              {% if l.remarque %}<br><span class="font-sans text-sourdine">{{ l.remarque }}</span>{% endif %}
-            </td>
-            <td>{% if l.a_valider %}<span class="puce bg-decision-clair text-decision-fonce">à valider</span>{% endif %}</td>
-            <td class="text-center">{{ l.priorite or "" }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table></div>
-      <aside class="flex-[1_1_380px] min-w-0 sous-carte flex flex-col gap-3 lg:sticky lg:top-3">
-        <h3>Aperçu de la notice</h3>
-        <form class="flex flex-col gap-3" hx-post="/admin/regles/apercu" hx-target="#resultat-apercu" hx-swap="innerHTML">
-          <input type="hidden" name="profil" value="{{ courant.profil }}">
-          <label class="block"><span class="etiquette">Contexte</span>
-            <select class="champ champ-sm" name="dossier">
-              <option value="">exemple de la référence (thèse fictive)</option>
-              {% for d in dossiers %}<option value="{{ d.id }}">{{ d.document }}{% if d.titre %} · {{ d.titre }}{% endif %}</option>{% endfor %}
-            </select></label>
-          <button class="btn-principal btn-sm self-start">Afficher la notice</button>
-        </form>
-        <div id="resultat-apercu" hx-post="/admin/regles/apercu" hx-trigger="load" hx-vals='{"profil": "{{ courant.profil }}"}' hx-swap="innerHTML">
-          <p class="text-xs text-sourdine">Chargement de l'aperçu…</p>
-        </div>
-      </aside>
-    </div>
 
-  {# ============================================================ variables #}
-  {% elif onglet == "variables" %}
+    <h3 class="mt-8 mb-2">Variables (données utilisables dans la notice)</h3>
     <p class="text-sm text-sourdine mb-3"><span class="font-mono">variables.yaml</span> : variables utilisables dans les profils (<span class="font-mono">{variable}</span> ou <span class="font-mono">{variable.attribut}</span>). Exemple : thèse fictive de la référence (<span class="font-mono">reference/moteur-regles/exemple_contexte.json</span>).</p>
     <div class="defilant"><table class="tableau min-w-[720px]">
       <thead><tr><th>Variable</th><th>Source</th><th>Type</th><th>Liste</th><th>Disponible</th><th>Exemple</th><th>Description</th></tr></thead>
@@ -226,8 +195,14 @@
       </tbody>
     </table></div>
 
-  {# ============================================================ modifier #}
+
+  {# ============================================================ banc d'essai #}
+  {% elif onglet == "essai" %}
+    {% include "_banc_essai.html" %}
+
+  {# ============================================================ fichiers #}
   {% else %}
+    <p class="avis bg-tonal mb-4 text-sm">Mode expert : les fichiers YAML que le studio écrit. Préférez les autres onglets ; toute modification passe par le vérificateur.</p>
     <nav class="flex flex-wrap gap-2 mb-4" aria-label="Fichiers de règles">
       {% for f in vue.fichiers %}
       <a class="filtre font-mono text-xs {% if f == fichier %}filtre-actif{% endif %}" href="/admin/regles?onglet=modifier&fichier={{ f }}">{{ f }}</a>

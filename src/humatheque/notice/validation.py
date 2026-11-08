@@ -1,11 +1,11 @@
 """Validation d'une notice éditée (SPEC §9.2), affichée en marqueurs Monaco :
 
 - syntaxe : étiquette sur 3 chiffres, indicateurs, sous-zones $x non vides ;
-- règles du profil du dossier (`regles/profils/`) : zones de priorité 1
+- règles de la notice-modèle du dossier (`regles/notice/` : socle + variante) : zones de priorité 1
   absentes (erreur), zones ou sous-zones produites par aucune ligne du profil
   (avertissement), PPN mal formés ($3, erreur).
 
-Les zones et sous-zones connues viennent des lignes du profil : aucune liste
+Les zones et sous-zones connues viennent des zones de la notice-modèle : aucune liste
 UNIMARC dans le code.
 """
 
@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from humatheque.notice.analyse import analyser
 from humatheque.regles.modeles import Regles
-from humatheque.regles.moteur import LIGNE, productible
+from humatheque.regles.notice import RENDUS, mode_rendu, productible
 
 RE_PPN = re.compile(r"\d{8}[\dX]")
 CODE_PPN = "3"  # sous-zone de lien vers une autorité (PPN) dans les lignes des profils
@@ -50,14 +50,16 @@ def profil_notice(regles: Regles, profil: str) -> ProfilNotice | None:
     prioritaires: dict[str, list[str]] = defaultdict(list)
     sous_zones: dict[str, set[str]] = defaultdict(set)
     etiquettes: set[str] = set()
-    for l in p.lignes:
-        etiquettes.add(l.etiquette)
-        for gabarit in filter(None, (l.principal, l.repli)):
-            m = LIGNE.match(gabarit)
-            if m:
-                sous_zones[m[1]].update(sz[0] for sz in m[3].split("$") if sz)
-        if l.priorite == 1 and productible(regles, l):
-            prioritaires[l.etiquette].append(l.trace)
+    for z in p.zones:
+        etiquettes.add(z.zone)
+        for sz in z.sous_zones:
+            if sz.autorite:
+                _, avec_ppn, sinon = RENDUS.get(mode_rendu(sz, regles, p.rendus), RENDUS["forme"])
+                sous_zones[z.zone].update(c for c, _ in avec_ppn + sinon)
+            else:
+                sous_zones[z.zone].add(sz.code)
+        if z.priorite == 1 and productible(regles, z):
+            prioritaires[z.zone].append(z.trace)
     return ProfilNotice(prioritaires=dict(prioritaires), sous_zones=dict(sous_zones), etiquettes=etiquettes)
 
 

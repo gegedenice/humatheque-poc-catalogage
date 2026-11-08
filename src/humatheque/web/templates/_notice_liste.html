@@ -1,0 +1,82 @@
+{# Studio › Notice UNIMARC : socle commun et variantes, zones listées dans l'ordre de la notice ;
+   un clic ouvre l'éditeur de la zone (sous-zones configurables) à côté. #}
+{% set n = notice %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <nav class="flex flex-wrap gap-2" aria-label="Socle et variantes">
+    {% for v in n.variantes %}
+    <a class="filtre {% if v.nom == n.variante %}filtre-actif{% endif %}" href="/admin/regles?onglet=notice&variante={{ v.nom }}">{{ v.libelle }}</a>
+    {% endfor %}
+  </nav>
+  <span class="flex-1"></span>
+  <button class="btn-principal btn-sm" hx-get="/admin/regles/notice/zone?variante={{ n.variante | urlencode }}" hx-target="#editeur-zone" hx-swap="innerHTML">+ Ajouter une zone</button>
+</div>
+<p class="text-sm text-sourdine mb-4">
+  {% if n.variante == "socle" %}Le <strong>socle</strong> réunit les zones communes ; chaque variante (choisie par une règle de décision) le modifie à la marge : zones ajoutées, modifiées ou retirées.
+  {% else %}Notice de la variante = socle + ses modifications. <span class="puce bg-conversion-clair text-conversion-fonce">modifiée</span> <span class="puce bg-auto-clair text-auto-fonce">ajoutée</span> <span class="puce bg-rail text-sourdine">retirée</span> ; les autres zones viennent du socle.{% endif %}
+  <span class="font-mono text-xs">{{ n.fichier }}</span></p>
+
+<div class="flex flex-wrap gap-6 items-start">
+  <div class="flex-[999_1_520px] min-w-0">
+    <ul class="flex flex-col divide-y divide-filet border border-filet rounded-2xl overflow-hidden bg-white">
+    {% for zv in n.zones %}{% set z = zv.zone %}
+      <li><button type="button" class="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-tonal focus:bg-tonal {% if zv.retiree or not z.actif %}opacity-60{% endif %}"
+              hx-get="/admin/regles/notice/zone?variante={{ n.variante | urlencode }}&id={{ z.id | urlencode }}" hx-target="#editeur-zone" hx-swap="innerHTML">
+        <span class="font-mono font-semibold text-primaire w-10 pt-0.5">{{ z.zone }}</span>
+        <span class="flex-1 min-w-0">
+          <span class="block text-sm font-medium {% if zv.retiree %}line-through{% endif %}">{{ z.libelle or z.id }}</span>
+          <span class="block font-mono text-xs text-sourdine truncate">{{ z.apercu() }}</span>
+        </span>
+        <span class="flex flex-wrap justify-end gap-1 max-w-[45%]">
+          {% if zv.origine == "modifiée" %}<span class="puce bg-conversion-clair text-conversion-fonce">modifiée</span>{% elif zv.origine == "ajoutée" %}<span class="puce bg-auto-clair text-auto-fonce">ajoutée</span>{% endif %}
+          {% if zv.retiree %}<span class="puce bg-rail text-sourdine">retirée</span>
+          {% elif not z.actif %}<span class="puce bg-rail text-sourdine">non produite</span>
+          {% elif not zv.productible %}<span class="puce bg-decision-clair text-decision-fonce" title="ses données ne sont pas encore disponibles">jamais produite</span>{% endif %}
+          {% if z.a_valider %}<span class="puce bg-decision-clair text-decision-fonce">à valider</span>{% endif %}
+          {% if z.priorite == 1 %}<span class="puce bg-primaire-clair text-primaire-fonce" title="priorité 1 : alerte si absente">obligatoire</span>{% endif %}
+          {% for sz in z.sous_zones if sz.si_absente == "verification" %}<span class="puce bg-decision-clair text-decision-fonce" title="vérification humaine si ${{ sz.code }} absente">⧗ ${{ sz.code }}</span>{% endfor %}
+        </span>
+      </button></li>
+    {% else %}<li class="p-4">{{ vide("Aucune zone.") }}</li>{% endfor %}
+    </ul>
+
+    {% if n.variante == "socle" %}
+    <form method="post" action="/admin/regles/notice/rendus" hx-boost="false" class="sous-carte mt-4 flex flex-col gap-3">
+      <h3>Rendu des autorités</h3>
+      <p class="text-xs text-sourdine">Mode partagé par toutes les zones d'autorité (700, 701, 711…), sauf choix contraire dans une sous-zone.</p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for t in ["personne", "organisme"] %}
+        <label class="block"><span class="etiquette">{{ t | capitalize }}</span>
+          <select class="champ champ-sm" name="rendu.{{ t }}">
+            {% for m, d in n.modes_rendu.items() %}<option value="{{ m }}" {% if n.rendus.get(t) == m %}selected{% endif %}>{{ d }}</option>{% endfor %}
+          </select></label>
+        {% endfor %}
+      </div>
+      <div class="flex items-center gap-2 justify-end">
+        <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+        <button class="btn btn-sm">Enregistrer les rendus</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+
+  <aside class="flex-[1_1_440px] min-w-0 flex flex-col gap-4 lg:sticky lg:top-3">
+    <div id="editeur-zone" {% if zone_ouverte and not (editeur is defined and editeur) %}hx-get="/admin/regles/notice/zone?variante={{ n.variante | urlencode }}&id={{ zone_ouverte | urlencode }}" hx-trigger="load"{% endif %}>
+      {% if editeur is defined and editeur %}
+        {% with zone=editeur.zone, variante=editeur.variante, ancien_id=editeur.ancien_id, origine=editeur.origine, retiree=False,
+                ouvrir=None, refus_zone=editeur.refus_zone, vue_variables=editeur.vue_variables, attributs=editeur.attributs,
+                modes_rendu=editeur.modes_rendu, rendus=editeur.rendus, apercu_zone=editeur.apercu_zone,
+                apercu_alertes=editeur.apercu_alertes %}{% include "_notice_zone.html" %}{% endwith %}
+      {% elif not zone_ouverte %}
+      <p class="vide border border-dashed border-filet rounded-2xl">Choisissez une zone pour voir et modifier ses sous-zones.</p>
+      {% endif %}
+    </div>
+    {% if n.variante != "socle" %}
+    <div class="sous-carte flex flex-col gap-2">
+      <h3>Aperçu de la notice</h3>
+      <div id="resultat-apercu" hx-post="/admin/regles/apercu" hx-trigger="load" hx-vals='{"profil": "{{ n.variante }}"}' hx-swap="innerHTML">
+        <p class="text-xs text-sourdine">Chargement de l'aperçu…</p>
+      </div>
+    </div>
+    {% endif %}
+  </aside>
+</div>
