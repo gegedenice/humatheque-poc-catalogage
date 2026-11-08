@@ -200,7 +200,7 @@ class Workflow:
         except ExtractionInvalide as e:
             d.etapes["extraction"].appels += e.appels
             d.etapes["extraction"].reponse = {"bruts": e.bruts}
-            rs = routage_service("extraction", "json_invalide")
+            rs = routage_service(self.services.regles, "extraction", "json_invalide")
             return self._arret(rs.routage or issues.INCIDENT, str(e), "json_invalide")
 
         d.extraction = res
@@ -240,10 +240,10 @@ class Workflow:
 
     def _etape_alma(self, d: Dossier) -> Suite:
         res = self._appel(d, "alma", verifier_alma, self.services.alma, d.metadonnees, d.document.type_document,
-                          self.services.parametres("alma"))
+                          self.services.parametres("alma"), self.services.regles.faits["alma"])
         d.alma = res
         if res.etat is None:
-            rs = routage_service("alma", res.statut)
+            rs = routage_service(self.services.regles, "alma", res.statut)
             inc = _cfg()["statut_inconnu"]
             return self._arret(rs.routage or inc["routage"], f"alma-checker : {inc['motif']} « {res.statut} »",
                                "service_indisponible")
@@ -264,13 +264,13 @@ class Workflow:
             raise _Incident("service_indisponible", _cfg()["motifs"]["seuil_sudoc"])
         reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees, d.document.type_document,
                               parametres)
-        q = agreger(reponse, float(seuil))
+        q = agreger(reponse, float(seuil), self.services.regles.faits["sudoc"])
         d.sudoc = q
         d.noter("sudoc", "decision", {"etat": q.etat, "justification": q.justification, "ppn_source": q.ppn_source})
         if q.incident:
             return self._arret(issues.INCIDENT, f"sudoc-checker : {q.justification}", "service_indisponible")
         d.etat_sudoc = d.corrections.get("sudoc", q.etat)
-        if d.etat_sudoc == charger_yaml("etats_sudoc")["etat_inconnu"]:
+        if d.etat_sudoc is not None and d.etat_sudoc == self.services.regles.faits["sudoc"].code_inconnu:
             motif = _cfg()["motifs"]["sudoc_indetermine"]
             d.exceptions.append(ExceptionDossier(etape="sudoc", objet="qualification Sudoc",
                                                  motif=f"{motif} : {q.justification}",
@@ -279,9 +279,12 @@ class Workflow:
         return Suite()
 
     def _etape_situation(self, d: Dossier) -> Suite:
-        faits = faits_du_dossier(d.document.type_document, d.provenance.valeur if d.provenance else None,
-                                 d.etat_alma, d.etat_sudoc)
-        dec = decider(self.services.regles, faits)
+        faits = faits_du_dossier(self.services.regles, d.document.type_document,
+                                 d.provenance.valeur if d.provenance else None, d.etat_alma, d.etat_sudoc)
+        codes = {"type": d.document.type_document, "provenance": d.provenance.valeur if d.provenance else None,
+                 "alma": d.alma.statut if d.alma else None,
+                 "sudoc": d.sudoc.code if d.sudoc else None}
+        dec = decider(self.services.regles, faits, codes)
         d.decision = dec
         d.noter("situation", "decision", dec.model_dump(exclude={"ligne"}))
         if dec.suite == "creer":
@@ -343,7 +346,7 @@ class Workflow:
         return Suite()
 
     def _statut_idref(self, d: Dossier, etape: str, service: str, a, objet: str) -> Suite | None:
-        rs = routage_service(service, a.statut)
+        rs = routage_service(self.services.regles, service, a.statut)
         d.alerter(*(f"{objet} : {x}" for x in rs.alertes))
         if rs.bloquant:
             return self._arret(rs.routage or issues.INCIDENT, f"{service} « {a.statut} » pour {objet}",
@@ -376,7 +379,7 @@ class Workflow:
         res = self._appel(d, "dewey", classer, self.services.dewey, d.metadonnees, self.services.seuil_dewey,
                           self.services.parametres("dewey"))
         d.dewey = res
-        rs = routage_service("dewey", res.statut)
+        rs = routage_service(self.services.regles, "dewey", res.statut)
         if rs.bloquant:
             return self._arret(rs.routage or issues.INCIDENT, f"dewey-classifier « {res.statut} »")
         if rs.exception:

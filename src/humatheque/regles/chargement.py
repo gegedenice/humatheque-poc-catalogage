@@ -16,10 +16,11 @@ import yaml
 from pydantic import ValidationError
 
 from humatheque.config import Reglages, reglages as reglages_par_defaut
-from humatheque.regles.modeles import Ligne, Profil, RegleDecision, Regles, Variable
+from humatheque.regles.modeles import Fait, Ligne, Profil, RegleDecision, Regles, ServiceSorties, Variable
 
 FICHIER_VARIABLES = "variables.yaml"
 FICHIER_DECISIONS = "decisions.yaml"
+FICHIER_SERVICES = "services.yaml"
 DOSSIER_PROFILS = "profils"
 
 
@@ -36,7 +37,7 @@ class ReglesInvalides(Exception):
 def fichiers_regles(dossier: Path) -> list[str]:
     """Chemins relatifs des fichiers de règles, dans l'ordre de lecture."""
     profils = sorted(p.relative_to(dossier).as_posix() for p in (dossier / DOSSIER_PROFILS).glob("*.yaml"))
-    return [FICHIER_VARIABLES, FICHIER_DECISIONS, *profils]
+    return [FICHIER_VARIABLES, FICHIER_DECISIONS, FICHIER_SERVICES, *profils]
 
 
 def lire_textes(dossier: Path) -> dict[str, str]:
@@ -92,11 +93,16 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
 
     # --- decisions.yaml
     brut = _yaml(FICHIER_DECISIONS, textes.get(FICHIER_DECISIONS, ""))
-    faits: dict[str, list[str]] = {}
+    faits: dict[str, Fait] = {}
     decisions: list[RegleDecision] = []
     sinon: dict[str, Any] = {}
     if _attendu(FICHIER_DECISIONS, isinstance(brut, dict), "clés faits, regles et sinon attendues", problemes):
-        faits = {str(k): [str(x) for x in (v or [])] for k, v in (brut.get("faits") or {}).items()}
+        for k, v in (brut.get("faits") or {}).items():
+            donnees = {"valeurs": v} if isinstance(v, list) else (v or {})
+            try:
+                faits[str(k)] = Fait.model_validate({**donnees, "nom": str(k)})
+            except ValidationError as e:
+                problemes += _erreurs_pydantic(FICHIER_DECISIONS, f"fait {k}", e)
         _attendu(FICHIER_DECISIONS, isinstance(brut.get("regles"), list), "liste « regles » attendue", problemes)
         for i, r in enumerate(brut.get("regles") or [], start=1):
             try:
@@ -105,6 +111,16 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
                 problemes += _erreurs_pydantic(FICHIER_DECISIONS, f"règle {i}", e)
         sinon = brut.get("sinon") or {}
         _attendu(FICHIER_DECISIONS, bool(sinon), "« sinon » obligatoire", problemes)
+
+    # --- services.yaml
+    brut = _yaml(FICHIER_SERVICES, textes.get(FICHIER_SERVICES, ""))
+    services: dict[str, ServiceSorties] = {}
+    if _attendu(FICHIER_SERVICES, isinstance(brut, dict), "dictionnaire des services attendu", problemes):
+        for nom, v in brut.items():
+            try:
+                services[str(nom)] = ServiceSorties.model_validate({**(v or {}), "nom": str(nom)})
+            except ValidationError as e:
+                problemes += _erreurs_pydantic(FICHIER_SERVICES, str(nom), e)
 
     # --- profils/*.yaml
     profils: dict[str, Profil] = {}
@@ -131,7 +147,7 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
 
     if problemes:
         raise ReglesInvalides(problemes)
-    return Regles(variables=variables, profils=profils, faits=faits, decisions=decisions, sinon=sinon,
+    return Regles(variables=variables, profils=profils, faits=faits, services=services, decisions=decisions, sinon=sinon,
                   emplacement=emplacement, horodatage=datetime.now(UTC), empreinte=_empreinte(textes),
                   textes=dict(textes))
 

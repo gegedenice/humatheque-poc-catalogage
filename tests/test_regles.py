@@ -117,9 +117,9 @@ def test_cas_non_couvert_comble(regles_fabriquees):
 
 # ---------------------------------------------------------------- brouillons (interface)
 def test_verifier_un_brouillon_sans_ecrire(regles_fabriquees):
-    texte = regles_fabriquees.texte("decisions.yaml").replace('alma == "présent"', 'alma == ')
+    texte = regles_fabriquees.texte("decisions.yaml").replace("quand: {alma: présent}", "quand: {alma: présente}")
     r = verifier_textes({"decisions.yaml": texte}, regles_fabriquees.reglages)
-    assert r.bloquant and "condition_invalide" in _codes(r)
+    assert r.bloquant and "valeur_inconnue" in _codes(r)
     assert regles_fabriquees.texte("decisions.yaml") != texte  # rien n'est écrit
     r = verifier_textes({"decisions.yaml": "regles: [\n"}, regles_fabriquees.reglages)
     assert _codes(r) == ["yaml_invalide"]

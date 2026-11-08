@@ -93,7 +93,21 @@ from humatheque.application.administration import Administration  # noqa: E402
 from humatheque.application.regles_admin import AdministrationRegles, ReglesRefusees  # noqa: E402,F401
 
 
-class Application(Administration, AdministrationRegles):
+class _ConditionDecision:
+    def _condition_decision(self, d) -> str | None:
+        """Condition en clair de la règle retenue (lue dans la règle enregistrée au dossier)."""
+        from humatheque.regles.modeles import RegleDecision
+
+        ligne = (d.decision.ligne if d.decision else None) or {}
+        if not ligne or ligne.get("nom") == "sinon" or not (ligne.get("quand") or ligne.get("si")):
+            return None
+        try:
+            return RegleDecision.model_validate({**ligne, "alors": ligne.get("alors") or ""}).texte_condition
+        except Exception:  # noqa: BLE001 — affichage seulement (dossier ancien)
+            return None
+
+
+class Application(Administration, AdministrationRegles, _ConditionDecision):
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
                  regles: Regles | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
@@ -402,7 +416,9 @@ class Application(Administration, AdministrationRegles):
         titre = (d.contexte.valeurs.get("title") if d.contexte else None) or (d.metadonnees or {}).get("title")
         return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=titre,
                           etapes=etapes, images=images, champs=champs,
-                          exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel)
+                          exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel,
+                          chaine_decision=d.decision.chaine(self.regles) if d.decision else [],
+                          condition_decision=self._condition_decision(d))
 
     def vue_apercu(self, dossier_id: str) -> VueApercu:
         """Images et notice finale, sans édition : version courante (validée, éditée ou

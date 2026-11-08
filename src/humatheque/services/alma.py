@@ -1,7 +1,7 @@
 """Client alma-checker (`/check/thesis`, `/check/dissertation`), SPEC §6 étape 3.
 
 Contrat : docs/services/alma-checker.README.md et .openapi.json.
-L'état Alma vient de `config/etats_alma.yaml` ; le PPN de `decision_support`
+L'état Alma vient du dictionnaire des faits (`regles/decisions.yaml`, fait `alma`) ; le PPN de `decision_support`
 est toujours repris.
 """
 
@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from humatheque.config import charger_yaml
+from humatheque.regles.modeles import Fait
 from humatheque.services.base import Appel, ClientService, liste, texte
 
 
@@ -69,20 +70,23 @@ def _candidat(c: dict[str, Any]) -> CandidatAlma:
     )
 
 
-def interpreter(reponse: dict[str, Any]) -> ResultatAlma:
-    cfg = charger_yaml("etats_alma")
+def interpreter(reponse: dict[str, Any], fait: Fait | None = None) -> ResultatAlma:
+    if fait is None:
+        from humatheque.regles import charger_regles
+
+        fait = charger_regles().faits["alma"]
     statut = str(reponse.get("status") or "")
     return ResultatAlma(
         statut=statut,
-        etat=cfg["correspondance"].get(statut),
-        motif=(cfg.get("motifs") or {}).get(statut),
+        etat=fait.traduire(statut) if statut else None,
+        motif=(charger_yaml("services")["alma"].get("motifs") or {}).get(statut),
         ppn=(reponse.get("decision_support") or {}).get("best_candidate_ppn"),
         candidats=[_candidat(c) for c in reponse.get("candidates") or []],
     )
 
 
 def verifier_alma(client: ClientService, metadonnees: dict[str, Any], type_document: str,
-                  parametres: dict[str, Any] | None = None) -> tuple[ResultatAlma, Appel]:
+                  parametres: dict[str, Any] | None = None, fait: Fait | None = None) -> tuple[ResultatAlma, Appel]:
     route = charger_yaml("services")["alma"]["routes"][type_document]
     reponse, appel = client.post(route, {**payload_alma(metadonnees), **(parametres or {})})
-    return interpreter(reponse), appel
+    return interpreter(reponse, fait), appel

@@ -69,7 +69,8 @@ l'avance.
 |---|---|
 | `regles/variables.yaml` | variables utilisables dans les profils (source, type, liste, disponible) |
 | `regles/profils/*.yaml` | notice-modèle de chaque profil : une ligne = une zone écrite comme dans WinIBW (`ligne \|\| repli`, `si`, `joindre`…) |
-| `regles/decisions.yaml` | faits, règles de décision (conditions rule-engine, première vraie), `sinon` |
+| `regles/decisions.yaml` | dictionnaire des faits (valeurs en clair ← codes de l'API), règles de décision (`quand: {fait: valeur}`, première qui correspond), `sinon` |
+| `regles/services.yaml` | sorties d'IdRef (personnes, structures), Dewey et de l'extraction : code → libellé, issue, alerte |
 
 Format détaillé : `docs/SPEC.md` §8 ; référence : `reference/moteur-regles/`.
 `humatheque check-spec` les vérifie (erreurs, avertissements, cas non couverts).
@@ -79,11 +80,14 @@ ou notice déjà au catalogue), À reprendre (un catalogueur tranche, onglet
 « Reprise » du dossier) ou Incident (panne technique). Elle découle de l'action
 de la règle de décision retenue (`création`, `conversion`, `arrêt` → terminé ;
 `vérification` → à reprendre) et des réponses des services, dont l'issue par
-statut est dans `config/services.yaml` (`statuts`).
+code est dans `regles/services.yaml`.
 
-**Administration › Règles** (`/admin/regles`) : tableau des décisions et banc
-d'essai (faits saisis ou repris d'un dossier : règle retenue, évaluation de
-chaque condition), profils ligne à ligne avec aperçu de la notice, variables, et
+**Administration › Règles** (`/admin/regles`) : tableau de décision modifiable
+par formulaire (ajout, modification, ordre, suppression) et banc d'essai
+(valeurs en clair ou codes bruts de l'API, saisis ou repris d'un dossier :
+traduction, règle retenue, évaluation de chaque règle), dictionnaire des faits
+et sorties des services, profils ligne à ligne (source et exemple des
+variables au survol) avec aperçu de la notice, variables, et
 modification des fichiers YAML dans l'éditeur (texte et commentaires
 conservés). « Vérifier » lance le vérificateur sans rien écrire ; « Enregistrer »
 refuse toute erreur bloquante, archive la version précédente dans

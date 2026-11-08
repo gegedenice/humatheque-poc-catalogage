@@ -47,15 +47,25 @@ def regle(condition: str) -> rule_engine.Rule:
 # ------------------------------------------------------------------ décision
 class Evaluation(BaseModel):
     nom: str
-    si: str
+    si: str = Field(description="condition en clair")
     vraie: bool | None = Field(None, description="None : non évaluée (règle précédente retenue) ou erreur")
     erreur: str | None = None
+
+
+class Traduction(BaseModel):
+    """Chaîne code d'API → valeur du fait (banc d'essai, dossier)."""
+
+    fait: str
+    code: Any = None
+    valeur: Any = None
+    connue: bool = Field(True, description="false : code ni listé ni rattrapé (code_inconnu)")
 
 
 class Choix(BaseModel):
     """Règle retenue pour des faits, et évaluation de chaque condition (banc d'essai)."""
 
     faits: dict[str, Any]
+    traductions: list[Traduction] = Field(default_factory=list)
     regle: dict[str, Any] = Field(description="règle retenue (ou `sinon`, nom « sinon »)")
     action: str
     suite: str
@@ -71,19 +81,38 @@ def _action(alors: str) -> dict[str, str]:
     return conventions()["actions"].get(alors) or {"suite": "arreter", "issue": issues.A_REPRENDRE}
 
 
-def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False) -> Choix:
-    """Première règle vraie ; `tout_evaluer` évalue aussi les suivantes (banc d'essai)."""
+def traduire(regles: Regles, codes: dict[str, Any]) -> list[Traduction]:
+    """Codes d'API (ou libellés) → valeurs des faits du dictionnaire (`decisions.yaml`)."""
+    sortie = []
+    for nom, code in codes.items():
+        f = regles.faits.get(nom)
+        if f is None:
+            sortie.append(Traduction(fait=nom, code=code, valeur=code, connue=False))
+            continue
+        valeur = f.traduire(code)
+        connue = valeur is not None and (code in (None, "") or str(code) in f.valeurs
+                                         or any(str(code) in c for c in f.valeurs.values()))
+        sortie.append(Traduction(fait=nom, code=code, valeur=valeur, connue=connue))
+    return sortie
+
+
+def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False,
+            codes: dict[str, Any] | None = None) -> Choix:
+    """Première règle vraie ; `tout_evaluer` évalue aussi les suivantes (banc d'essai).
+    `codes` : codes d'API bruts, traduits en faits par le dictionnaire (prioritaires)."""
+    traductions = traduire(regles, codes) if codes else []
+    faits = {**faits, **{t.fait: t.valeur for t in traductions}}
     retenue: RegleDecision | None = None
     evaluations = []
     for r in regles.decisions:
         if retenue is not None and not tout_evaluer:
-            evaluations.append(Evaluation(nom=r.nom, si=r.si))
+            evaluations.append(Evaluation(nom=r.nom, si=r.texte_condition))
             continue
         try:
-            vraie = regle(r.si).matches(faits)
-            evaluations.append(Evaluation(nom=r.nom, si=r.si, vraie=vraie))
+            vraie = regle(r.condition).matches(faits)
+            evaluations.append(Evaluation(nom=r.nom, si=r.texte_condition, vraie=vraie))
         except rule_engine.errors.EngineError as e:
-            evaluations.append(Evaluation(nom=r.nom, si=r.si, erreur=getattr(e, "message", str(e))))
+            evaluations.append(Evaluation(nom=r.nom, si=r.texte_condition, erreur=getattr(e, "message", str(e))))
             continue
         if vraie and retenue is None:
             retenue = r
@@ -95,7 +124,7 @@ def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False
     alors = str(donnees.get("alors", "vérification"))
     a = _action(alors)
     motif = str(donnees.get("motif") or donnees["nom"])
-    return Choix(faits=faits, regle=donnees, action=alors, suite=a["suite"], issue=a["issue"],
+    return Choix(faits=faits, traductions=traductions, regle=donnees, action=alors, suite=a["suite"], issue=a["issue"],
                  profil=donnees.get("profil"), motif=motif, evaluations=evaluations)
 
 

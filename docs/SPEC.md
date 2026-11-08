@@ -28,7 +28,7 @@ Alma ou Orion, annotation et export de jeux de données (restent dans le POC).
 humatheque-catalogage/
   CLAUDE.md  docs/SPEC.md  pyproject.toml  .env.example
   Dockerfile  docker-compose.yml
-  regles/                   règles de catalogage (§8) : variables.yaml, profils/*.yaml, decisions.yaml
+  regles/                   règles de catalogage (§8) : variables.yaml, profils/*.yaml, decisions.yaml, services.yaml
   reference/                POC, maquette, mindmap, moteur-regles/ (lecture seule)
   src/humatheque/
     config.py               settings pydantic (env), chemins, seuils
@@ -342,7 +342,8 @@ dans le dossier :
      `duplicate_threshold` (`config/services.yaml`, décision du 05/11),
      envoyé au service : le statut du service et l'agrégation utilisent le
      même seuil ;
-   - correspondance `thesis_state` → `etat_sudoc` dans `config/etats_sudoc.yaml` :
+   - correspondance `thesis_state` → `etat_sudoc` dans le dictionnaire des faits
+     (`regles/decisions.yaml`, fait `sudoc`, §7) :
 
      | `thesis_state` | `etat_sudoc` |
      |---|---|
@@ -419,16 +420,33 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 
 ## 7. Décision
 
-- **Faits de décision** : `type` (thèse, mémoire), `provenance` (EPHE, hors
-  EPHE, incertaine, sans objet pour un mémoire), `alma` (présent, incertain,
-  absent : correspondance du §6), `sudoc` (état agrégé du §6 ; `non vérifié`
-  quand Alma a trouvé une notice). Leurs valeurs possibles sont déclarées dans
-  `regles/decisions.yaml` (`faits:`).
+- **Dictionnaire des faits** (décision du 08/11) : `regles/decisions.yaml`
+  (`faits:`) décrit chaque fait de décision — question, source, note — et, pour
+  chaque valeur en clair, **les codes renvoyés par l'API** (ou calculés par le
+  démonstrateur) qui y mènent. C'est la seule traduction code → libellé ; les
+  anciens `config/etats_alma.yaml`, `config/etats_sudoc.yaml` et la section
+  `faits` de `config/regles.yaml` sont supprimés.
+
+  | Fait | Valeurs (codes) |
+  |---|---|
+  | `type` | thèse (`these`), mémoire (`memoire`) |
+  | `provenance` | EPHE, hors EPHE, incertaine (`absent`, `ambigu`), sans objet (`mémoire`) |
+  | `alma` (status d'alma-checker) | présent (`academic_record_found`), incertain (`ambiguous_academic_candidate`, `off_profile_match_only`), absent (`no_academic_record_found`) ; tout autre code : incident |
+  | `sudoc` (§6) | originale imprimée (`printed_original`), reproduction imprimée (`printed_reproduction`), reproduction microfiche (`microfiche_reproduction`), électronique seule (`electronic`), ambigu (`ambiguous_print_candidate`), indéterminé (`code_inconnu` : tout thesis_state non listé), rien (`sans_code` : aucun candidat retenu), non vérifié (Sudoc pas interrogé) |
+
+  L'ordre des valeurs de `sudoc` est l'ordre de force du §6.
 - **Moteur** : `regles/decisions.yaml`, règles lues dans l'ordre, la première
-  dont la condition est vraie l'emporte ; `sinon` est obligatoire. Les
-  conditions sont des expressions `rule-engine` (`==`, `!=`, `in [...]`, `and`,
-  `or`, `not`, comparaisons numériques), ce qui permet d'ajouter plus tard des
-  faits produits par un modèle de décision (`qualite_extraction < 0.6`).
+  qui correspond l'emporte ; `sinon` est obligatoire. Une règle s'écrit
+  `quand: {fait: valeur}` (ou une liste de valeurs admises) ; un fait non cité
+  est indifférent ; le vérificateur rejette un fait ou une valeur absents du
+  dictionnaire. Pour les cas avancés, `si` ajoute (par « et ») une expression
+  `rule-engine` (`==`, `!=`, `in [...]`, `and`, `or`, `not`, comparaisons), ce
+  qui permet d'ajouter plus tard des faits produits par un modèle de décision
+  (`qualite_extraction < 0.6`).
+- **Traçabilité** : le dossier conserve, fait par fait, le code reçu de l'API et
+  la valeur retenue (`Decision.codes`) ; la chaîne « code → valeur → règle →
+  issue » est affichée dans le dossier et le banc d'essai (une valeur corrigée
+  par un catalogueur est signalée).
 - **Règles nommées** : chaque règle porte un `nom` en clair, qui sert
   d'identifiant (unique) et s'affiche dans le dossier, le rapport et
   l'administration (« Notice déjà dans Alma », « Thèse EPHE absente du Sudoc »…).
@@ -464,17 +482,24 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 - Une action `arrêt` ou `vérification` arrête sans conversion. L'onglet
   « Reprise » du dossier (faux positif, traité hors outil) n'apparaît que pour
   un document à reprendre ou en incident.
-- **Réponses des services** : `config/services.yaml` associe, pour chaque
-  service, son statut à une issue (`statuts`), une alerte éventuelle
-  (`alertes`) et le caractère non bloquant (`non_bloquant`). Une erreur HTTP
-  (4xx/5xx), un service injoignable (`service_indisponible`) ou un statut
-  absent du fichier donnent « incident ». **alma-checker et sudoc-checker**
-  n'ont pas de `statuts` : ils sont jugés par les états du §6 et
-  `decisions.yaml`. Pour IdRef et Dewey (`non_bloquant: true`), « à reprendre »
-  **n'arrête pas** la génération : on utilise le repli (`$a{nom}$b{prenom}` ou
-  zone omise) et une exception est créée. `not_found` côté IdRef ajoute l'alerte
-  « proto-notice d'autorité à créer ». (Décision du 06/11 : l'ancienne table
-  Grist `Statuts_services` est retirée.)
+- **Sorties des services d'enrichissement** (décision du 08/11) :
+  `regles/services.yaml` liste, pour l'extraction, IdRef personnes
+  (`idref_personne`), IdRef structures (`idref_organisations`) et Dewey,
+  chaque sortie : libellé, codes, issue, alerte, effet. Une erreur HTTP
+  (4xx/5xx), un service injoignable ou un code non listé donnent « incident ».
+  Alma et Sudoc n'y figurent pas : leurs codes deviennent des faits (ci-dessus).
+
+  | Service | Sortie (codes) | Issue |
+  |---|---|---|
+  | IdRef personnes et structures | alignée (`accepted`) | terminé, PPN en `$3` |
+  | | confiance faible (`low_confidence`), ambiguë (`ambiguous`) | à reprendre, candidats proposés |
+  | | introuvable (`not_found`) | à reprendre, alerte « proto-notice d'autorité à créer » |
+  | Dewey (statut calculé : score de la 1re classe / `DEWEY_SEUIL`) | classe retenue (`au_dessus_seuil`) | terminé |
+  | | sous le seuil (`sous_seuil`), aucune classe (`aucune_classe`) | à reprendre |
+  | Extraction | JSON valide / invalide | terminé / incident |
+
+  IdRef et Dewey sont `bloquant: false` : « à reprendre » **n'arrête pas** la
+  génération (repli `$a{nom}$b{prenom}` ou zone omise, exception créée).
 - **Issue du dossier** : la plus sévère de ses étapes, dans l'ordre
   `incident > à reprendre > terminé`. Les dossiers enregistrés avec l'ancien
   routage sont relus avec la nouvelle issue (auto, sortie, conversion → terminé ;
@@ -490,7 +515,8 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 | `regles/profils/these-originale-imprimee.yaml` | Notice-modèle de la thèse originale imprimée |
 | `regles/profils/these-reproduction-imprimee.yaml` | Notice-modèle de la thèse de reproduction imprimée |
 | `regles/profils/memoire-original-imprime.yaml` | Notice-modèle du mémoire original imprimé |
-| `regles/decisions.yaml` | Faits, règles de décision, `sinon` |
+| `regles/decisions.yaml` | Dictionnaire des faits (valeurs et codes d'API), règles de décision (`quand`), `sinon` |
+| `regles/services.yaml` | Sorties des services d'enrichissement (IdRef personnes et structures, Dewey, extraction) : codes, issue, alerte |
 
 Le dossier des règles est `REGLES_DIR` (`regles` par défaut). Les fichiers
 sont versionnés avec le code. Le bouton « Recharger les règles » les relit sans
@@ -566,6 +592,7 @@ chaque enregistrement depuis l'interface (§9.3), affiché dans l'interface.
 | erreur | Variable absente de `variables.yaml` ; attribut impossible pour le type |
 | erreur | Ligne qui se répète sur deux variables différentes ; `joindre` sur une variable qui n'est pas une liste de la ligne |
 | erreur | Condition rule-engine invalide (profil ou décision) ; profil inconnu dans une décision ; action inconnue ; nom de règle de décision en double |
+| erreur | Fait ou valeur de `quand` absent du dictionnaire ; code d'API listé pour deux valeurs (ou deux sorties) ; issue de sortie inconnue |
 | avertissement | Variable utilisée mais absente de la liste `variables` du profil |
 | avertissement | Profil atteint par aucune décision |
 | avertissement | **Cas non couvert** : combinaison des valeurs de faits (Alma absent) qui tombe dans `sinon` |
@@ -654,11 +681,17 @@ défaut sur la version générée.
     aussi par défaut dans le formulaire), déclencheurs (§3.1), état du
     planificateur.
   - **`/admin/regles` Règles** (décision du 06/11), en onglets :
-    **Décisions** (tableau des règles, banc d'essai : faits saisis ou repris
-    d'un dossier → règle retenue et évaluation de chaque condition ; cas non
-    couverts), **Profils** (notice-modèle ligne à ligne, aperçu en direct de la
-    notice produite sur le contexte d'un dossier ou d'un exemple), **Variables**
-    (dictionnaire) et **Modifier** (fichier YAML dans Monaco, texte et
+    **Décisions** (tableau de décision : une colonne par fait, valeurs admises
+    en puces ; ajout, modification, suppression et réordonnancement par
+    formulaire, qui réécrit `regles:` et `sinon:` de `decisions.yaml` en
+    conservant l'en-tête et le dictionnaire, après vérification et archivage ;
+    banc d'essai : valeurs en clair ou codes bruts de l'API, saisis ou repris
+    d'un dossier → traduction, règle retenue et évaluation de chaque règle ;
+    cas non couverts), **Faits et sorties** (dictionnaire des faits et sorties
+    des services, codes d'API compris), **Profils** (notice-modèle ligne à
+    ligne, source et exemple de chaque variable au survol, aperçu en direct de
+    la notice produite sur le contexte d'un dossier ou d'un exemple),
+    **Variables** (dictionnaire, avec la valeur de l'exemple) et **Modifier** (fichier YAML dans Monaco, texte et
     commentaires conservés). « Vérifier » lance le vérificateur sur le
     brouillon ; « Enregistrer » refuse toute erreur bloquante, archive la
     version précédente dans `regles/archives/<horodatage>/`, journalise

@@ -1,6 +1,12 @@
 # Règles de décision, lues dans l'ordre : la première règle vraie l'emporte.
-# Chaque règle porte un nom en clair (affiché dans le dossier et le rapport).
-# Conditions au format rule-engine : ==, !=, in [...], and, or, not, <, >, null.
+#
+# Faits : ce que le workflow sait du document au moment de décider. Chaque
+# valeur en clair liste les codes renvoyés par l'API (ou calculés par le
+# démonstrateur) qui y mènent : c'est la seule traduction code → libellé.
+#
+# Règles : `quand` donne, pour chaque fait cité, la valeur (ou la liste de
+# valeurs) admise ; un fait non cité est indifférent. `si` (facultatif) ajoute
+# une condition rule-engine pour les cas avancés.
 #
 # Actions et issue du document :
 #   création      on produit la notice (profil)            → Terminé
@@ -11,82 +17,122 @@
 # à_valider: true signale une règle encore en discussion.
 # En v1, une conversion reprend la notice Sudoc source telle quelle.
 
-# Valeurs possibles des faits : servent au contrôle de complétude.
 faits:
-  type: [thèse, mémoire]
-  provenance: [EPHE, hors EPHE, incertaine, sans objet]
-  alma: [présent, incertain, absent]
-  sudoc: [originale imprimée, reproduction imprimée, reproduction microfiche, électronique seule, ambigu, indéterminé, rien]
+  type:
+    question: Type de document
+    source: formulaire de dépôt (type choisi pour le lot)
+    valeurs:
+      thèse: [these]
+      mémoire: [memoire]
+
+  provenance:
+    question: Établissement de soutenance
+    source: démonstrateur, d'après granting_institution extrait (config/provenance.yaml)
+    valeurs:
+      EPHE: [EPHE]
+      hors EPHE: [hors EPHE]
+      incertaine: [absent, ambigu]
+      sans objet: [mémoire]
+
+  alma:
+    question: Le document est-il déjà dans Alma ?
+    source: alma-checker, champ status
+    code_inconnu:          # statut non listé : incident
+    valeurs:
+      présent: [academic_record_found]
+      incertain: [ambiguous_academic_candidate, off_profile_match_only]
+      absent: [no_academic_record_found]
+
+  sudoc:
+    question: Que trouve-t-on au Sudoc ?
+    source: sudoc-checker, thesis_state des candidats retenus (score ≥ duplicate_threshold), sinon champ status
+    note: >-
+      Les quatre premières valeurs sont dans l'ordre de force : parmi les candidats
+      retenus, la plus forte l'emporte. Un thesis_state non listé donne « indéterminé »
+      (sauf si une originale imprimée est retenue). Sans candidat retenu, le status
+      « ambiguous_print_candidate » donne « ambigu », tout autre status « rien ».
+      « non vérifié » : Sudoc n'est pas interrogé (notice déjà dans Alma).
+    code_inconnu: indéterminé
+    sans_code: rien
+    valeurs:
+      originale imprimée: [printed_original]
+      reproduction imprimée: [printed_reproduction]
+      reproduction microfiche: [microfiche_reproduction]
+      électronique seule: [electronic]
+      ambigu: [ambiguous_print_candidate]
+      indéterminé: []
+      rien: []
+      non vérifié: []
 
 regles:
   - nom: Notice déjà dans Alma
-    si: alma == "présent"
+    quand: {alma: présent}
     alors: arrêt
 
   - nom: Candidat Alma à vérifier
-    si: alma == "incertain"
+    quand: {alma: incertain}
     alors: vérification
     à_valider: true
 
   - nom: Provenance à confirmer
-    si: type == "thèse" and provenance == "incertaine"
+    quand: {type: thèse, provenance: incertaine}
     alors: vérification
     motif: établissement de soutenance absent ou ambigu
 
   - nom: Résultat Sudoc à vérifier
-    si: sudoc in ["ambigu", "indéterminé"]
+    quand: {sudoc: [ambigu, indéterminé]}
     alors: vérification
 
   - nom: Thèse hors EPHE, originale imprimée au Sudoc
-    si: type == "thèse" and sudoc == "originale imprimée" and provenance == "hors EPHE"
+    quand: {type: thèse, provenance: hors EPHE, sudoc: originale imprimée}
     alors: conversion
     profil: these-reproduction-imprimee
 
   - nom: Thèse hors EPHE, notice électronique au Sudoc
-    si: type == "thèse" and sudoc == "électronique seule" and provenance == "hors EPHE"
+    quand: {type: thèse, provenance: hors EPHE, sudoc: électronique seule}
     alors: conversion
     profil: these-reproduction-imprimee
     à_valider: true
 
   - nom: Thèse hors EPHE, reproduction imprimée déjà au Sudoc
-    si: type == "thèse" and sudoc == "reproduction imprimée" and provenance == "hors EPHE"
+    quand: {type: thèse, provenance: hors EPHE, sudoc: reproduction imprimée}
     alors: arrêt
 
   - nom: Thèse hors EPHE, reproduction microfiche au Sudoc
-    si: type == "thèse" and sudoc == "reproduction microfiche" and provenance == "hors EPHE"
+    quand: {type: thèse, provenance: hors EPHE, sudoc: reproduction microfiche}
     alors: conversion
     profil: these-reproduction-imprimee
     à_valider: true
 
   - nom: Thèse EPHE, notice électronique au Sudoc
-    si: type == "thèse" and sudoc == "électronique seule" and provenance == "EPHE"
+    quand: {type: thèse, provenance: EPHE, sudoc: électronique seule}
     alors: conversion
     profil: these-originale-imprimee
 
   - nom: Thèse EPHE, reproduction au Sudoc
-    si: type == "thèse" and sudoc in ["reproduction imprimée", "reproduction microfiche"] and provenance == "EPHE"
+    quand: {type: thèse, provenance: EPHE, sudoc: [reproduction imprimée, reproduction microfiche]}
     alors: conversion
     profil: these-originale-imprimee
     à_valider: true
 
   - nom: Thèse EPHE absente du Sudoc
-    si: type == "thèse" and sudoc == "rien" and provenance == "EPHE"
+    quand: {type: thèse, provenance: EPHE, sudoc: rien}
     alors: création
     profil: these-originale-imprimee
 
   - nom: Thèse hors EPHE absente du Sudoc
-    si: type == "thèse" and sudoc == "rien" and provenance == "hors EPHE"
+    quand: {type: thèse, provenance: hors EPHE, sudoc: rien}
     alors: création
     profil: these-reproduction-imprimee
 
   - nom: Mémoire absent du Sudoc
-    si: type == "mémoire" and sudoc == "rien"
+    quand: {type: mémoire, sudoc: rien}
     alors: création
     profil: memoire-original-imprime
     à_valider: true
 
   - nom: Mémoire, notice électronique au Sudoc
-    si: type == "mémoire" and sudoc == "électronique seule"
+    quand: {type: mémoire, sudoc: électronique seule}
     alors: conversion
     profil: memoire-original-imprime
 

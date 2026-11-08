@@ -45,6 +45,26 @@ def _colorer_notice(texte: str | None) -> Markup:
 
 
 gabarits.env.filters["colorer_notice"] = _colorer_notice
+
+
+def _survol_variables(html: Markup, infos: dict[str, dict]) -> Markup:
+    """Variables `{nom}` / `{nom.attribut}` d'une ligne de profil : source et exemple au survol."""
+    def remplacer(m: re.Match) -> str:
+        nom = m.group(1)
+        info = infos.get(nom)
+        if not info:
+            return m.group(0)
+        titre = f"{nom} — source : {info.get('source') or '—'}"
+        titre += f"\nexemple : {info['exemple']}" if info.get("exemple") else "\nexemple : (vide)"
+        if not info.get("disponible", True):
+            titre += "\nindisponible : jamais renseignée"
+        return (f'<span class="underline decoration-dotted decoration-contour cursor-help" '
+                f'title="{escape(titre)}">{m.group(0)}</span>')
+
+    return Markup(re.sub(r"\{(\w+)(?:\.\w+)?\}", remplacer, str(html)))
+
+
+gabarits.env.filters["survol_variables"] = _survol_variables
 def _libelle_routage(routage: str | None) -> str:
     from humatheque.issues import normaliser
 
