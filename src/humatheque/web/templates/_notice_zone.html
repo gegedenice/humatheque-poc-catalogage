@@ -1,0 +1,187 @@
+{# Éditeur d'une zone de la notice (studio, onglet « Notice UNIMARC »).
+   Les boutons « brouillon » renvoient le formulaire au serveur, qui le réaffiche
+   modifié (ajout de sous-zone, changement de sorte de valeur…) sans rien écrire ;
+   « Enregistrer » écrit le socle ou la variante après passage du vérificateur. #}
+{% set z = zone %}
+{% set types = vue_variables | dictsort %}
+{% macro brouillon(action, libelle, classe="btn-discret btn-sm", titre="") -%}
+  <button type="button" class="{{ classe }}" name="action" value="{{ action }}" {% if titre %}title="{{ titre }}" aria-label="{{ titre }}"{% endif %}
+          hx-post="/admin/regles/notice/zone/brouillon" hx-target="#editeur-zone" hx-swap="innerHTML">{{ libelle }}</button>
+{%- endmacro %}
+<section class="sous-carte flex flex-col gap-4" aria-labelledby="titre-zone">
+  <div class="flex items-start gap-3">
+    <div class="flex-1">
+      <h3 id="titre-zone" class="flex items-center gap-2"><span class="font-mono text-primaire">{{ z.zone or "…" }}</span> {{ z.libelle or ("Nouvelle zone" if not ancien_id else "") }}</h3>
+      <p class="text-xs text-sourdine">{% if variante == "socle" %}Socle commun : s'applique à toutes les variantes{% else %}Variante <span class="font-mono">{{ variante }}</span> · {{ {"socle": "zone du socle", "modifiée": "zone du socle modifiée pour cette variante", "ajoutée": "zone propre à cette variante"}[origine] if origine else "nouvelle zone de la variante" }}{% endif %}</p>
+    </div>
+    <button type="button" class="btn-icone" aria-label="Fermer" onclick="document.getElementById('editeur-zone').innerHTML = ''">✕</button>
+  </div>
+
+  {% if refus_zone %}<div class="carte-alerte"><h4 class="font-semibold mb-1">Enregistrement refusé : erreurs bloquantes</h4>{% with rapport = refus_zone %}{% include "_regles_rapport.html" %}{% endwith %}</div>{% endif %}
+
+  <form method="post" action="/admin/regles/notice/zone" hx-boost="false" class="flex flex-col gap-4" id="form-zone">
+    <input type="hidden" name="variante" value="{{ variante }}">
+    <input type="hidden" name="ancien_id" value="{{ ancien_id or '' }}">
+    <input type="hidden" name="origine" value="{{ origine or '' }}">
+    <div class="grid gap-3 grid-cols-[5rem_6rem_1fr]">
+      <label class="block"><span class="etiquette">Étiquette</span>
+        <input class="champ champ-sm font-mono" name="zone" value="{{ z.zone }}" pattern="[0-9]{3}" maxlength="3" required></label>
+      <label class="block"><span class="etiquette">Indicateurs</span>
+        <input class="champ champ-sm font-mono" name="indicateurs" value="{{ z.indicateurs or '' }}" maxlength="2" placeholder="(contrôle)"></label>
+      <label class="block"><span class="etiquette">Identifiant</span>
+        <input class="champ champ-sm font-mono" name="id" value="{{ z.id }}" required {% if ancien_id %}readonly title="identifiant fixé : les variantes s'y réfèrent"{% endif %}></label>
+      <label class="block col-span-3"><span class="etiquette">Libellé</span>
+        <input class="champ champ-sm" name="libelle" value="{{ z.libelle }}"></label>
+    </div>
+
+    <h4 class="etiquette mb-0">Sous-zones</h4>
+    <ol class="flex flex-col gap-2">
+    {% for sz in z.sous_zones %}{% set i = loop.index0 %}{% set p = "sz-" ~ i ~ "-" %}
+      <li><details class="bg-white rounded-xl border border-filet open:shadow-carte" {% if i == ouvrir %}open{% endif %}>
+        <summary class="flex items-center gap-3 px-3 py-2.5 cursor-pointer list-none">
+          <span class="font-mono font-semibold text-[#b3261e] w-8">${{ sz.code }}</span>
+          <span class="flex-1 min-w-0"><span class="block font-medium text-sm">{{ sz.libelle or {"constante": "Valeur fixe", "variable": sz.variable, "composition": "Composition", "autorite": "Autorité", "vide": "—"}[sz.genre] }}</span>
+            <span class="block text-xs text-sourdine truncate">{% if sz.genre == "constante" %}« {{ sz.constante }} »{% elif sz.genre == "variable" %}Source : {{ sz.variable }}{% if sz.attribut %}.{{ sz.attribut }}{% endif %}{% if sz.prefixe %} · préfixe « {{ sz.prefixe }} »{% endif %}{% if sz.liste == "joindre" %} · valeurs jointes{% endif %}{% elif sz.genre == "composition" %}{% for pt in sz.parties %}{{ pt.texte or ("‹" ~ pt.variable ~ "›") }}{% endfor %}{% elif sz.genre == "autorite" %}{{ sz.autorite }} · {{ modes_rendu.get(sz.rendu) if sz.rendu else "rendu du type (" ~ (modes_rendu.get(rendus.get((vue_variables.get(sz.autorite) or {}).get("type", ""), ""), "?")) ~ ")" }}{% else %}sans valeur{% endif %}</span></span>
+          <span class="text-xs text-sourdine whitespace-nowrap">{{ sz.presence }}</span><span class="text-contour" aria-hidden="true">›</span>
+        </summary>
+        <div class="border-t border-filet p-3 flex flex-col gap-3">
+          <div class="grid gap-3 grid-cols-[5rem_1fr]">
+            <label class="block"><span class="etiquette">Code</span><input class="champ champ-sm font-mono" name="{{ p }}code" value="{{ sz.code }}" maxlength="1" required></label>
+            <label class="block"><span class="etiquette">Libellé</span><input class="champ champ-sm" name="{{ p }}libelle" value="{{ sz.libelle }}"></label>
+          </div>
+          <fieldset><legend class="etiquette">Valeur</legend>
+            <div class="segmente">
+              {% for g, lib in [("constante", "Valeur fixe"), ("variable", "Donnée"), ("composition", "Composition"), ("autorite", "Autorité")] %}
+              <label><input type="radio" name="{{ p }}genre" value="{{ g }}" {% if sz.genre == g or (sz.genre == "vide" and g == "constante") %}checked{% endif %}
+                     hx-post="/admin/regles/notice/zone/brouillon" hx-trigger="change" hx-target="#editeur-zone" hx-vals='{"ouvrir": "{{ i }}"}'>{{ lib }}</label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          {% if sz.genre in ("constante", "vide") %}
+            <label class="block"><span class="etiquette">Valeur fixe</span><input class="champ champ-sm font-mono" name="{{ p }}constante" value="{{ sz.constante or '' }}"></label>
+          {% elif sz.genre == "variable" %}
+            {% set v = vue_variables.get(sz.variable) or {} %}
+            <div class="grid gap-3 sm:grid-cols-[1fr_9rem]">
+              <label class="block"><span class="etiquette">Donnée</span>
+                <select class="champ champ-sm" name="{{ p }}variable" hx-post="/admin/regles/notice/zone/brouillon" hx-trigger="change" hx-target="#editeur-zone" hx-vals='{"ouvrir": "{{ i }}"}'>
+                  {% for n, info in types %}<option value="{{ n }}" {% if n == sz.variable %}selected{% endif %}>{{ n }}{% if info.description %} — {{ info.description[:50] }}{% endif %}{% if not info.disponible %} (indisponible){% endif %}</option>{% endfor %}
+                </select></label>
+              {% if v.type in ("personne", "organisme") %}
+              <label class="block"><span class="etiquette">Attribut</span>
+                <select class="champ champ-sm" name="{{ p }}attribut">
+                  {% for a in attributs[v.type] %}<option value="{{ a if a != 'forme' else '' }}" {% if (sz.attribut or 'forme') == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+                </select></label>
+              {% endif %}
+            </div>
+            <p class="text-xs text-sourdine">Source : <span class="font-mono">{{ v.source or "—" }}</span>{% if v.exemple %} · exemple : {{ v.exemple }}{% endif %}</p>
+            <div class="grid gap-3 grid-cols-2">
+              <label class="block"><span class="etiquette">Texte avant</span><input class="champ champ-sm" name="{{ p }}prefixe" value="{{ sz.prefixe }}" placeholder="ex. sous la direction de "></label>
+              <label class="block"><span class="etiquette">Texte après</span><input class="champ champ-sm" name="{{ p }}suffixe" value="{{ sz.suffixe }}"></label>
+            </div>
+            {% if v.liste %}
+            <fieldset class="flex flex-col gap-2"><legend class="etiquette">Plusieurs valeurs</legend>
+              <label class="text-sm flex items-center gap-2"><input type="radio" class="accent-primaire" name="{{ p }}liste" value="repeter" {% if sz.liste != "joindre" %}checked{% endif %}> une sous-zone par valeur</label>
+              <label class="text-sm flex flex-wrap items-center gap-2"><input type="radio" class="accent-primaire" name="{{ p }}liste" value="joindre" {% if sz.liste == "joindre" %}checked{% endif %}> une seule sous-zone, valeurs séparées par
+                <input class="champ champ-sm w-16 font-mono" name="{{ p }}separateur" value="{{ sz.separateur }}" aria-label="séparateur"> et, avant la dernière,
+                <input class="champ champ-sm w-16 font-mono" name="{{ p }}dernier" value="{{ sz.dernier if sz.dernier is not none else '' }}" placeholder="idem" aria-label="dernier séparateur"></label>
+              <p class="text-xs text-sourdine">Les espaces comptent : « , » puis « et » entourés d'espaces donnent « A, B et C ».</p>
+            </fieldset>
+            {% endif %}
+          {% elif sz.genre == "composition" %}
+            <p class="text-xs text-sourdine">Morceaux mis bout à bout ; si une donnée manque, la sous-zone est absente.</p>
+            <ol class="flex flex-col gap-2">
+              {% for pt in sz.parties or [] %}{% set j = loop.index0 %}
+              <li class="flex items-center gap-2">
+                <select class="champ champ-sm w-48" name="{{ p }}p-{{ j }}-variable" aria-label="morceau {{ j + 1 }}">
+                  <option value="">texte fixe</option>
+                  {% for n, info in types %}<option value="{{ n }}" {% if n == pt.variable %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                </select>
+                <input class="champ champ-sm flex-1 font-mono" name="{{ p }}p-{{ j }}-texte" value="{{ pt.texte or '' }}" placeholder="texte (si texte fixe)">
+                {{ brouillon("supprimer_partie:" ~ i ~ ":" ~ j, "✕", "btn-icone", "supprimer le morceau") }}
+              </li>
+              {% endfor %}
+            </ol>
+            <div>{{ brouillon("ajouter_partie:" ~ i, "+ Ajouter un morceau") }}</div>
+          {% elif sz.genre == "autorite" %}
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="block"><span class="etiquette">Personne ou organisme</span>
+                <select class="champ champ-sm" name="{{ p }}autorite">
+                  {% for n, info in types if info.type in ("personne", "organisme") %}<option value="{{ n }}" {% if n == sz.autorite %}selected{% endif %}>{{ n }} ({{ info.type }}{% if info.liste %}, plusieurs{% endif %})</option>{% endfor %}
+                </select></label>
+              <label class="block"><span class="etiquette">Rendu</span>
+                <select class="champ champ-sm" name="{{ p }}rendu">
+                  <option value="">rendu du type (socle)</option>
+                  {% for m, d in modes_rendu.items() %}<option value="{{ m }}" {% if m == sz.rendu %}selected{% endif %}>{{ d }}</option>{% endfor %}
+                </select></label>
+            </div>
+            <p class="text-xs text-sourdine">Une zone par personne ou organisme ; le code de la sous-zone est remplacé par ceux du rendu ($3, ou $a $b).</p>
+          {% endif %}
+          {% if sz.genre in ("variable", "composition", "autorite") %}
+          <fieldset class="flex flex-col gap-1.5"><legend class="etiquette">Si la valeur est absente</legend>
+            <label class="text-sm flex items-center gap-2"><input type="radio" class="accent-primaire" name="{{ p }}si_absente" value="omettre" {% if sz.si_absente == "omettre" %}checked{% endif %}> Ne pas produire la sous-zone</label>
+            <label class="text-sm flex flex-wrap items-center gap-2"><input type="radio" class="accent-primaire" name="{{ p }}si_absente" value="repli" {% if sz.si_absente == "repli" %}checked{% endif %}> Utiliser une valeur de repli
+              <input class="champ champ-sm w-32 font-mono" name="{{ p }}repli" value="{{ sz.repli or '' }}" aria-label="valeur de repli"></label>
+            <label class="text-sm flex items-center gap-2"><input type="radio" class="accent-primaire" name="{{ p }}si_absente" value="verification" {% if sz.si_absente == "verification" %}checked{% endif %}> Demander une vérification humaine <span class="text-xs text-sourdine">(document à reprendre)</span></label>
+          </fieldset>
+          {% endif %}
+          <label class="block"><span class="etiquette">Remarque</span><input class="champ champ-sm" name="{{ p }}remarque" value="{{ sz.remarque or '' }}"></label>
+          <div class="flex gap-1 justify-end">
+            {{ brouillon("monter_sz:" ~ i, "↑", "btn-icone", "monter") }}{{ brouillon("descendre_sz:" ~ i, "↓", "btn-icone", "descendre") }}
+            {{ brouillon("supprimer_sz:" ~ i, "Supprimer la sous-zone", "btn-discret btn-sm text-sortie") }}
+          </div>
+        </div>
+      </details></li>
+    {% else %}<li class="text-sm text-sourdine">Aucune sous-zone.</li>{% endfor %}
+    </ol>
+    <div>{{ brouillon("ajouter_sz", "+ Ajouter une sous-zone") }}</div>
+
+    <div class="grid gap-3 sm:grid-cols-[8rem_1fr]">
+      <label class="block"><span class="etiquette">Priorité</span>
+        <select class="champ champ-sm" name="priorite">
+          {% for v, lib in [("", "—"), ("1", "1 (obligatoire)"), ("2", "2"), ("3", "3")] %}<option value="{{ v }}" {% if (z.priorite | string) == v or (not z.priorite and not v) %}selected{% endif %}>{{ lib }}</option>{% endfor %}
+        </select></label>
+      <label class="block"><span class="etiquette">Remarque</span><input class="champ champ-sm" name="remarque" value="{{ z.remarque or '' }}"></label>
+    </div>
+    <div class="flex flex-wrap gap-4">
+      <label class="text-sm flex items-center gap-2"><input type="checkbox" class="accent-primaire w-4 h-4" name="a_valider" value="1" {% if z.a_valider %}checked{% endif %}> à valider (encore en discussion)</label>
+      <label class="text-sm flex items-center gap-2"><input type="checkbox" class="accent-primaire w-4 h-4" name="actif" value="1" {% if z.actif %}checked{% endif %}> produite (décochée : documentée, non produite)</label>
+    </div>
+
+    {% if apercu_zone is not none %}
+    <div class="bg-white rounded-xl p-3">
+      <p class="etiquette">Aperçu sur l'exemple (thèse fictive)</p>
+      {% if apercu_zone %}<pre class="font-mono text-[13px] whitespace-pre-wrap break-words">{{ apercu_zone | join("\n") | colorer_notice }}</pre>
+      {% else %}<p class="text-sm text-sourdine">Zone non produite pour l'exemple.</p>{% endif %}
+      {% if apercu_alertes %}<p class="text-xs text-decision-fonce mt-1">{{ apercu_alertes | join(" · ") }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-filet pt-3">
+      <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+      <span class="flex-1"></span>
+      {% if variante == "socle" %}
+        <button class="btn-principal btn-sm" name="portee" value="socle">Enregistrer</button>
+      {% elif origine == "socle" %}
+        <button class="btn btn-sm" name="portee" value="socle" title="modifie la zone pour toutes les variantes">Enregistrer dans le socle</button>
+        <button class="btn-principal btn-sm" name="portee" value="variante">Enregistrer pour cette variante</button>
+      {% else %}
+        <button class="btn-principal btn-sm" name="portee" value="variante">Enregistrer</button>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if ancien_id %}
+  <form method="post" action="/admin/regles/notice/zone/operation" hx-boost="false" class="flex flex-wrap items-center gap-2"
+        onsubmit="return confirm('Confirmer : ' + event.submitter.textContent.trim() + ' ?')">
+    <input type="hidden" name="variante" value="{{ variante }}"><input type="hidden" name="id" value="{{ ancien_id }}">
+    <input type="hidden" name="auteur" value="{{ auteur }}">
+    <span class="text-xs text-sourdine mr-auto">{% if not auteur %}Indiquez votre nom (enregistrez une fois) pour ces actions.{% endif %}</span>
+    {% if variante == "socle" %}<button class="btn-discret btn-sm text-sortie" name="operation" value="supprimer" {% if not auteur %}disabled{% endif %}>Supprimer la zone du socle</button>
+    {% elif retiree %}<button class="btn btn-sm" name="operation" value="remettre" {% if not auteur %}disabled{% endif %}>Remettre dans cette variante</button>
+    {% elif origine == "modifiée" %}<button class="btn-discret btn-sm" name="operation" value="revenir" {% if not auteur %}disabled{% endif %}>Revenir à la zone du socle</button>
+      <button class="btn-discret btn-sm text-sortie" name="operation" value="retirer" {% if not auteur %}disabled{% endif %}>Retirer de cette variante</button>
+    {% elif origine == "ajoutée" %}<button class="btn-discret btn-sm text-sortie" name="operation" value="supprimer" {% if not auteur %}disabled{% endif %}>Supprimer de la variante</button>
+    {% else %}<button class="btn-discret btn-sm text-sortie" name="operation" value="retirer" {% if not auteur %}disabled{% endif %}>Retirer de cette variante</button>{% endif %}
+  </form>
+  {% endif %}
+</section>

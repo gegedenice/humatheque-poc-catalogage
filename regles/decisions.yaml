@@ -13,6 +13,7 @@
 #   conversion    on dérive la notice Sudoc (profil cible) → Terminé
 #   arrêt         rien à produire (motif)                   → Terminé
 #   vérification  un catalogueur doit trancher (motif)      → À reprendre
+#                 `verification` : état proposé au catalogueur (verifications.yaml)
 # Une panne technique donne « Incident », sans règle.
 # à_valider: true signale une règle encore en discussion.
 # En v1, une conversion reprend la notice Sudoc source telle quelle.
@@ -72,16 +73,19 @@ regles:
   - nom: Candidat Alma à vérifier
     quand: {alma: incertain}
     alors: vérification
+    verification: alma_incertain
     à_valider: true
 
   - nom: Provenance à confirmer
     quand: {type: thèse, provenance: incertaine}
     alors: vérification
+    verification: provenance
     motif: établissement de soutenance absent ou ambigu
 
   - nom: Résultat Sudoc à vérifier
     quand: {sudoc: [ambigu, indéterminé]}
     alors: vérification
+    verification: sudoc_a_qualifier
 
   - nom: Thèse hors EPHE, originale imprimée au Sudoc
     quand: {type: thèse, provenance: hors EPHE, sudoc: originale imprimée}
@@ -136,4 +140,4 @@ regles:
     alors: conversion
     profil: memoire-original-imprime
 
-sinon: {alors: vérification, motif: Situation non prévue}
+sinon: {alors: vérification, motif: Situation non prévue, verification: situation_non_prevue}

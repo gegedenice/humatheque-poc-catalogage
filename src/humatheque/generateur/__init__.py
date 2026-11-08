@@ -1,7 +1,7 @@
-"""Générateur UNIMARC piloté par les profils de regles/ (SPEC §8).
+"""Générateur UNIMARC piloté par la notice structurée de regles/notice/ (SPEC §8).
 
-`moteur` est importé à la demande : `regles.moteur` utilise les modèles de
-notice de ce package, et `generateur.moteur` utilise `regles.moteur`.
+`moteur` est importé à la demande : `regles.notice` utilise les modèles de
+notice de ce package, et `generateur.moteur` utilise `regles.notice`.
 """
 
 from humatheque.generateur.modeles import Notice, Zone

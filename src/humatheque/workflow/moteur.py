@@ -19,7 +19,7 @@ from humatheque import issues
 from humatheque.config import charger_yaml, reglages
 from humatheque.contexte import ResultatsServices, construire, document_vide, normaliser_metadonnees
 from humatheque.conversion import ConversionEchec, convertir, depuis_iso, unimarc_xml_vers_iso, vers_winibw as iso_vers_winibw
-from humatheque.decision.moteur import decider, faits_du_dossier, routage_final, routage_service
+from humatheque.decision.moteur import decider, decision_imposee, faits_du_dossier, routage_final, routage_service
 from humatheque.decision.provenance import provenance as deduire_provenance
 from humatheque.extraction import (
     ExtractionInvalide, ImageIllisible, ImageInaccessible, InferenceIndisponible, extraire,
@@ -230,17 +230,16 @@ class Workflow:
         d.provenance = p
         d.noter("provenance", "decision", {"valeur": p.valeur, "regle": p.regle,
                                            "forme_comparee": p.forme_comparee, "forme_reconnue": p.forme_reconnue})
-        if p.a_confirmer and not d.provenance_manuelle:
-            motif = _cfg()["motifs"]["provenance"]
-            d.exceptions.append(ExceptionDossier(etape="provenance", objet="provenance",
-                                                 motif=f"{motif} ({p.valeur} : « {m.get('granting_institution') or ''} »)",
-                                                 candidats=["EPHE", "hors EPHE"]))
-            return self._arret(issues.A_REPRENDRE, f"{motif} ({p.valeur})")
+        # Provenance absente ou ambiguë : pas d'arrêt ici, la décision (fait « provenance »)
+        # mène à l'état de vérification configuré (regles/verifications.yaml).
         return Suite()
 
     def _etape_alma(self, d: Dossier) -> Suite:
-        res = self._appel(d, "alma", verifier_alma, self.services.alma, d.metadonnees, d.document.type_document,
-                          self.services.parametres("alma"), self.services.regles.faits["alma"])
+        if "alma" in d.corrections and d.alma is not None:  # choix d'un catalogueur : pas de nouvel appel
+            res = d.alma
+        else:
+            res = self._appel(d, "alma", verifier_alma, self.services.alma, d.metadonnees, d.document.type_document,
+                              self.services.parametres("alma"), self.services.regles.faits["alma"])
         d.alma = res
         if res.etat is None:
             rs = routage_service(self.services.regles, "alma", res.statut)
@@ -262,20 +261,18 @@ class Workflow:
         seuil = parametres.get("duplicate_threshold")
         if seuil is None:
             raise _Incident("service_indisponible", _cfg()["motifs"]["seuil_sudoc"])
-        reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees, d.document.type_document,
-                              parametres)
-        q = agreger(reponse, float(seuil), self.services.regles.faits["sudoc"])
+        if "sudoc" in d.corrections and d.sudoc is not None:  # choix d'un catalogueur : pas de nouvel appel
+            q = d.sudoc
+        else:
+            reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees,
+                                  d.document.type_document, parametres)
+            q = agreger(reponse, float(seuil), self.services.regles.faits["sudoc"])
         d.sudoc = q
         d.noter("sudoc", "decision", {"etat": q.etat, "justification": q.justification, "ppn_source": q.ppn_source})
         if q.incident:
             return self._arret(issues.INCIDENT, f"sudoc-checker : {q.justification}", "service_indisponible")
         d.etat_sudoc = d.corrections.get("sudoc", q.etat)
-        if d.etat_sudoc is not None and d.etat_sudoc == self.services.regles.faits["sudoc"].code_inconnu:
-            motif = _cfg()["motifs"]["sudoc_indetermine"]
-            d.exceptions.append(ExceptionDossier(etape="sudoc", objet="qualification Sudoc",
-                                                 motif=f"{motif} : {q.justification}",
-                                                 candidats=[c.model_dump() for c in q.candidats if c.retenu]))
-            return self._arret(issues.A_REPRENDRE, motif)
+        # « indéterminé » n'arrête pas ici : la décision mène à l'état de vérification configuré.
         return Suite()
 
     def _etape_situation(self, d: Dossier) -> Suite:
@@ -284,7 +281,13 @@ class Workflow:
         codes = {"type": d.document.type_document, "provenance": d.provenance.valeur if d.provenance else None,
                  "alma": d.alma.statut if d.alma else None,
                  "sudoc": d.sudoc.code if d.sudoc else None}
-        dec = decider(self.services.regles, faits, codes)
+        # Faits corrigés par un catalogueur (états de vérification) : prioritaires.
+        faits.update({k: v for k, v in d.corrections.items() if k in faits and k not in ("alma", "sudoc")})
+        if d.corrections.get("action"):
+            dec = decision_imposee(self.services.regles, faits, codes, d.corrections["action"],
+                                   d.corrections.get("profil") or None, d.corrections.get("choix", ""))
+        else:
+            dec = decider(self.services.regles, faits, codes)
         d.decision = dec
         d.noter("situation", "decision", dec.model_dump(exclude={"ligne"}))
         if dec.suite == "creer":
@@ -398,7 +401,10 @@ class Workflow:
         d.alerter(*notice.alertes)
         for z in notice.zones_triees():
             d.noter("generation", "zone", {"zone": z.texte(), "regles": [r.model_dump() for r in z.regles]})
-        return Suite()
+        # Sous-zone « vérification humaine si absente » : la notice est produite, un catalogueur vérifie.
+        for v in notice.verifications:
+            d.exceptions.append(ExceptionDossier(etape="generation", objet="notice", motif=v))
+        return Suite(routage=issues.A_REPRENDRE) if notice.verifications else Suite()
 
     # ================================================================ outils
     def _contexte(self, d: Dossier):

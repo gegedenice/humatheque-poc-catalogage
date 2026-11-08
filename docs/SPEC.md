@@ -28,7 +28,7 @@ Alma ou Orion, annotation et export de jeux de données (restent dans le POC).
 humatheque-catalogage/
   CLAUDE.md  docs/SPEC.md  pyproject.toml  .env.example
   Dockerfile  docker-compose.yml
-  regles/                   règles de catalogage (§8) : variables.yaml, profils/*.yaml, decisions.yaml, services.yaml
+  regles/                   règles de catalogage (§8) : variables, decisions, verifications, services, notice/ (socle, variantes)
   reference/                POC, maquette, mindmap, moteur-regles/ (lecture seule)
   src/humatheque/
     config.py               settings pydantic (env), chemins, seuils
@@ -42,7 +42,7 @@ humatheque-catalogage/
     services/               clients HTTP : alma, sudoc, idref, dewey
     qualification/          agrégation des thesis_state Sudoc en état du document (pas d'appel réseau)
     regles/                 chargement des règles YAML, moteur, vérificateur
-    decision/               décisions (rule-engine), issue des réponses de services, provenance
+    decision/               décisions (tables), issue des réponses de services, provenance
     conversion/             conversion d'une notice Sudoc existante (copie en v1)
     generateur/             remplissage des profils + sérialisation
     workflow/               orchestrateur : un document → un Dossier
@@ -308,9 +308,11 @@ dans le dossier :
    - `ambigu` : correspondance partielle (par exemple « hautes études » sans
      « pratique »), ou EPHE présente seulement dans `co_tutelle_institutions`.
 
-   `absent` et `ambigu` arrêtent le document (issue « à reprendre », motif
-   « provenance à confirmer ») ; le catalogueur choisit EPHE ou hors EPHE et le
-   pipeline reprend à l'étape 3. La règle appliquée et la forme comparée sont
+   `absent` et `ambigu` donnent le fait `provenance = incertaine` ; le
+   traitement continue (Alma, Sudoc) et la décision mène à l'état de
+   vérification « Provenance à confirmer » (§7, décision du 08/11) : le
+   catalogueur choisit EPHE ou hors EPHE et la décision est reprise, sans
+   rappeler les services. La règle appliquée et la forme comparée sont
    journalisées. **Modèle de décision** (optionnel, désactivé par défaut,
    `PROVENANCE_CONFIRMATION_LLM=false`) : un appel LLM texte peut confirmer la
    déduction ; en cas de désaccord avec la règle, le document part en décision.
@@ -355,8 +357,8 @@ dans le dossier :
    - état du document = le plus fort parmi les candidats retenus, dans l'ordre
      `originale imprimée > reproduction imprimée > reproduction microfiche >
      électronique seule` ;
-   - un candidat retenu `unknown` donne `indéterminé` (issue « à reprendre »,
-     motif « nature de la notice Sudoc non qualifiable ») : cette notice
+   - un candidat retenu `unknown` donne `indéterminé` (la décision mène à
+     l'état de vérification « Sudoc : résultat à qualifier ») : cette notice
      pourrait être l'originale, on ne tranche pas à sa place. **Exception** :
      si une originale imprimée est déjà retenue, l'`unknown` ne change rien et
      l'état reste `originale imprimée` ;
@@ -439,10 +441,9 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
   qui correspond l'emporte ; `sinon` est obligatoire. Une règle s'écrit
   `quand: {fait: valeur}` (ou une liste de valeurs admises) ; un fait non cité
   est indifférent ; le vérificateur rejette un fait ou une valeur absents du
-  dictionnaire. Pour les cas avancés, `si` ajoute (par « et ») une expression
-  `rule-engine` (`==`, `!=`, `in [...]`, `and`, `or`, `not`, comparaisons), ce
-  qui permet d'ajouter plus tard des faits produits par un modèle de décision
-  (`qualite_extraction < 0.6`).
+  dictionnaire. Décision du 08/11 : plus d'expressions (`si`, rule-engine
+  retiré) ; un futur fait produit par un modèle sera déclaré dans le
+  dictionnaire avec ses valeurs, comme les autres.
 - **Traçabilité** : le dossier conserve, fait par fait, le code reçu de l'API et
   la valeur retenue (`Decision.codes`) ; la chaîne « code → valeur → règle →
   issue » est affichée dans le dossier et le banc d'essai (une valeur corrigée
@@ -480,8 +481,24 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
     stockées dans le dossier et téléchargeables ;
   - le rapport indique le PPN source, le profil cible et le lien vers le Sudoc.
 - Une action `arrêt` ou `vérification` arrête sans conversion. L'onglet
-  « Reprise » du dossier (faux positif, traité hors outil) n'apparaît que pour
-  un document à reprendre ou en incident.
+  « Reprise » du dossier n'apparaît que pour un document à reprendre ou en
+  incident.
+- **Vérifications humaines = états configurables** (décision du 08/11,
+  `regles/verifications.yaml`, studio › Vérifications). Une règle
+  `alors: vérification` désigne un état (`verification: sudoc_a_qualifier`) ;
+  le document s'arrête « à reprendre » **en attente de vérification**. L'onglet
+  « Reprise » affiche la question, les candidats Alma ou Sudoc à examiner et
+  les choix configurés ; chaque choix :
+  - **corrige des faits** (`faits: {sudoc: rien}`) puis relance la décision —
+    le traitement reprend à l'étape du fait corrigé sans rappeler Alma ni
+    Sudoc (leurs résultats sont gardés) ;
+  - ou **impose une action** (`action: création`, `profil: …`) : décision
+    « Choix du catalogueur », sans règle.
+
+  Le choix, son auteur et son commentaire sont journalisés. États actuels :
+  Alma : candidat incertain ; Provenance à confirmer ; Sudoc : résultat à
+  qualifier (ambigu ou indéterminé) ; Situation non prévue (`sinon`).
+  « Traité hors outil » reste proposé pour tout document à reprendre.
 - **Sorties des services d'enrichissement** (décision du 08/11) :
   `regles/services.yaml` liste, pour l'extraction, IdRef personnes
   (`idref_personne`), IdRef structures (`idref_organisations`) et Dewey,
@@ -509,94 +526,121 @@ l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 
 ### 8.1 Où sont les règles
 
+Décision du 08/11 : les règles sont éditées dans le **studio de catalogage**
+(§9.3) ; les catalogueurs manipulent des décisions, des vérifications et des
+zones de notice, jamais des expressions ni des chaînes UNIMARC à conditions.
+Le studio écrit des fichiers YAML versionnés, validés avant enregistrement.
+
 | Fichier | Contenu |
 |---|---|
 | `regles/variables.yaml` | Dictionnaire des variables : `source`, `type` (texte, personne, organisme), `liste`, `disponible`, `description` |
-| `regles/profils/these-originale-imprimee.yaml` | Notice-modèle de la thèse originale imprimée |
-| `regles/profils/these-reproduction-imprimee.yaml` | Notice-modèle de la thèse de reproduction imprimée |
-| `regles/profils/memoire-original-imprime.yaml` | Notice-modèle du mémoire original imprimé |
-| `regles/decisions.yaml` | Dictionnaire des faits (valeurs et codes d'API), règles de décision (`quand`), `sinon` |
+| `regles/decisions.yaml` | Dictionnaire des faits (valeurs et codes d'API), tableau de décision (`quand`), `sinon` |
+| `regles/verifications.yaml` | Vérifications humaines : états, question, choix (§7) |
 | `regles/services.yaml` | Sorties des services d'enrichissement (IdRef personnes et structures, Dewey, extraction) : codes, issue, alerte |
+| `regles/notice/socle.yaml` | Socle commun de la notice : zones structurées, rendu des autorités |
+| `regles/notice/variantes/*.yaml` | Variantes (thèse originale imprimée, thèse de reproduction imprimée, mémoire original imprimé) : zones ajoutées, remplacées, retirées |
 
-Le dossier des règles est `REGLES_DIR` (`regles` par défaut). Les fichiers
-sont versionnés avec le code. Le bouton « Recharger les règles » les relit sans
-redémarrer ; la version chargée (date et empreinte des fichiers) est
-enregistrée dans chaque dossier. L'API `GET /api/v1/regles` les sert tels
-quels. La référence d'implémentation est `reference/moteur-regles/` (moteur,
-exemple de contexte, tests sur les règles réelles). En cas d'écart UNIMARC
-entre cette référence et l'ancien classeur Grist, le classeur a fait foi lors de
-la migration (décision du 06/11) ; Grist est ensuite retiré du projet.
+Le dossier des règles est `REGLES_DIR` (`regles` par défaut). Le bouton
+« Recharger les règles » les relit sans redémarrer ; la version chargée (date
+et empreinte des fichiers) est enregistrée dans chaque dossier. L'API
+`GET /api/v1/regles` les sert tels quels. Les anciens profils WinIBW
+(`regles/profils/`, lignes `ZZZ II$a{x} || repli`) ont été convertis
+automatiquement en socle + variantes, sans écart sur 33 cas comparés
+(11 contextes × 3 profils), puis supprimés ; rule-engine est retiré.
 
-### 8.2 Format d'un profil
+### 8.2 Notice structurée : socle, variantes, zones
+
+Une **notice-modèle** (ce que désigne le `profil` d'une décision) = le socle +
+une variante. Le socle réunit les zones communes ; une variante `ajouter` des
+zones, en `remplacer` (même `id`) ou en `retirer`.
 
 ```yaml
-profil: these-originale-imprimee
-libelle: Thèse originale imprimée
-variables: [annee, langue, titre_classement, auteur, directeur, ...]
-lignes:
-  - "008 $aAax3"
-  - {ligne: "100 0#$a{annee} || 100 0#$a19XX", priorite: 1, à_valider: true}
-  - {ligne: "200 1#$a{titre_classement}$f{auteur}$gsous la direction de {directeur}",
-     joindre: {directeur: [", ", " et "]}}
-  - {ligne: "700 #1$3{auteur.ppn}$4070 || 700 #1$a{auteur.nom}$b{auteur.prenom}$4070", priorite: 1}
-  - {ligne: "330 ##$a{resume}", actif: false}
+# regles/notice/socle.yaml
+rendus: {personne: ppn_sinon_nom_prenom, organisme: ppn_sinon_forme}
+zones:
+  - id: '328'
+    zone: '328'
+    libelle: Note de thèse
+    indicateurs: '#0'
+    sous_zones:
+      - {code: b, libelle: Diplôme, variable: diplome}
+      - {code: d, libelle: Année, variable: annee, si_absente: repli, repli: '19..'}
+    priorite: 1
+    à_valider: true
+  - id: 200
+    sous_zones:
+      - {code: g, variable: directeur, prefixe: 'sous la direction de ', liste: joindre,
+         separateur: ', ', dernier: ' et '}
+  - id: 700-auteur
+    zone: '700'
+    indicateurs: '#1'
+    sous_zones: [{code: '3', autorite: auteur}, {code: '4', constante: '070'}]
 ```
 
-- Une ligne est une zone écrite comme dans WinIBW (`ZZZ II$a…`, `#` = blanc ;
-  sans indicateurs : zone de contrôle). Forme courte : une chaîne. Forme
-  développée : `ligne`, et au besoin `si` (condition rule-engine sur les
-  variables), `priorite`, `remarque`, `joindre`, `à_valider` (`true` : ligne
-  encore en discussion ; absent : validée) et `actif` (`false` : zone documentée
-  mais non produite). Décision du 06/11 : plus de `ref` ni de `statut` hérités
-  de Grist.
-- `{variable}` ou `{variable.attribut}` (`forme`, `nom`, `prenom`, `ppn` pour une
-  personne ; `forme`, `ppn` pour un organisme). `{x}` seul vaut `{x.forme}`.
-- `joindre: {variable: [séparateur, dernier séparateur]}` (ou un seul
-  séparateur) : la variable liste est jointe dans **une seule** sous-zone au lieu
-  de répéter la sous-zone. Décision du 06/11 : 200$g = `sous la direction de A
-  et B` (`A, B et C` pour trois directeurs).
-- `variables` liste les variables du profil ; le vérificateur la compare aux
-  variables réellement utilisées.
+Chaque **sous-zone** a une seule sorte de valeur :
+
+| Valeur | Propriétés |
+|---|---|
+| constante | `constante` |
+| donnée du document | `variable` (+ `attribut` : forme, nom, prenom, ppn), `prefixe`, `suffixe` ; variable liste : `liste: repeter` (une sous-zone par valeur) ou `joindre` (`separateur`, `dernier`) |
+| composition | `parties` : textes fixes et variables mis bout à bout (029 $b = année + code établissement + numéro NNT) |
+| autorité | `autorite` (personne ou organisme) ; `rendu` : mode partagé du socle par défaut |
+
+Et, sauf pour une constante, **si la valeur est absente** (`si_absente`) :
+ne pas produire la sous-zone (`omettre`), utiliser une valeur de repli
+(`repli`), ou **demander une vérification humaine** (`verification` : la
+sous-zone est omise, la notice produite, le document passe « à reprendre »
+avec une exception).
+
+**Rendus d'autorité** (implémentés en Python, choisis dans la configuration) :
+`ppn_sinon_nom_prenom` ($3 si aligné, sinon $a nom $b prénom),
+`ppn_sinon_forme`, `nom_prenom`, `forme`. Ils remplacent les replis `||`
+répétés dans chaque zone 7xx.
+
+Une **zone** porte `id` (unique, référencé par les variantes), `zone`
+(étiquette), `indicateurs` (absents : zone de contrôle), `libelle`,
+`priorite`, `à_valider`, `actif` (`false` : documentée mais non produite),
+`remarque`.
 
 ### 8.3 Règles de production
 
-1. **Répétition** : une ligne qui utilise un attribut d'une personne ou d'un
-   organisme est produite une fois par élément (zéro s'il n'y en a pas).
-2. **Sous-zone répétée** : une variable liste utilisée seule (`$e{sous_titre}`)
-   répète la sous-zone pour chaque valeur, sauf si elle est dans `joindre`.
-3. **Donnée manquante** : la ligne de repli (`||`) est utilisée si elle existe ;
-   sinon seules les sous-zones concernées sont omises.
-4. **Ligne vide** : si toutes les sous-zones à variable sont omises, la zone est
-   omise ; une ligne sans variable est toujours produite.
-5. **Priorité 1** : une ligne `priorite: 1` qui ne produit rien déclenche une
-   alerte en clair : « zone 029 obligatoire non produite (ligne 2) ».
+1. **Répétition** : une zone dont une sous-zone est une autorité est produite
+   une fois par personne ou organisme (zéro s'il n'y en a pas).
+2. **Sous-zone répétée** : une variable liste répète la sous-zone pour chaque
+   valeur, sauf `liste: joindre`.
+3. **Donnée manquante** : selon `si_absente` (omettre, repli, vérification).
+4. **Zone vide** : si toutes les sous-zones à variable sont absentes et qu'une
+   au moins n'a pas de repli, la zone est omise ; une zone sans variable est
+   toujours produite.
+5. **Priorité 1** : une zone `priorite: 1` qui ne produit rien déclenche une
+   alerte en clair : « zone 029 obligatoire non produite (029 (these-originale-imprimee)) ».
 6. **`actif: false`** : jamais produite, listée comme « non couverte ».
-7. **`si`** : la ligne n'est produite que si la condition est vraie.
-8. **Ordre** : zones triées par étiquette ; sous-zones dans l'ordre de la ligne.
+7. **Ordre** : zones triées par étiquette (ordre du socle, puis des ajouts, à
+   étiquette égale) ; sous-zones dans l'ordre configuré.
 
-Chaque zone produite garde la trace de sa ligne (zone et numéro, « 105 (ligne 7) »,
-et « à valider » le cas échéant), affichée en
-annotation dans le dossier et l'éditeur. Décisions du 06/11 sur les écarts avec
-l'ancienne référence : 029$b = `{annee}{code_etab}{numero_nnt}` ; aucune zone
-600 à 607 n'est produite (R040, ligne inactive).
+Chaque zone produite garde la trace de sa provenance (`id (socle)` ou
+`id (variante)`, et « à valider » le cas échéant), affichée en annotation dans
+le dossier, l'éditeur et le banc d'essai. Décisions du 06/11 : 029$b =
+`{annee}{code_etab}{numero_nnt}` ; aucune zone 600 à 607 n'est produite.
 
 ### 8.4 Vérificateur
 
 `humatheque check-spec`, exécuté au démarrage, à chaque rechargement et avant
-chaque enregistrement depuis l'interface (§9.3), affiché dans l'interface.
+chaque enregistrement depuis le studio (§9.3), affiché dans l'interface.
 
 | Gravité | Contrôle |
 |---|---|
-| erreur | YAML invalide (fichier, ligne) ; structure attendue absente |
-| erreur | Zone sans étiquette sur 3 chiffres |
-| erreur | Variable absente de `variables.yaml` ; attribut impossible pour le type |
-| erreur | Ligne qui se répète sur deux variables différentes ; `joindre` sur une variable qui n'est pas une liste de la ligne |
-| erreur | Condition rule-engine invalide (profil ou décision) ; profil inconnu dans une décision ; action inconnue ; nom de règle de décision en double |
+| erreur | YAML invalide (fichier, ligne) ; structure attendue absente ; propriété inconnue |
+| erreur | Étiquette hors 3 chiffres ; indicateurs hors 2 caractères ; code de sous-zone ; identifiant de zone en double |
+| erreur | Sous-zone sans valeur (zone active) ou avec deux sortes de valeur ; repli choisi sans valeur ; mode de rendu inconnu |
+| erreur | Variable absente de `variables.yaml` ; attribut impossible pour le type ; autorité qui n'est ni personne ni organisme ; zone répétée sur deux autorités |
+| erreur | Variante qui remplace ou retire une zone absente du socle, ou ajoute une zone déjà dans le socle |
 | erreur | Fait ou valeur de `quand` absent du dictionnaire ; code d'API listé pour deux valeurs (ou deux sorties) ; issue de sortie inconnue |
-| avertissement | Variable utilisée mais absente de la liste `variables` du profil |
-| avertissement | Profil atteint par aucune décision |
+| erreur | Profil inconnu dans une décision ; action inconnue ; nom de règle en double ; état de vérification inconnu |
+| erreur | Choix de vérification : à la fois (ou ni) faits et action ; valeur de fait inconnue ; profil inconnu |
+| avertissement | Variante atteinte par aucune décision ni vérification ; vérification sans état ; règle sans `quand` |
 | avertissement | **Cas non couvert** : combinaison des valeurs de faits (Alma absent) qui tombe dans `sinon` |
-| info | Variable déclarée dans un profil mais utilisée par aucune ligne active |
+| info | Variable utilisée par aucune zone active |
 
 Avec les règles actuelles, le contrôle de complétude doit signaler 4 cas :
 thèse EPHE avec originale imprimée au Sudoc ; mémoire avec originale,
@@ -680,22 +724,37 @@ défaut sur la version générée.
     réglages des lots automatiques (fournisseur, paramètres avancés ; proposés
     aussi par défaut dans le formulaire), déclencheurs (§3.1), état du
     planificateur.
-  - **`/admin/regles` Règles** (décision du 06/11), en onglets :
-    **Décisions** (tableau de décision : une colonne par fait, valeurs admises
-    en puces ; ajout, modification, suppression et réordonnancement par
-    formulaire, qui réécrit `regles:` et `sinon:` de `decisions.yaml` en
-    conservant l'en-tête et le dictionnaire, après vérification et archivage ;
-    banc d'essai : valeurs en clair ou codes bruts de l'API, saisis ou repris
-    d'un dossier → traduction, règle retenue et évaluation de chaque règle ;
-    cas non couverts), **Faits et sorties** (dictionnaire des faits et sorties
-    des services, codes d'API compris), **Profils** (notice-modèle ligne à
-    ligne, source et exemple de chaque variable au survol, aperçu en direct de
-    la notice produite sur le contexte d'un dossier ou d'un exemple),
-    **Variables** (dictionnaire, avec la valeur de l'exemple) et **Modifier** (fichier YAML dans Monaco, texte et
-    commentaires conservés). « Vérifier » lance le vérificateur sur le
-    brouillon ; « Enregistrer » refuse toute erreur bloquante, archive la
-    version précédente dans `regles/archives/<horodatage>/`, journalise
-    (qui, quand, fichier) et recharge les règles.
+  - **`/admin/regles` Studio de catalogage** (décision du 08/11), une vue par
+    logique de travail, sans expression ni YAML à écrire :
+    - **Décisions** : tableau de décision, une colonne par fait, valeurs en
+      clair (codes d'API au survol) ; ajout, modification, suppression,
+      réordonnancement par formulaire ; action, profil ou état de
+      vérification ;
+    - **Vérifications** : états d'attente (question, candidats montrés,
+      choix : corriger un fait ou imposer une action), édités par formulaire ;
+    - **Notice UNIMARC** : socle commun et variantes ; liste des zones
+      (provenance socle / modifiée / ajoutée / retirée, à valider, obligatoire,
+      jamais produite) ; éditeur de zone : étiquette, indicateurs, libellé,
+      sous-zones listées puis paramétrées (sorte de valeur, donnée et sa
+      source, texte avant / après, plusieurs valeurs, si la valeur est
+      absente : omettre, repli, vérification humaine), aperçu immédiat de la
+      zone sur l'exemple ; enregistrement dans le socle ou pour la variante,
+      retour au socle, retrait ; rendu des autorités partagé ; aperçu de la
+      notice de la variante ;
+    - **Données** : dictionnaire des faits, sorties des services, variables
+      (source, exemple) ;
+    - **Banc d'essai** : un dossier réel (codes d'API repris) ou l'exemple
+      fictif avec des faits saisis → décisions appliquées (code → valeur →
+      règle), données préparées, notice prévisualisée avec la provenance de
+      chaque zone, vérifications et alertes ; **non-régression** : régénère les
+      notices déjà produites (25 au plus) et indique les zones qui changent
+      (« change la zone 328 sur 1 des 1 notices ») ;
+    - **Fichiers** (experts) : YAML dans Monaco, vérifier / enregistrer.
+
+    Chaque enregistrement réécrit un seul fichier, refuse toute erreur
+    bloquante du vérificateur, archive la version précédente dans
+    `regles/archives/<horodatage>/`, journalise (qui, quand, fichier) et
+    recharge les règles.
 - **Mot de passe** : `MOT_DE_PASSE` dans `.env` protège toute l'application
   (pages par cookie de session, API par `Authorization: Bearer`) ; vide =
   désactivé (état actuel).
@@ -731,7 +790,7 @@ défaut sur la version générée.
     (ALM-SUD-F-004) ;
   - les réponses brutes des API, repliées par défaut et dépliables
     (ALM-SUD-F-003) ;
-  - la notice, chaque zone annotée par sa ligne de profil (zone, numéro, « à valider ») ;
+  - la notice, chaque zone annotée par sa provenance (zone du socle ou de la variante, « à valider ») ;
   - les alertes.
 
   **Résolution d'exception** :

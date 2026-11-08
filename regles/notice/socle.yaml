@@ -1,0 +1,422 @@
+rendus:
+  personne: ppn_sinon_nom_prenom
+  organisme: ppn_sinon_forme
+zones:
+- id: 008
+  zone: 008
+  libelle: Type de document
+  sous_zones:
+  - code: a
+    constante: Aax3
+  priorite: 1
+- id: '100'
+  zone: '100'
+  libelle: Données générales de traitement
+  indicateurs: 0#
+  sous_zones:
+  - code: a
+    libelle: Date de publication
+    variable: annee
+    si_absente: repli
+    repli: 19XX
+  priorite: 1
+  à_valider: true
+  remarque: repli à harmoniser avec 214 et 328
+- id: '101'
+  zone: '101'
+  libelle: Langue
+  indicateurs: 0#
+  sous_zones:
+  - code: a
+    libelle: Langue du texte
+    variable: langue
+  - code: d
+    libelle: Langue du résumé
+    variable: langue_resume
+  priorite: 1
+- id: '102'
+  zone: '102'
+  libelle: Pays de publication
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    constante: FR
+  priorite: 1
+- id: '104'
+  zone: '104'
+  libelle: 'Données codées : texte'
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    constante: k
+  - code: b
+    constante: y
+  - code: c
+    constante: y
+  - code: d
+    constante: ba
+  - code: e
+    constante: '0'
+  - code: f
+    constante: fre
+  priorite: 2
+- id: '105'
+  zone: '105'
+  libelle: 'Données codées : monographie'
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    constante: a
+  - code: b
+    constante: m
+  - code: b
+    constante: a
+  - code: c
+    constante: '0'
+  - code: d
+    constante: '0'
+  - code: e
+    constante: '0'
+  - code: f
+    constante: y
+  - code: g
+    constante: y
+  priorite: 1
+  à_valider: true
+  remarque: valeurs par défaut de $a, $e et $g à confirmer
+- id: '106'
+  zone: '106'
+  libelle: 'Données codées : forme'
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    constante: r
+  priorite: 3
+- id: '181'
+  zone: '181'
+  libelle: Type de contenu
+  indicateurs: '##'
+  sous_zones:
+  - code: P
+    constante: '01'
+  - code: c
+    constante: txt
+  priorite: 1
+- id: '182'
+  zone: '182'
+  libelle: Type de médiation
+  indicateurs: '##'
+  sous_zones:
+  - code: P
+    constante: '01'
+  - code: c
+    constante: n
+  priorite: 1
+- id: '183'
+  zone: '183'
+  libelle: Type de support
+  indicateurs: '##'
+  sous_zones:
+  - code: P
+    constante: '01'
+  - code: a
+    constante: nga
+  priorite: 1
+- id: '200'
+  zone: '200'
+  libelle: Titre et mention de responsabilité
+  indicateurs: 1#
+  sous_zones:
+  - code: a
+    libelle: Titre propre
+    variable: titre_classement
+  - code: e
+    libelle: Complément du titre
+    variable: sous_titre
+  - code: f
+    libelle: Première mention de responsabilité
+    variable: auteur
+  - code: g
+    libelle: Mention de responsabilité suivante
+    variable: directeur
+    prefixe: 'sous la direction de '
+    liste: joindre
+    separateur: ', '
+    dernier: ' et '
+  priorite: 1
+  à_valider: true
+  remarque: 'un seul $g : « sous la direction de A et B » (décision du 06/11)'
+- id: '214'
+  zone: '214'
+  libelle: Mention de production
+  indicateurs: '#1'
+  sous_zones:
+  - code: d
+    libelle: Date
+    variable: annee
+    si_absente: repli
+    repli: 19..
+  priorite: 1
+  à_valider: true
+- id: '215'
+  zone: '215'
+  libelle: Description matérielle
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    libelle: Importance matérielle
+    variable: volumaison
+  priorite: 1
+  à_valider: true
+- id: '328'
+  zone: '328'
+  libelle: Note de thèse
+  indicateurs: '#0'
+  sous_zones:
+  - code: b
+    libelle: Diplôme
+    variable: diplome
+  - code: c
+    libelle: Discipline
+    variable: discipline
+  - code: e
+    libelle: Établissement
+    variable: etablissement
+  - code: d
+    libelle: Année
+    variable: annee
+    si_absente: repli
+    repli: 19..
+  priorite: 1
+  à_valider: true
+  remarque: 'repli de 328$d sans année : seule $d a un repli'
+- id: '608'
+  zone: '608'
+  libelle: Forme, genre
+  indicateurs: '##'
+  sous_zones:
+  - code: '3'
+    libelle: PPN
+    constante: 027253139
+  - code: a
+    libelle: Forme
+    constante: Thèses et écrits académiques
+  - code: '2'
+    libelle: Vocabulaire
+    constante: rameau
+  priorite: 1
+- id: '686'
+  zone: '686'
+  libelle: Classification (TEF)
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    libelle: Indice
+    variable: dewey
+  - code: '2'
+    libelle: Code du système
+    constante: TEF
+  priorite: 1
+  à_valider: true
+  remarque: granularité TEF à trancher
+- id: 700-auteur
+  zone: '700'
+  libelle: 'Auteur : auteur'
+  indicateurs: '#1'
+  sous_zones:
+  - code: '3'
+    autorite: auteur
+    libelle: Auteur
+  - code: '4'
+    constante: '070'
+  priorite: 1
+- id: 701-directeur
+  zone: '701'
+  libelle: 'Responsabilité secondaire (personne) : directeur'
+  indicateurs: '#1'
+  sous_zones:
+  - code: '3'
+    autorite: directeur
+    libelle: Directeur
+  - code: '4'
+    constante: '727'
+  priorite: 2
+- id: 701-president
+  zone: '701'
+  libelle: 'Responsabilité secondaire (personne) : président'
+  indicateurs: '#1'
+  sous_zones:
+  - code: '3'
+    autorite: president
+    libelle: Président
+  - code: '4'
+    constante: '956'
+  - code: '4'
+    constante: '555'
+  priorite: 2
+  à_valider: true
+  remarque: double code à confirmer
+- id: 701-rapporteur
+  zone: '701'
+  libelle: 'Responsabilité secondaire (personne) : rapporteur'
+  indicateurs: '#1'
+  sous_zones:
+  - code: '3'
+    autorite: rapporteur
+    libelle: Rapporteur
+  - code: '4'
+    constante: '958'
+  - code: '4'
+    constante: '555'
+  priorite: 2
+  à_valider: true
+  remarque: double code à confirmer
+- id: 701-membre-jury
+  zone: '701'
+  libelle: 'Responsabilité secondaire (personne) : membre du jury'
+  indicateurs: '#1'
+  sous_zones:
+  - code: '3'
+    autorite: membre_jury
+    libelle: Membre du jury
+  - code: '4'
+    constante: '555'
+  priorite: 2
+- id: 711-etablissement
+  zone: '711'
+  libelle: 'Responsabilité secondaire (collectivité) : établissement'
+  indicateurs: '02'
+  sous_zones:
+  - code: '3'
+    autorite: etablissement
+    libelle: Établissement
+  - code: '4'
+    constante: '295'
+  priorite: 1
+- id: 711-cotutelle
+  zone: '711'
+  libelle: 'Responsabilité secondaire (collectivité) : cotutelle'
+  indicateurs: '02'
+  sous_zones:
+  - code: '3'
+    autorite: cotutelle
+    libelle: Cotutelle
+  - code: '4'
+    constante: '995'
+  priorite: 2
+- id: 711-ecole-doctorale
+  zone: '711'
+  libelle: 'Responsabilité secondaire (collectivité) : école doctorale'
+  indicateurs: '02'
+  sous_zones:
+  - code: '3'
+    autorite: ecole_doctorale
+    libelle: École doctorale
+  - code: '4'
+    constante: '996'
+  priorite: 2
+- id: 200-2
+  zone: '200'
+  libelle: Titre et mention de responsabilité
+  indicateurs: 1#
+  sous_zones:
+  - code: d
+    variable: titre_parallele
+    prefixe: '= '
+    libelle: Titre parallèle
+  - code: z
+    variable: langue_titre_parallele
+    libelle: Langue du titre parallèle
+  priorite: 1
+  à_valider: true
+  actif: false
+- id: 215-2
+  zone: '215'
+  libelle: Description matérielle
+  indicateurs: '##'
+  sous_zones:
+  - code: c
+  priorite: 3
+  actif: false
+- id: 215-3
+  zone: '215'
+  libelle: Description matérielle
+  indicateurs: '##'
+  sous_zones:
+  - code: d
+  priorite: 2
+  à_valider: true
+  actif: false
+  remarque: valeur fixe par type, établissement ou période ?
+- id: '320'
+  zone: '320'
+  libelle: Note sur les bibliographies
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+  priorite: 2
+  à_valider: true
+  actif: false
+  remarque: à harmoniser avec 105 $ba
+- id: '330'
+  zone: '330'
+  libelle: Résumé
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    variable: resume
+    libelle: Résumé
+  priorite: 2
+  à_valider: true
+  actif: false
+- id: '510'
+  zone: '510'
+  libelle: Titre parallèle
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    variable: titre_parallele
+    libelle: Titre parallèle
+  - code: z
+    variable: langue_titre_parallele
+    libelle: Langue du titre parallèle
+  priorite: 1
+  à_valider: true
+  actif: false
+- id: '541'
+  zone: '541'
+  libelle: Titre traduit
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+  priorite: 2
+  actif: false
+- id: '600'
+  zone: '600'
+  libelle: 'Sujet : nom de personne'
+  sous_zones: []
+  priorite: 1
+  à_valider: true
+  actif: false
+  remarque: aucune zone 600 à 607 produite (décision du 06/11)
+- id: '610'
+  zone: '610'
+  libelle: 'Sujet : termes libres'
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+  priorite: 2
+  actif: false
+- id: 711-partenaire
+  zone: '711'
+  libelle: 'Responsabilité secondaire (collectivité) : partenaire'
+  indicateurs: '02'
+  sous_zones:
+  - code: '3'
+    autorite: partenaire
+    libelle: Partenaire
+  - code: '4'
+    constante: '985'
+  priorite: 2
+  à_valider: true
+  actif: false

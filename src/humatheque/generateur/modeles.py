@@ -50,6 +50,7 @@ class Notice(BaseModel):
     alertes: list[str] = Field(default_factory=list)
     non_couvertes: list[RegleNonCouverte] = Field(default_factory=list)
     replis: list[str] = Field(default_factory=list)
+    verifications: list[str] = Field(default_factory=list, description="valeurs absentes à vérifier par un catalogueur")
     trace: list[str] = Field(default_factory=list)
 
     def zones_triees(self) -> list[Zone]:

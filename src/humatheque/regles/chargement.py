@@ -16,12 +16,15 @@ import yaml
 from pydantic import ValidationError
 
 from humatheque.config import Reglages, reglages as reglages_par_defaut
-from humatheque.regles.modeles import Fait, Ligne, Profil, RegleDecision, Regles, ServiceSorties, Variable
+from humatheque.regles.modeles import (EtatVerification, Fait, RegleDecision, Regles, ServiceSorties, Socle, Variable,
+                                      Variante, ZoneRegle)
 
 FICHIER_VARIABLES = "variables.yaml"
 FICHIER_DECISIONS = "decisions.yaml"
 FICHIER_SERVICES = "services.yaml"
-DOSSIER_PROFILS = "profils"
+FICHIER_VERIFICATIONS = "verifications.yaml"
+FICHIER_SOCLE = "notice/socle.yaml"
+DOSSIER_VARIANTES = "notice/variantes"
 
 
 class ReglesInvalides(Exception):
@@ -36,8 +39,8 @@ class ReglesInvalides(Exception):
 
 def fichiers_regles(dossier: Path) -> list[str]:
     """Chemins relatifs des fichiers de règles, dans l'ordre de lecture."""
-    profils = sorted(p.relative_to(dossier).as_posix() for p in (dossier / DOSSIER_PROFILS).glob("*.yaml"))
-    return [FICHIER_VARIABLES, FICHIER_DECISIONS, FICHIER_SERVICES, *profils]
+    variantes = sorted(p.relative_to(dossier).as_posix() for p in (dossier / DOSSIER_VARIANTES).glob("*.yaml"))
+    return [FICHIER_VARIABLES, FICHIER_DECISIONS, FICHIER_SERVICES, FICHIER_VERIFICATIONS, FICHIER_SOCLE, *variantes]
 
 
 def lire_textes(dossier: Path) -> dict[str, str]:
@@ -76,6 +79,16 @@ def _empreinte(textes: dict[str, str]) -> str:
     for rel in sorted(textes):
         h.update(rel.encode() + b"\0" + textes[rel].encode("utf-8") + b"\0")
     return h.hexdigest()[:12]
+
+
+def _zones(rel: str, brutes: list, origine: str, problemes: list) -> list[ZoneRegle]:
+    zones = []
+    for i, z in enumerate(brutes, start=1):
+        try:
+            zones.append(ZoneRegle.model_validate({**(z or {}), "origine": origine}))
+        except ValidationError as e:
+            problemes += _erreurs_pydantic(rel, f"zone {i} ({(z or {}).get('id', '?')})", e)
+    return zones
 
 
 def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
@@ -122,32 +135,47 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
             except ValidationError as e:
                 problemes += _erreurs_pydantic(FICHIER_SERVICES, str(nom), e)
 
-    # --- profils/*.yaml
-    profils: dict[str, Profil] = {}
-    for rel in sorted(k for k in textes if k.startswith(DOSSIER_PROFILS + "/")):
-        p = _yaml(rel, textes[rel])
-        if not _attendu(rel, isinstance(p, dict) and isinstance(p.get("lignes"), list),
-                        "clés profil et lignes attendues", problemes):
-            continue
-        lignes = []
-        for n, l in enumerate(p["lignes"], start=1):
-            donnees = l if isinstance(l, dict) else {"ligne": l}
+    # --- verifications.yaml
+    brut = _yaml(FICHIER_VERIFICATIONS, textes.get(FICHIER_VERIFICATIONS, "")) or {}
+    verifications: dict[str, EtatVerification] = {}
+    if _attendu(FICHIER_VERIFICATIONS, isinstance(brut, dict), "dictionnaire des états attendu", problemes):
+        for nom, v in brut.items():
             try:
-                lignes.append(Ligne.model_validate({**donnees, "numero": n}))
+                verifications[str(nom)] = EtatVerification.model_validate({**(v or {}), "nom": str(nom)})
             except ValidationError as e:
-                problemes += _erreurs_pydantic(rel, f"ligne {n}", e)
+                problemes += _erreurs_pydantic(FICHIER_VERIFICATIONS, str(nom), e)
+
+    # --- notice/socle.yaml
+    brut = _yaml(FICHIER_SOCLE, textes.get(FICHIER_SOCLE, ""))
+    socle = Socle(zones=[], fichier=FICHIER_SOCLE)
+    if _attendu(FICHIER_SOCLE, isinstance(brut, dict) and isinstance(brut.get("zones"), list),
+                "clés rendus et zones attendues", problemes):
+        socle = Socle(rendus={str(k): str(v) for k, v in (brut.get("rendus") or {}).items()},
+                      zones=_zones(FICHIER_SOCLE, brut["zones"], "socle", problemes), fichier=FICHIER_SOCLE)
+
+    # --- notice/variantes/*.yaml
+    variantes: dict[str, Variante] = {}
+    for rel in sorted(k for k in textes if k.startswith(DOSSIER_VARIANTES + "/")):
+        v = _yaml(rel, textes[rel])
+        if not _attendu(rel, isinstance(v, dict) and v.get("variante"), "clé variante attendue", problemes):
+            continue
+        nom = str(v["variante"])
         try:
-            profil = Profil.model_validate({**p, "lignes": lignes, "fichier": rel})
+            variante = Variante.model_validate({
+                **{k: x for k, x in v.items() if k not in ("ajouter", "remplacer")}, "fichier": rel,
+                "ajouter": _zones(rel, v.get("ajouter") or [], nom, problemes),
+                "remplacer": _zones(rel, v.get("remplacer") or [], nom, problemes)})
         except ValidationError as e:
             problemes += _erreurs_pydantic(rel, "", e)
             continue
-        if profil.profil in profils:
-            problemes.append((rel, "", f"profil « {profil.profil} » déjà défini dans {profils[profil.profil].fichier}"))
-        profils[profil.profil] = profil
+        if nom in variantes:
+            problemes.append((rel, "", f"variante « {nom} » déjà définie dans {variantes[nom].fichier}"))
+        variantes[nom] = variante
 
     if problemes:
         raise ReglesInvalides(problemes)
-    return Regles(variables=variables, profils=profils, faits=faits, services=services, decisions=decisions, sinon=sinon,
+    return Regles(variables=variables, faits=faits, services=services, decisions=decisions, socle=socle,
+                  variantes=variantes, verifications=verifications, sinon=sinon,
                   emplacement=emplacement, horodatage=datetime.now(UTC), empreinte=_empreinte(textes),
                   textes=dict(textes))
 

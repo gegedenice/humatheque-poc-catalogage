@@ -21,8 +21,9 @@ from humatheque.contexte import construire, variables_profil
 from humatheque.generateur import vers_winibw
 from humatheque.regles.chargement import FICHIER_DECISIONS, ReglesInvalides, charger_regles, fichiers_regles
 from humatheque.regles.ecriture import remplacer_regles
-from humatheque.regles.modeles import Fait, RegleDecision, ServiceSorties
-from humatheque.regles.moteur import Choix, choisir, conventions, generer, productible, variable_iteree
+from humatheque.regles.modeles import EtatVerification, Fait, RegleDecision, ServiceSorties
+from humatheque.regles.moteur import Choix, choisir, conventions
+from humatheque.regles.notice import generer
 from humatheque.regles.verificateur import Rapport, verifier, verifier_textes
 
 if TYPE_CHECKING:
@@ -32,26 +33,10 @@ EXEMPLE = Path("reference") / "moteur-regles" / "exemple_contexte.json"
 JOURNAL = "journal_regles.jsonl"
 
 
-class LigneProfilVue(BaseModel):
-    numero: int
-    ligne: str
-    etiquette: str
-    a_valider: bool
-    priorite: int | None
-    remarque: str | None
-    si: str | None
-    joindre: dict[str, list[str]]
-    actif: bool
-    productible: bool
-    repetee_sur: str | None = Field(None, description="variable personne / organisme : une zone par élément")
-
-
 class ProfilVue(BaseModel):
     profil: str
     libelle: str
     fichier: str
-    variables: list[str]
-    lignes: list[LigneProfilVue]
     decisions: list[str] = Field(default_factory=list, description="règles de décision qui mènent à ce profil")
 
 
@@ -72,6 +57,7 @@ class VueRegles(BaseModel):
     decisions: list[dict[str, Any]]
     sinon: dict[str, Any]
     profils: list[ProfilVue]
+    verifications: list[EtatVerification] = Field(default_factory=list)
     variables: list[dict[str, Any]]
     fichiers: list[str]
     journal: list[EntreeJournalRegles] = Field(default_factory=list)
@@ -85,6 +71,37 @@ class Apercu(BaseModel):
     alertes: list[str]
     non_couvertes: list[str]
     variables: dict[str, Any]
+    verifications: list[str] = Field(default_factory=list)
+    zones: list[dict[str, Any]] = Field(default_factory=list, description="zone produite, règle, statut")
+
+
+class BancEssai(BaseModel):
+    """Banc d'essai de bout en bout : décision, données préparées, notice."""
+
+    source: str
+    choix: Choix
+    donnees: list[dict[str, Any]] = Field(default_factory=list, description="variable, source, valeur")
+    apercu: Apercu | None = None
+    profil_essaye: str | None = Field(None, description="profil de l'aperçu (décision ou choix explicite)")
+
+
+class EcartNotice(BaseModel):
+    dossier: str
+    document: str
+    profil: str
+    zones: list[str] = Field(description="étiquettes dont le contenu change")
+    avant: str
+    apres: str
+
+
+class NonRegression(BaseModel):
+    version: str
+    comparees: int
+    ecarts: list[EcartNotice]
+
+    @property
+    def zones_touchees(self) -> list[str]:
+        return sorted({z for e in self.ecarts for z in e.zones})
 
 
 class EnregistrementRegles(BaseModel):
@@ -98,14 +115,8 @@ class AdministrationRegles:
     # -------------------------------------------------------------- consultation
     def vue_regles(self: "Application") -> VueRegles:
         r = self.regles
-        profils = []
-        for nom, p in r.profils.items():
-            lignes = [LigneProfilVue(numero=l.numero, ligne=l.ligne, etiquette=l.etiquette,
-                                     a_valider=l.a_valider, priorite=l.priorite, remarque=l.remarque, si=l.si,
-                                     joindre=l.joindre, actif=l.actif, productible=productible(r, l),
-                                     repetee_sur=variable_iteree(r, l)) for l in p.lignes]
-            profils.append(ProfilVue(profil=nom, libelle=p.libelle, fichier=p.fichier, variables=p.variables,
-                                     lignes=lignes, decisions=[d.nom for d in r.decisions if d.profil == nom]))
+        profils = [ProfilVue(profil=nom, libelle=v.libelle or nom, fichier=v.fichier,
+                             decisions=[d.nom for d in r.decisions if d.profil == nom]) for nom, v in r.variantes.items()]
         exemple = self.exemple_variables()
         variables = [{"nom": n, **v.model_dump(exclude={"nom"}), "exemple": _apercu_valeur(exemple.get(n))}
                      for n, v in r.variables.items()]
@@ -117,7 +128,7 @@ class AdministrationRegles:
                                      "autres": {f: d.admises(f) for f in d.quand if f not in r.faits},
                                      "issue": (actions.get(d.alors) or {}).get("issue")} for d in r.decisions],
                          sinon={**r.sinon, "issue": (actions.get(r.sinon.get("alors")) or {}).get("issue")},
-                         profils=profils, variables=variables, fichiers=list(r.textes), journal=self.journal_regles())
+                         profils=profils, verifications=list(r.verifications.values()), variables=variables, fichiers=list(r.textes), journal=self.journal_regles())
 
     def fichiers_regles(self: "Application") -> dict[str, str]:
         """Textes des fichiers de règles tels que chargés (API GET /api/v1/regles)."""
@@ -171,11 +182,13 @@ class AdministrationRegles:
         `champs` : nom, quand {fait: [valeurs]}, si, alors, profil, motif, a_valider."""
         regles = list(self.regles.decisions)
         if ancien_nom == "sinon":
-            sinon = {"alors": champs.get("alors") or "vérification", "motif": (champs.get("motif") or "").strip()}
+            sinon = {"alors": champs.get("alors") or "vérification", "motif": (champs.get("motif") or "").strip(),
+                     "verification": champs.get("verification") or ""}
             return self._ecrire_decisions(regles, sinon, auteur)
         quand = {f: (v[0] if len(v) == 1 else v) for f, v in (champs.get("quand") or {}).items() if v}
-        nouvelle = RegleDecision(nom=(champs.get("nom") or "").strip(), quand=quand, si=champs.get("si") or None,
+        nouvelle = RegleDecision(nom=(champs.get("nom") or "").strip(), quand=quand,
                                  alors=champs.get("alors") or "", profil=champs.get("profil") or None,
+                                 verification=champs.get("verification") or None,
                                  motif=(champs.get("motif") or "").strip() or None,
                                  a_valider=bool(champs.get("a_valider")))
         if not nouvelle.nom:
@@ -184,6 +197,8 @@ class AdministrationRegles:
             raise ActionImpossible("« sinon » est réservé à la règle par défaut")
         if self.regles.actions_sans_profil(nouvelle.alors):
             nouvelle.profil = None
+        if nouvelle.alors != "vérification":
+            nouvelle.verification = None
         index = next((i for i, r in enumerate(regles) if r.nom == ancien_nom), None) if ancien_nom else None
         if ancien_nom and index is None:
             raise Introuvable(f"règle « {ancien_nom} »")
@@ -212,9 +227,7 @@ class AdministrationRegles:
         return self._ecrire_decisions(regles, dict(self.regles.sinon), auteur)
 
     # -------------------------------------------------------------- aperçu d'un profil
-    def apercu_profil(self: "Application", profil: str, dossier_id: str | None = None) -> Apercu:
-        if profil not in self.regles.profils:
-            raise Introuvable(f"profil {profil}")
+    def _variables_essai(self: "Application", dossier_id: str | None) -> tuple[dict[str, Any], str]:
         if dossier_id:
             d = self._dossier(dossier_id)
             if not d.metadonnees:
@@ -231,10 +244,56 @@ class AdministrationRegles:
             if not variables:
                 raise ActionImpossible(f"exemple de contexte introuvable ({EXEMPLE}) : choisissez un dossier")
             source = "exemple (reference/moteur-regles/exemple_contexte.json)"
+        return variables, source
+
+    def apercu_profil(self: "Application", profil: str, dossier_id: str | None = None) -> Apercu:
+        if profil not in self.regles.variantes:
+            raise Introuvable(f"profil {profil}")
+        variables, source = self._variables_essai(dossier_id)
         n = generer(self.regles, profil, variables)
         return Apercu(profil=profil, source=source, texte=vers_winibw(n), annote=vers_winibw(n, annoter=True),
                       alertes=n.alertes, non_couvertes=[f"{x.zone} [{x.regle}]" for x in n.non_couvertes],
-                      variables=variables)
+                      variables=variables, verifications=n.verifications,
+                      zones=[{"texte": z.texte(), "etiquette": z.etiquette,
+                              "regles": [r.id for r in z.regles], "statut": z.regles[0].statut if z.regles else "",
+                              "repli": any(r.id in n.replis for r in z.regles)} for z in n.zones_triees()])
+
+    def banc_essai(self: "Application", dossier_id: str | None = None, faits: dict[str, Any] | None = None,
+                   profil: str | None = None) -> BancEssai:
+        """Décisions appliquées, données préparées et notice prévisualisée, d'un coup."""
+        choix = self.essayer_decision(self.faits_dossier(dossier_id) if dossier_id else (faits or {}))
+        variables, source = self._variables_essai(dossier_id)
+        donnees = [{"nom": n, "source": v.source, "valeur": variables.get(n), "disponible": v.disponible}
+                   for n, v in self.regles.variables.items()]
+        cible = profil or (choix.profil if choix.suite in ("creer", "convertir") else None)
+        apercu = self.apercu_profil(cible, dossier_id) if cible in self.regles.variantes else None
+        return BancEssai(source=source, choix=choix, donnees=donnees, apercu=apercu, profil_essaye=cible)
+
+    def non_regression(self: "Application", limite: int = 25) -> NonRegression:
+        """Régénère, avec les règles chargées, les notices déjà produites (dossiers terminés) et
+        liste les zones qui changeraient : la configuration modifiée est-elle sans surprise ?"""
+        from humatheque.contexte import ResultatsServices
+
+        ecarts, comparees = [], 0
+        for lot in self.store.lots(50):
+            for ligne, d in self.store.dossiers_du_lot(lot.id):
+                if comparees >= limite:
+                    break
+                profil = d.decision.profil_cible if d.decision else None
+                if not (d.notice_texte and d.metadonnees and profil in self.regles.variantes):
+                    continue
+                res = ResultatsServices(personnes=d.idref_personnes, organisations=d.idref_organisations,
+                                        dewey_code=d.dewey.code if d.dewey else None)
+                variables = variables_profil(construire(d.metadonnees, d.document.type_document, res).valeurs,
+                                             self.regles)
+                apres = vers_winibw(generer(self.regles, profil, variables))
+                comparees += 1
+                if apres != d.notice_texte:
+                    a, b = d.notice_texte.splitlines(), apres.splitlines()
+                    zones = sorted({l[:3] for l in set(a) ^ set(b)})
+                    ecarts.append(EcartNotice(dossier=d.id, document=d.document.id, profil=profil, zones=zones,
+                                              avant=d.notice_texte, apres=apres))
+        return NonRegression(version=self.regles.version, comparees=comparees, ecarts=ecarts)
 
     def exemple_variables(self: "Application") -> dict[str, Any]:
         """Contexte d'exemple (thèse fictive de la référence), vide s'il est introuvable."""

@@ -65,6 +65,15 @@ def _survol_variables(html: Markup, infos: dict[str, dict]) -> Markup:
 
 
 gabarits.env.filters["survol_variables"] = _survol_variables
+
+
+def _apercu_valeur(v) -> str:
+    from humatheque.application.regles_admin import _apercu_valeur as apercu
+
+    return apercu(v)
+
+
+gabarits.env.filters["apercu_valeur"] = _apercu_valeur
 def _libelle_routage(routage: str | None) -> str:
     from humatheque.issues import normaliser
 

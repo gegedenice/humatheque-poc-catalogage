@@ -1,0 +1,20 @@
+variante: these-originale-imprimee
+libelle: Thèse originale imprimée
+ajouter:
+- id: 029
+  zone: 029
+  libelle: Numéro national de thèse
+  indicateurs: '##'
+  sous_zones:
+  - code: a
+    libelle: Pays
+    constante: FR
+  - code: b
+    libelle: Numéro
+    parties:
+    - variable: annee
+    - variable: code_etab
+    - variable: numero_nnt
+  priorite: 1
+  à_valider: true
+  remarque: source des numéros incrémentaux non définie

@@ -11,8 +11,6 @@ etat_sudoc_non_verifie: non vérifié
 
 # Motifs d'arrêt du workflow (SPEC §3.1, §6).
 motifs:
-  provenance: provenance à confirmer
-  sudoc_indetermine: nature de la notice Sudoc non qualifiable
   document_invalide: document invalide
   titre_absent: titre non extrait
   seuil_sudoc: duplicate_threshold de sudoc-checker absent de config/services.yaml

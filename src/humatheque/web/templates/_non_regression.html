@@ -1,0 +1,19 @@
+{# Non-régression : notices déjà produites régénérées avec la configuration actuelle. #}
+<div class="flex flex-col gap-3" aria-live="polite">
+  {% if not nr.comparees %}
+  <p class="text-sm text-sourdine">Aucune notice produite à comparer (dossiers terminés avec notice).</p>
+  {% elif not nr.ecarts %}
+  <p class="avis bg-auto-clair text-auto-fonce">✓ Aucun changement sur les {{ nr.comparees }} notice(s) comparée(s).</p>
+  {% else %}
+  <p class="avis bg-decision-clair text-decision-fonce">Cette configuration change {{ "la zone" if nr.zones_touchees | length == 1 else "les zones" }} <strong>{{ nr.zones_touchees | join(", ") }}</strong> sur <strong>{{ nr.ecarts | length }}</strong> des {{ nr.comparees }} notices comparées.</p>
+  <ul class="flex flex-col gap-2">
+    {% for e in nr.ecarts %}
+    <li class="bg-white rounded-xl p-3"><details><summary class="cursor-pointer text-sm"><a href="/dossiers/{{ e.dossier }}">{{ e.document }}</a> · <span class="font-mono text-xs">{{ e.profil }}</span> · zones {{ e.zones | join(", ") }}</summary>
+      <div class="grid gap-3 md:grid-cols-2 mt-2">
+        <div><p class="etiquette">Avant (notice produite)</p><pre class="code">{{ e.avant }}</pre></div>
+        <div><p class="etiquette">Après (configuration actuelle)</p><pre class="code">{{ e.apres }}</pre></div>
+      </div></details></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

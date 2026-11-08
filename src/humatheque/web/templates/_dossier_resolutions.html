@@ -8,10 +8,40 @@
 {# Faux positif proposé seulement quand le document est à reprendre : une notice
    au-dessus du seuil arrête le workflow sans alerte (terminé, décision du 05/11). #}
 {% set a_decider = d.routage not in (none, "terminé") and not d.cloture %}
-{% set faux_alma = a_decider and d.routage == "à reprendre" and d.alma and d.etat_alma not in (none, "absent") %}
-{% set faux_sudoc = a_decider and d.routage == "à reprendre" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
+{% set etat = vue.verification %}
+{% set faux_alma = a_decider and not etat and d.routage == "à reprendre" and d.alma and d.etat_alma not in (none, "absent") %}
+{% set faux_sudoc = a_decider and not etat and d.routage == "à reprendre" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
 {% if ouvertes or a_decider %}
 <div class="flex flex-col gap-3">
+  {% if etat %}
+  {# État de vérification configuré (regles/verifications.yaml) : question, éléments à examiner, choix. #}
+  <form method="post" action="/dossiers/{{ d.id }}/verification" class="sous-carte flex flex-col gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="puce bg-decision-clair text-decision-fonce">En attente de vérification</span>
+      <p class="font-semibold">{{ etat.libelle }}</p>
+    </div>
+    {% if etat.question %}<p class="text-sm">{{ etat.question }}</p>{% endif %}
+    {% if etat.montrer == "alma" and d.alma and d.alma.candidats %}
+    <ul class="text-[13px] bg-white rounded-xl p-3 flex flex-col gap-1">
+      {% for c in d.alma.candidats[:5] %}<li><span class="font-mono">{% if c.lien_sudoc %}<a href="{{ c.lien_sudoc }}" target="_blank" rel="noopener">{{ c.ppn or c.mms_id }}</a>{% else %}{{ c.ppn or c.mms_id }}{% endif %}</span>
+        {{ c.titre or "" }}{% if c.annee %} ({{ c.annee }}){% endif %} <span class="text-sourdine">score {{ c.score }}{% if c.type %} · {{ c.type }}{% endif %}</span></li>{% endfor %}
+    </ul>
+    {% elif etat.montrer == "sudoc" and d.sudoc and d.sudoc.candidats %}
+    <ul class="text-[13px] bg-white rounded-xl p-3 flex flex-col gap-1">
+      {% for c in d.sudoc.candidats if c.retenu %}<li><span class="font-mono">{% if c.lien %}<a href="{{ c.lien }}" target="_blank" rel="noopener">{{ c.ppn }}</a>{% else %}{{ c.ppn }}{% endif %}</span>
+        {{ c.titre or "" }}{% if c.annee %} ({{ c.annee }}){% endif %} <span class="text-sourdine">score {{ c.score }} · <span class="font-mono">{{ c.thesis_state }}</span></span></li>{% endfor %}
+    </ul>
+    {% endif %}
+    <div class="flex flex-col gap-1.5" role="radiogroup" aria-label="{{ etat.libelle }}">
+      {% for c in etat.choix %}
+      <label class="flex items-baseline gap-2.5 text-sm cursor-pointer"><input class="accent-primaire" type="radio" name="choix" value="{{ loop.index0 }}" required>
+        <span><span class="font-medium">{{ c.libelle }}</span>{% if c.description %} <span class="text-sourdine text-xs">— {{ c.description }}</span>{% endif %}</span></label>
+      {% endfor %}
+    </div>
+    <input class="champ champ-sm" name="commentaire" placeholder="commentaire (facultatif)">
+    <div class="flex items-center gap-2 justify-end">{{ champ_auteur() }}<button class="btn-principal btn-sm">Valider et reprendre</button></div>
+  </form>
+  {% endif %}
   {% set ns_idref = namespace(n=0) %}
   {% for e in d.exceptions %}{% if not e.resolue %}{% set i = loop.index0 %}
     <div class="sous-carte">

@@ -47,15 +47,15 @@ def test_accueil_etat_de_la_spec(app):
 
 def test_recharger_spec(app):
     avant = app.etat_spec()
-    profil = app.reglages.dossier_regles / "profils" / "these-originale-imprimee.yaml"
-    profil.write_text(profil.read_text(encoding="utf-8").replace("101 0#$a{langue}", "101 0#$a{langue_x}"),
+    profil = app.reglages.dossier_regles / "notice" / "socle.yaml"
+    profil.write_text(profil.read_text(encoding="utf-8").replace("variable: langue\n", "variable: langue_x\n", 1),
                       encoding="utf-8")
     apres = app.recharger_spec()
     assert apres.version.split()[1] != avant.version.split()[1]  # empreinte changée
     (erreur,) = [c for c in apres.constats if c.gravite == "erreur"]
     assert apres.nb_erreurs == 1 and "101" in erreur.ligne and "langue_x" in erreur.message
     # fichier illisible : rechargement refusé, règles en place conservées
-    profil.write_text("profil: [\n", encoding="utf-8")
+    profil.write_text("zones: [\n", encoding="utf-8")
     with pytest.raises(ActionImpossible, match="illisibles"):
         app.recharger_spec()
     assert app.etat_spec().version == apres.version
@@ -214,7 +214,8 @@ def test_provenance_puis_relance(app, image):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
-    assert app.vue_dossier(ligne.id).dossier.etape_arret == "provenance"
+    d = app.vue_dossier(ligne.id).dossier  # provenance incertaine : état de vérification « provenance »
+    assert (d.etape_arret, d.decision.verification) == ("situation", "provenance")
     with pytest.raises(ActionImpossible):
         app.choisir_provenance(ligne.id, "peut-être", auteur="cat")
     v = app.choisir_provenance(ligne.id, "hors EPHE", auteur="cat")

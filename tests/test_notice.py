@@ -68,7 +68,7 @@ def test_notice_generee_sans_marqueur(notice, regles):
 def test_zone_prioritaire_absente(notice, regles):
     texte = "\n".join(l for l in notice.splitlines() if not l.startswith("101 "))
     (m,) = valider(texte, regles, ORIG)
-    assert m.gravite == "erreur" and "zone 101 absente" in m.message and "ligne 4" in m.message
+    assert m.gravite == "erreur" and "zone 101 absente" in m.message and "101 (socle)" in m.message
 
 
 def test_zone_et_sous_zone_inconnues_avertissement(notice, regles):
