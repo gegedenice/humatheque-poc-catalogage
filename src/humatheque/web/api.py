@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from humatheque.application import Application
@@ -52,9 +52,11 @@ def rapport(request: Request, lot_id: str) -> str:
     return _app(request).export_csv(lot_id)
 
 
-@routeur.get("/lots/{lot_id}/notices.txt", response_class=PlainTextResponse)
-def notices(request: Request, lot_id: str) -> str:
-    return _app(request).export_notices(lot_id)
+@routeur.get("/lots/{lot_id}/notices.{format_}")
+def notices(request: Request, lot_id: str, format_: Literal["mrc", "xml"]) -> Response:
+    """Notices produites du lot : ISO 2709 (`mrc`) ou UNIMARC/XML (`xml`)."""
+    return Response(_app(request).export_notices(lot_id, format_),
+                    media_type="application/marc" if format_ == "mrc" else "application/xml")
 
 
 @routeur.get("/dossiers/{dossier_id}", response_model=VueDossier)

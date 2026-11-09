@@ -90,5 +90,14 @@ def vers_record(texte: str) -> Record:
     return rec
 
 
+def record_vers_xml(rec: Record, namespace: bool = True) -> str:
+    """Notice → UNIMARC/XML en UTF-8 (caractères accentués lisibles, pas d'entités)."""
+    import xml.etree.ElementTree as ET
+
+    from pymarc.marcxml import record_to_xml_node
+
+    return ET.tostring(record_to_xml_node(rec, namespace=namespace), encoding="unicode")
+
+
 def vers_marcxml(texte: str) -> str:
-    return record_to_xml(vers_record(texte), namespace=True).decode("utf-8")
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + record_vers_xml(vers_record(texte))

@@ -129,11 +129,11 @@ def test_mode1_vue_dossier_et_telechargements(app, image):
     assert v.etapes[0].libelle == "Extraction VLM" and v.etapes[0].statut == "ok"
     champ = next(c for c in v.champs if c.champ == "title")
     assert champ.brut == EXTRACTION["title"] and champ.normalise.startswith("Contribution à")
-    assert set(v.telechargements.values()) == {"notice.txt", "notice.xml"}
+    assert v.telechargements == {"Notice (ISO 2709)": "notice.mrc", "Notice (UNIMARC/XML)": "notice.xml"}
     nom, contenu, mime = app.telecharger(ligne.id, "notice.xml")
     assert nom.endswith(".xml") and b"<record" in contenu and mime == "application/xml"
     with pytest.raises(Introuvable):
-        app.telecharger(ligne.id, "source.iso")
+        app.telecharger(ligne.id, "source.mrc")
     assert v.images[0].url == ""  # image hors de data/uploads : non servie
 
 
@@ -144,10 +144,12 @@ def test_conversion_telechargements_iso(app, image):  # ALM-SUD-F-002
     (ligne,) = app.store.lignes_du_lot(lot.id)
     v = app.vue_dossier(ligne.id)
     assert v.dossier.routage == "terminé"  # candidat Sudoc retenu : conversion sans alerte (05/11)
-    assert {"source.iso", "convertie.iso", "convertie.txt"} <= set(v.telechargements.values())
-    _, iso, _ = app.telecharger(ligne.id, "source.iso")
+    assert set(v.telechargements.values()) == {"notice.mrc", "notice.xml", "source.mrc", "source.xml"}
+    _, iso, _ = app.telecharger(ligne.id, "source.mrc")
     assert iso.endswith(b"\x1d")
-    assert "029 ##$aFR$b2017EHES0033" in app.export_notices(lot.id)
+    _, xml, _ = app.telecharger(ligne.id, "source.xml")
+    assert b'tag="029"' in xml and b"2017EHES0033" in xml
+    assert "2017EHES0033" in app.export_notices(lot.id).decode()
 
 
 @respx.mock
@@ -247,7 +249,8 @@ def test_exports_et_historique(app, image):
     assert [l["document"] for l in lignes] == ["TH/TH-01", "TH/TH-02"]
     assert lignes[0]["issue"] == "terminé" and lignes[0]["regle_de_decision"] == "Création de la notice › type = these ET ephe = oui" and lignes[0]["version_spec"]
     notices = app.export_notices(lot.id)
-    assert notices.count("008 $aAax3") == 2
+    assert notices.count(b"\x1d") == 2  # deux notices ISO 2709 à la suite
+    assert app.export_notices(lot.id, "xml").count(b"<record") == 2
     h = app.historique()
     assert h.ingestions[0].lot_id == lot.id and h.ingestions[0].documents == ["TH/TH-01", "TH/TH-02"]
     assert h.lots[0].lot.id == lot.id
@@ -300,9 +303,9 @@ def test_notice_versions_validation_et_regeneration(app, image):
     app.enregistrer_notice(ligne.id, corrigee, "cat", base=2)
     n4 = app.valider_notice(ligne.id, "cat")
     assert (n4.version, n4.statut) == (4, "validée")
-    _, contenu, _ = app.telecharger(ligne.id, "notice.txt")
-    assert contenu.decode().endswith("610 ##$aDémocratie")  # export = version validée
-    assert "610 ##$aDémocratie" in app.export_notices(lot.id)
+    _, contenu, _ = app.telecharger(ligne.id, "notice.xml")
+    assert "Démocratie" in contenu.decode()  # export = version validée
+    assert "Démocratie" in app.export_notices(lot.id).decode()
 
     # résolution IdRef → régénération proposée, l'édition n'est pas écrasée
     i = next(i for i, e in enumerate(app.vue_dossier(ligne.id).dossier.exceptions) if e.objet.startswith("author"))
@@ -331,3 +334,12 @@ def test_identifiant_document_par_url():
     assert ident(["https://minio.smartbiblia.fr/images/memoires/CESOR/doc_01/page_de_titre.jpg?x=1"]) == \
         "images/memoires/CESOR/doc_01/page_de_titre.jpg"
     assert ident(["/data/uploads/ab/001_p.png"]) == "001_p.png"
+
+
+@pytest.mark.parametrize("identifiant, nom", [
+    ("p0.png", "p0"), ("TH/Thèse-01/page_de_titre.JPG", "TH_These-01_page_de_titre"),
+    ("https-chemin/a b.tiff", "https-chemin_a_b"), ("///", "notice"),
+])
+def test_nom_de_fichier_sans_extension_d_image(identifiant, nom):
+    from humatheque.application import nom_de_fichier
+    assert nom_de_fichier(identifiant) == nom

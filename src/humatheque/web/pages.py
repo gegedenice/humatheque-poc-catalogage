@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 
-from humatheque.application import ActionImpossible, Application, documents_depuis_liste
+from humatheque.application import ActionImpossible, Application, Introuvable, documents_depuis_liste
 from humatheque.application.vues import EntreeLot
 from humatheque.web import gabarits
 
@@ -123,10 +123,13 @@ def rapport(request: Request, lot_id: str):
                     headers={"Content-Disposition": f'attachment; filename="rapport-{lot_id}.csv"'})
 
 
-@routeur.get("/lots/{lot_id}/notices.txt")
-def notices(request: Request, lot_id: str):
-    return Response(_app(request).export_notices(lot_id), media_type="text/plain; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="notices-{lot_id}.txt"'})
+@routeur.get("/lots/{lot_id}/notices.{format_}")
+def notices(request: Request, lot_id: str, format_: str):
+    if format_ not in ("mrc", "xml"):
+        raise Introuvable(f"format {format_}")
+    mime = "application/marc" if format_ == "mrc" else "application/xml"
+    return Response(_app(request).export_notices(lot_id, format_), media_type=mime,
+                    headers={"Content-Disposition": f'attachment; filename="notices-{lot_id}.{format_}"'})
 
 
 # ---------------------------------------------------------------- dossier (mode 1)
