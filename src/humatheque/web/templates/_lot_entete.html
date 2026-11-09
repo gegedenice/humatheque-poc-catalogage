@@ -17,8 +17,14 @@
   <span class="flex-1"></span>
   <a class="btn btn-sm" href="/lots/{{ vue.lot.id }}/rapport.csv" hx-boost="false">
     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>Rapport CSV</a>
-  <a class="btn-principal btn-sm" href="/lots/{{ vue.lot.id }}/notices.txt" hx-boost="false">
-    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>Notices produites</a>
+  <details class="relative">
+    <summary class="btn-principal btn-sm list-none [&::-webkit-details-marker]:hidden">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>Notices produites ▾</summary>
+    <ul class="absolute right-0 z-20 mt-2 min-w-[14rem] rounded-2xl bg-carte shadow-lg border border-filet py-2">
+      <li><a class="block px-4 py-2 text-sm text-encre no-underline hover:bg-tonal" hx-boost="false" href="/lots/{{ vue.lot.id }}/notices.mrc">ISO 2709</a></li>
+      <li><a class="block px-4 py-2 text-sm text-encre no-underline hover:bg-tonal" hx-boost="false" href="/lots/{{ vue.lot.id }}/notices.xml">UNIMARC/XML</a></li>
+    </ul>
+  </details>
 </div>
 {% set incidents = ind.par_routage.get("incident", 0) %}
 <div id="kpis-lot" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] mb-6" {% if oob %}hx-swap-oob="true"{% endif %}>

@@ -134,7 +134,7 @@ src/humatheque/
   qualification/     agrégation des thesis_state
   decision/          provenance, valeurs lues par le pipeline (pipeline.yaml), décision
   conversion/        notice Sudoc existante (copie en v1, ISO 2709)
-  generateur/        notice d'un dossier (socle + variante), WinIBW et MARCXML
+  generateur/        notice d'un dossier (socle + variante) ; exports ISO 2709 et UNIMARC/XML
   workflow/          orchestrateur : un document → un dossier, reprises
   ingestion/         stockage S3, constitution des documents
   notice/            notice éditable : analyse, validation, versions

@@ -377,9 +377,11 @@ sont donc journalisés avec la requête. Les paramètres internes aux services
 propre environnement.
 8. **Générateur** (§8), puis rapport.
 
-Le dossier mémorise les résultats de chaque étape. **Relancer un dossier**
-repart de la première étape en échec ou non faite ; les étapes réussies ne sont
-pas rappelées, sauf demande explicite (ING-F-007).
+Le dossier mémorise les résultats de chaque étape. Après une reprise, le
+traitement repart de l'étape concernée sans rappeler les étapes réussies
+(ING-F-007). Le bouton **« Relancer »** du dossier (décision du 09/11 : un
+seul bouton) relance **tout le pipeline**, extraction comprise ; les choix de
+reprise déjà faits (provenance, faux positif, PPN) sont conservés.
 
 **Vérification Alma avant Sudoc** (ALM-SUD-F-001) : l'ordre des étapes 3 et 4
 est imposé ; la route appelée dépend du type de document (ING-T-005).
@@ -610,8 +612,12 @@ reprendre) : `printed_reproduction` hors EPHE, `printed_original` à l'EPHE
 
 ### 8.5 Sorties
 
-**Sorties** : texte au format WinIBW, une zone par ligne, triée par étiquette
-(format de référence) ; MARCXML via `pymarc`. Les deux sont téléchargeables.
+**Sorties** : la notice est affichée et éditée au format WinIBW (une zone par
+ligne, triée par étiquette) ; elle se télécharge en **ISO 2709** (`.mrc`) et
+en **UNIMARC/XML** (`.xml`, UTF-8), via `pymarc` (décision du 09/11 : plus
+d'export texte WinIBW). Pour une conversion, la notice source Sudoc se
+télécharge aussi dans les deux formats. Le nom du fichier reprend
+l'identifiant du document, en ASCII et sans l'extension de l'image.
 L'export porte sur la **dernière version validée** de la notice (§9.2), à
 défaut sur la version générée.
 
@@ -717,7 +723,10 @@ défaut sur la version générée.
   - les filtres À reprendre / Incidents ;
   - la file d'exceptions (document, étape, motif, bouton Reprendre) ;
   - le journal ;
-  - l'export : CSV du rapport et fichier texte de toutes les notices produites.
+  - l'export : CSV du rapport, et toutes les notices produites en ISO 2709 ou
+    en UNIMARC/XML (collection) ;
+  - un seul bouton **« Voir »** par document, qui ouvre le dossier (décision
+    du 09/11) ; l'aperçu en lecture seule reste accessible depuis le dossier.
 - **`/dossiers/{id}` Dossier** (mode 1, et cible de « Reprendre »). Mise en
   page en vis-à-vis :
   - **panneau gauche** : les images du document, avec défilement d'une image à
@@ -725,7 +734,7 @@ défaut sur la version générée.
   - **panneau droit, haut** : les métadonnées extraites ;
   - **panneau droit, bas** : les informations du traitement (date, modèle,
     statut), le motif de l'arrêt s'il y a lieu (ALM-SUD-F-005), les sorties
-    détaillées de chaque brique, et le bouton « Relancer l'extraction » ;
+    détaillées de chaque brique, et le bouton « Relancer » (tout le pipeline) ;
   - pour le résultat final, la notice UNIMARC en vis-à-vis des images, dans
     l'éditeur (§9.2) ;
   - pour une conversion : images à gauche, notice Sudoc avant transformation en

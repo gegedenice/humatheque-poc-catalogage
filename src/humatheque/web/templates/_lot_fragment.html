@@ -54,8 +54,7 @@
           <td><span class="flex flex-col items-start gap-1">{{ badge("terminé") }}<span class="text-sourdine">{{ l.motif or "" }}</span>
             {% if l.repris %}<span class="text-xs text-sourdine">repris par un catalogueur</span>{% endif %}</span></td>
           <td class="whitespace-nowrap text-right">
-            <a class="btn-tonal btn-sm" href="/dossiers/{{ l.dossier_id }}/apercu">Voir</a>
-            <a class="btn-discret btn-sm" href="/dossiers/{{ l.dossier_id }}">Dossier</a></td>
+            <a class="btn-tonal btn-sm" href="/dossiers/{{ l.dossier_id }}">Voir</a></td>
         </tr>
       {% endfor %}
       </tbody>

@@ -24,6 +24,7 @@ from humatheque.application.vues import (
     LigneException, LigneJournal, Reglable, ResumeLot, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
 )
 from humatheque import issues
+from humatheque.conversion import depuis_iso, vers_iso
 from humatheque.config import charger_yaml
 from humatheque import ingestion
 from humatheque.config import Reglages, reglages as reglages_par_defaut
@@ -92,6 +93,16 @@ def documents_depuis_liste(texte: str) -> list[list[str]]:
 from humatheque.application.administration import Administration  # noqa: E402
 from humatheque.application.regles_admin import AdministrationRegles, ReglesRefusees  # noqa: E402,F401
 from humatheque.application.studio import Studio  # noqa: E402
+
+
+def nom_de_fichier(identifiant: str) -> str:
+    """Identifiant du document → nom de fichier ASCII, sans l'extension de l'image
+    (« TH/Thèse-01/page.png » → « TH_These-01_page »)."""
+    import unicodedata
+
+    racine = re.sub(r"\.(png|jpe?g|tiff?|webp|gif|bmp|pdf)$", "", identifiant, flags=re.I)
+    ascii_ = unicodedata.normalize("NFKD", racine).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^A-Za-z0-9-]+", "_", ascii_).strip("_") or "notice"
 
 
 def parcours(d) -> list[dict]:
@@ -401,11 +412,11 @@ class Application(Administration, AdministrationRegles, Studio):
         champs = [ChampVue(champ=c, brut=brut.get(c), normalise=ctx.get(c, (d.metadonnees or {}).get(c)))
                   for c in (d.metadonnees or {})]
         tel = {}
-        if d.notice_texte or self.store.versions(d.id):
-            tel.update({"Notice (WinIBW)": "notice.txt", "Notice (MARCXML)": "notice.xml"})
+        if self._texte_a_exporter(d):
+            tel.update({"Notice (ISO 2709)": "notice.mrc", "Notice (UNIMARC/XML)": "notice.xml"})
         if d.notice_source_iso:
-            tel.update({"Notice source (ISO 2709)": "source.iso", "Notice convertie (ISO 2709)": "convertie.iso",
-                        "Notice convertie (WinIBW)": "convertie.txt"})
+            tel.update({"Notice source Sudoc (ISO 2709)": "source.mrc",
+                        "Notice source Sudoc (UNIMARC/XML)": "source.xml"})
         titre = (d.contexte.valeurs.get("title") if d.contexte else None) or (d.metadonnees or {}).get("title")
         return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=titre,
                           etapes=etapes, images=images, champs=champs,
@@ -455,20 +466,20 @@ class Application(Administration, AdministrationRegles, Studio):
         return chemin
 
     def telecharger(self, dossier_id: str, fichier: str) -> tuple[str, bytes, str]:
-        """(nom, contenu, type MIME) d'un fichier du dossier."""
+        """(nom, contenu, type MIME) d'un fichier du dossier : notice produite (dernière version
+        validée, à défaut générée ou convertie) ou notice source Sudoc, en ISO 2709 ou UNIMARC/XML."""
         d = self._dossier(dossier_id)
-        base = re.sub(r"\W", "_", d.document.id)
+        base = nom_de_fichier(d.document.id)
         texte = self._texte_a_exporter(d)
-        if fichier == "notice.txt" and texte:
-            return f"{base}.txt", texte.encode("utf-8"), "text/plain; charset=utf-8"
+        if fichier == "notice.mrc" and texte:
+            return f"{base}.mrc", vers_iso(notice_analyse.vers_record(texte)).encode("utf-8"), "application/marc"
         if fichier == "notice.xml" and texte:
             return f"{base}.xml", notice_analyse.vers_marcxml(texte).encode("utf-8"), "application/xml"
-        if fichier == "source.iso" and d.notice_source_iso:
-            return f"{base}-source-{d.ppn_source}.iso", d.notice_source_iso.encode("utf-8"), "application/marc"
-        if fichier == "convertie.iso" and d.notice_convertie:
-            return f"{base}-convertie.iso", d.notice_convertie.iso.encode("utf-8"), "application/marc"
-        if fichier == "convertie.txt" and d.notice_convertie:
-            return f"{base}-convertie.txt", d.notice_convertie.texte.encode("utf-8"), "text/plain; charset=utf-8"
+        if fichier == "source.mrc" and d.notice_source_iso:
+            return f"{base}-source-{d.ppn_source}.mrc", d.notice_source_iso.encode("utf-8"), "application/marc"
+        if fichier == "source.xml" and d.notice_source_iso:
+            xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + notice_analyse.record_vers_xml(depuis_iso(d.notice_source_iso))
+            return f"{base}-source-{d.ppn_source}.xml", xml.encode("utf-8"), "application/xml"
         raise Introuvable(f"{fichier} pour le dossier {dossier_id}")
 
     # ============================================================ actions
@@ -543,16 +554,18 @@ class Application(Administration, AdministrationRegles, Studio):
             return v.texte
         return d.notice_texte or (d.notice_convertie.texte if d.notice_convertie else None)
 
-    def export_notices(self, lot_id: str) -> str:
-        """Toutes les notices produites (validées, sinon générées ou converties), séparées par une ligne vide."""
+    def export_notices(self, lot_id: str, format_: str = "mrc") -> bytes:
+        """Toutes les notices produites du lot (validées, sinon générées ou converties) :
+        `mrc` (ISO 2709, notices à la suite) ou `xml` (collection UNIMARC/XML)."""
         if self.store.lot(lot_id) is None:
             raise Introuvable(f"lot {lot_id}")
-        blocs = []
-        for _, d in self.store.dossiers_du_lot(lot_id):
-            texte = self._texte_a_exporter(d)
-            if texte:
-                blocs.append(texte)
-        return "\n\n".join(blocs) + ("\n" if blocs else "")
+        notices = [notice_analyse.vers_record(t) for _, d in self.store.dossiers_du_lot(lot_id)
+                   if (t := self._texte_a_exporter(d))]
+        if format_ == "xml":
+            corps = "".join(notice_analyse.record_vers_xml(n, namespace=False) for n in notices)
+            return ('<?xml version="1.0" encoding="UTF-8"?>\n<collection xmlns="http://www.loc.gov/MARC21/slim">'
+                    + corps + "</collection>\n").encode("utf-8")
+        return "".join(vers_iso(n) for n in notices).encode("utf-8")
 
     # ============================================================ notice éditable (SPEC §9.2)
     def _profil(self, d: Dossier) -> str | None:

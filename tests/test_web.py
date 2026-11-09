@@ -71,9 +71,13 @@ def test_mode1_televersement_redirige_vers_le_dossier(client):
     assert "hx-trigger=\"every 3s\"" not in page.text  # traitement terminé : pas de rafraîchissement
     # téléchargements
     dossier = r.headers["location"]
-    t = client.get(f"{dossier}/telecharger/notice.txt")
-    assert t.status_code == 200 and "attachment" in t.headers["content-disposition"]
-    assert client.get(f"{dossier}/telecharger/source.iso").status_code == 404
+    t = client.get(f"{dossier}/telecharger/notice.mrc")
+    assert t.status_code == 200 and t.headers["content-disposition"] == 'attachment; filename="001_p0.mrc"'
+    assert t.content.endswith(b"\x1d")  # ISO 2709 (et plus de .png dans le nom)
+    x = client.get(f"{dossier}/telecharger/notice.xml")
+    assert x.headers["content-disposition"].endswith('.xml"') and b"<record" in x.content
+    assert client.get(f"{dossier}/telecharger/source.mrc").status_code == 404
+    assert client.get(f"{dossier}/telecharger/notice.txt").status_code == 404  # plus de WinIBW
 
 
 @respx.mock
@@ -90,7 +94,10 @@ def test_mode2_lot_file_filtres_et_exports(client):
     assert 'id="lot-dyn"' in frag.text and 'hx-swap-oob="true"' in frag.text
     assert "Aucun document dans cette catégorie" in frag.text
     assert client.get(f"{lot}/rapport.csv").text.startswith("document,dossier,issue,regle_de_decision")
-    assert client.get(f"{lot}/notices.txt").status_code == 200
+    m = client.get(f"{lot}/notices.mrc")
+    assert m.status_code == 200 and m.headers["content-type"] == "application/marc"
+    assert b"<collection" in client.get(f"{lot}/notices.xml").content
+    assert client.get(f"{lot}/notices.txt").status_code == 404
 
 
 @respx.mock
@@ -184,7 +191,7 @@ def test_apercu_documents_passes_seuls(client, app):
     simuler()
     lot = _televerser(client, n=2).headers["location"]
     page = html.unescape(client.get(lot).text)
-    assert "Documents terminés" in page and page.count('/apercu">Voir</a>') == 2
+    assert "Documents terminés" in page and page.count('">Voir</a>') == 2 and "/apercu\">Voir" not in page
     lot_id = lot.rsplit("/", 1)[1]
     dossier_id = app.vue_lot(lot_id).passes[0].dossier_id
     apercu = client.get(f"/dossiers/{dossier_id}/apercu")
