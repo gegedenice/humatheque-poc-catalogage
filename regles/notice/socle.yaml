@@ -1,3 +1,11 @@
+# Socle de la notice : zones communes à toutes les variantes (studio, onglet
+# « Notice UNIMARC »). Fichier écrit par le studio ; chaque zone a un
+# identifiant, une étiquette, des indicateurs et des sous-zones configurables :
+#   constante | variable (attribut) | parties (composition) | autorite (rendu)
+#   prefixe, suffixe ; liste : repeter | joindre (separateur, dernier)
+#   si_absente : omettre | repli (valeur) | verification (humaine)
+# rendus : mode de rendu d'une autorité selon son type (personne, organisme).
+
 rendus:
   personne: ppn_sinon_nom_prenom
   organisme: ppn_sinon_forme
@@ -141,7 +149,6 @@ zones:
     variable: directeur
     prefixe: 'sous la direction de '
     liste: joindre
-    separateur: ', '
     dernier: ' et '
   priorite: 1
   à_valider: true
@@ -225,8 +232,8 @@ zones:
   indicateurs: '#1'
   sous_zones:
   - code: '3'
-    autorite: auteur
     libelle: Auteur
+    autorite: auteur
   - code: '4'
     constante: '070'
   priorite: 1
@@ -236,8 +243,8 @@ zones:
   indicateurs: '#1'
   sous_zones:
   - code: '3'
-    autorite: directeur
     libelle: Directeur
+    autorite: directeur
   - code: '4'
     constante: '727'
   priorite: 2
@@ -247,14 +254,13 @@ zones:
   indicateurs: '#1'
   sous_zones:
   - code: '3'
-    autorite: president
     libelle: Président
+    autorite: president
   - code: '4'
     constante: '956'
   - code: '4'
     constante: '555'
   priorite: 2
-  à_valider: true
   remarque: double code à confirmer
 - id: 701-rapporteur
   zone: '701'
@@ -262,8 +268,8 @@ zones:
   indicateurs: '#1'
   sous_zones:
   - code: '3'
-    autorite: rapporteur
     libelle: Rapporteur
+    autorite: rapporteur
   - code: '4'
     constante: '958'
   - code: '4'
@@ -277,8 +283,8 @@ zones:
   indicateurs: '#1'
   sous_zones:
   - code: '3'
-    autorite: membre_jury
     libelle: Membre du jury
+    autorite: membre_jury
   - code: '4'
     constante: '555'
   priorite: 2
@@ -288,8 +294,8 @@ zones:
   indicateurs: '02'
   sous_zones:
   - code: '3'
-    autorite: etablissement
     libelle: Établissement
+    autorite: etablissement
   - code: '4'
     constante: '295'
   priorite: 1
@@ -299,8 +305,8 @@ zones:
   indicateurs: '02'
   sous_zones:
   - code: '3'
-    autorite: cotutelle
     libelle: Cotutelle
+    autorite: cotutelle
   - code: '4'
     constante: '995'
   priorite: 2
@@ -310,8 +316,8 @@ zones:
   indicateurs: '02'
   sous_zones:
   - code: '3'
-    autorite: ecole_doctorale
     libelle: École doctorale
+    autorite: ecole_doctorale
   - code: '4'
     constante: '996'
   priorite: 2
@@ -321,12 +327,12 @@ zones:
   indicateurs: 1#
   sous_zones:
   - code: d
+    libelle: Titre parallèle
     variable: titre_parallele
     prefixe: '= '
-    libelle: Titre parallèle
   - code: z
-    variable: langue_titre_parallele
     libelle: Langue du titre parallèle
+    variable: langue_titre_parallele
   priorite: 1
   à_valider: true
   actif: false
@@ -364,8 +370,8 @@ zones:
   indicateurs: '##'
   sous_zones:
   - code: a
-    variable: resume
     libelle: Résumé
+    variable: resume
   priorite: 2
   à_valider: true
   actif: false
@@ -375,11 +381,11 @@ zones:
   indicateurs: '##'
   sous_zones:
   - code: a
-    variable: titre_parallele
     libelle: Titre parallèle
+    variable: titre_parallele
   - code: z
-    variable: langue_titre_parallele
     libelle: Langue du titre parallèle
+    variable: langue_titre_parallele
   priorite: 1
   à_valider: true
   actif: false
@@ -394,7 +400,6 @@ zones:
 - id: '600'
   zone: '600'
   libelle: 'Sujet : nom de personne'
-  sous_zones: []
   priorite: 1
   à_valider: true
   actif: false
@@ -413,8 +418,8 @@ zones:
   indicateurs: '02'
   sous_zones:
   - code: '3'
-    autorite: partenaire
     libelle: Partenaire
+    autorite: partenaire
   - code: '4'
     constante: '985'
   priorite: 2

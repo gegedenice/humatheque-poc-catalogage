@@ -17,117 +17,186 @@
 # Une panne technique (service injoignable, réponse illisible) donne
 # « incident », sans règle.
 
-# Variables lues à toutes les étapes.
 communes:
-  type: [these, memoire]          # dossier S3 (TH / MM) ou choix à l'envoi
-  ephe: [oui, non, absent, ambigu]  # d'après extraction.granting_institution
-
+  type:
+  - these
+  - memoire
+  ephe:
+  - oui
+  - non
+  - absent
+  - ambigu
 etapes:
   provenance:
     libelle: Provenance
     source: établissement de soutenance (extraction.granting_institution) comparé aux formes de l'EPHE
     branches:
-      - si: {ephe: [absent, ambigu]}
-        resultat: stop à reprendre
-        motif: établissement de soutenance absent ou ambigu
-    sinon: {resultat: poursuite}
-
+    - si:
+        type: these
+        ephe:
+        - absent
+        - ambigu
+      resultat: stop à reprendre
+      motif: établissement de soutenance absent ou ambigu
+    sinon:
+      resultat: poursuite
   alma:
     libelle: Alma
     source: alma-checker, champ status
     variables:
-      status: [academic_record_found, ambiguous_academic_candidate, off_profile_match_only, no_academic_record_found]
+      status:
+      - academic_record_found
+      - ambiguous_academic_candidate
+      - off_profile_match_only
+      - no_academic_record_found
     branches:
-      - si: {status: academic_record_found}
-        resultat: stop
-        motif: notice déjà dans Alma
-      - si: {status: [ambiguous_academic_candidate, off_profile_match_only]}
-        resultat: stop à reprendre
-        motif: candidat Alma à vérifier
-      - si: {status: no_academic_record_found}
-        resultat: poursuite
-    sinon: {resultat: stop à reprendre, motif: statut Alma non prévu}
-
+    - si:
+        status: academic_record_found
+      resultat: stop
+      motif: notice déjà dans Alma
+    - si:
+        status:
+        - ambiguous_academic_candidate
+        - off_profile_match_only
+      resultat: stop à reprendre
+      motif: candidat Alma à vérifier
+    - si:
+        status: no_academic_record_found
+      resultat: poursuite
+    sinon:
+      resultat: stop à reprendre
+      motif: statut Alma non prévu
   sudoc:
     libelle: Sudoc
     source: sudoc-checker, champs status et thesis_state (candidat retenu le plus fort)
     variables:
-      status: [duplicate_found, ambiguous_print_candidate, electronic_only, no_print_duplicate_found]
-      thesis_state: [printed_original, printed_reproduction, microfiche_reproduction, electronic, unknown]
+      status:
+      - duplicate_found
+      - ambiguous_print_candidate
+      - electronic_only
+      - no_print_duplicate_found
+      thesis_state:
+      - printed_original
+      - printed_reproduction
+      - microfiche_reproduction
+      - electronic
+      - unknown
     branches:
-      - si: {type: these}
+    - si:
+        type: these
+      branches:
+      - si:
+          status: duplicate_found
         branches:
-          - si: {status: duplicate_found}
-            branches:
-              - si: {thesis_state: printed_original, ephe: non}
-                resultat: conversion
-                notice: these-reproduction-imprimee
-              - si: {thesis_state: printed_reproduction, ephe: oui}
-                resultat: conversion
-                notice: these-originale-imprimee
-              - si: {thesis_state: microfiche_reproduction, ephe: non}
-                resultat: conversion
-                notice: these-reproduction-imprimee
-              - si: {thesis_state: microfiche_reproduction, ephe: oui}
-                resultat: conversion
-                notice: these-originale-imprimee
-                motif: cas improbable
-              - si: {thesis_state: unknown}
-                resultat: stop à reprendre
-                motif: nature de la notice Sudoc non qualifiable
-          - si: {status: electronic_only, ephe: non}
-            resultat: conversion
-            notice: these-reproduction-imprimee
-          - si: {status: electronic_only, ephe: oui}
-            resultat: conversion
-            notice: these-originale-imprimee
-      - si: {type: memoire, status: duplicate_found}
-        resultat: stop
-        motif: mémoire déjà au Sudoc
-      - si: {type: memoire, status: electronic_only}
+        - si:
+            thesis_state: printed_original
+            ephe: non
+          resultat: conversion
+          notice: these-reproduction-imprimee
+        - si:
+            thesis_state: printed_reproduction
+            ephe: oui
+          resultat: conversion
+          notice: these-originale-imprimee
+        - si:
+            thesis_state: microfiche_reproduction
+            ephe: non
+          resultat: conversion
+          notice: these-reproduction-imprimee
+        - si:
+            thesis_state: microfiche_reproduction
+            ephe: oui
+          resultat: conversion
+          notice: these-originale-imprimee
+          motif: cas improbable
+        - si:
+            thesis_state: unknown
+          resultat: stop à reprendre
+          motif: nature de la notice Sudoc non qualifiable
+      - si:
+          status: electronic_only
+          ephe: non
         resultat: conversion
-        notice: memoire-original-imprime
-      - si: {status: ambiguous_print_candidate}
-        resultat: stop à reprendre
-        motif: candidat Sudoc à vérifier
-      - si: {status: no_print_duplicate_found}
-        resultat: poursuite
-    sinon: {resultat: stop à reprendre, motif: cas Sudoc non prévu}
-
+        notice: these-reproduction-imprimee
+      - si:
+          status: electronic_only
+          ephe: oui
+        resultat: conversion
+        notice: these-originale-imprimee
+    - si:
+        type: memoire
+        status: duplicate_found
+      resultat: stop
+      motif: mémoire déjà au Sudoc
+    - si:
+        type: memoire
+        status: electronic_only
+      resultat: conversion
+      notice: memoire-original-imprime
+    - si:
+        status: ambiguous_print_candidate
+      resultat: stop à reprendre
+      motif: candidat Sudoc à vérifier
+    - si:
+        status: no_print_duplicate_found
+      resultat: poursuite
+    sinon:
+      resultat: stop à reprendre
+      motif: cas Sudoc non prévu
   idref:
     libelle: IdRef
     source: idref-linker, champ status, pour chaque personne et chaque organisme
     variables:
-      status: [accepted, low_confidence, ambiguous, not_found]
+      status:
+      - accepted
+      - low_confidence
+      - ambiguous
+      - not_found
     branches:
-      - si: {status: accepted}
-        resultat: poursuite
-        motif: PPN repris ($3)
-      - si: {status: [low_confidence, ambiguous]}
-        resultat: poursuite à reprendre
-        motif: alignement IdRef à vérifier ($a nom $b prénom en attendant)
-      - si: {status: not_found}
-        resultat: poursuite avec alerte
-        alerte: non trouvé dans IdRef
-    sinon: {resultat: poursuite à reprendre, motif: statut IdRef non prévu}
-
+    - si:
+        status: accepted
+      resultat: poursuite
+      motif: PPN repris ($3)
+    - si:
+        status:
+        - low_confidence
+        - ambiguous
+      resultat: poursuite à reprendre
+      motif: alignement IdRef à vérifier ($a nom $b prénom en attendant)
+    - si:
+        status: not_found
+      resultat: poursuite avec alerte
+      alerte: non trouvé dans IdRef
+    sinon:
+      resultat: poursuite à reprendre
+      motif: statut IdRef non prévu
   dewey:
     libelle: Dewey
     source: dewey-classifier (première classe ; aucune vérification)
     variables:
-      status: [au_dessus_seuil, sous_seuil, aucune_classe]   # calculé : score de la 1re classe / DEWEY_SEUIL
-    sinon: {resultat: poursuite}
-
+      status:
+      - au_dessus_seuil
+      - sous_seuil
+      - aucune_classe
+    sinon:
+      resultat: poursuite
   creation:
     libelle: Création de la notice
     branches:
-      - si: {type: these, ephe: oui}
-        resultat: création
-        notice: these-originale-imprimee
-      - si: {type: these, ephe: non}
-        resultat: création
-        notice: these-reproduction-imprimee
-      - si: {type: memoire}
-        resultat: création
-        notice: memoire-original-imprime
-    sinon: {resultat: stop à reprendre, motif: aucune notice pour ce type de document}
+    - si:
+        type: these
+        ephe: oui
+      resultat: création
+      notice: these-originale-imprimee
+    - si:
+        type: these
+        ephe: non
+      resultat: création
+      notice: these-reproduction-imprimee
+    - si:
+        type: memoire
+      resultat: création
+      notice: memoire-original-imprime
+    sinon:
+      resultat: stop à reprendre
+      motif: aucune notice pour ce type de document
