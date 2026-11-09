@@ -190,13 +190,6 @@ def provenance(request: Request, dossier_id: str, valeur: Annotated[str, Form()]
     return _rediriger(f"/dossiers/{dossier_id}", auteur)
 
 
-@routeur.post("/dossiers/{dossier_id}/verification")
-def verification(request: Request, dossier_id: str, choix: Annotated[int, Form()], auteur: Annotated[str, Form()],
-                 commentaire: Annotated[str, Form()] = ""):
-    _app(request).choisir_verification(dossier_id, choix, _auteur(auteur), commentaire)
-    return _rediriger(f"/dossiers/{dossier_id}", auteur)
-
-
 @routeur.post("/dossiers/{dossier_id}/faux-positif")
 def faux_positif(request: Request, dossier_id: str, service: Annotated[str, Form()],
                  auteur: Annotated[str, Form()], commentaire: Annotated[str, Form()] = ""):

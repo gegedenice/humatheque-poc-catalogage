@@ -1,34 +1,36 @@
-{# Studio › Banc d'essai : un document (dossier réel ou exemple + faits saisis) →
-   décisions appliquées, données préparées, notice prévisualisée ; et non-régression. #}
+{# Studio › Banc d'essai : un document (dossier réel ou exemple + valeurs choisies) →
+   parcours du pipeline, données préparées, notice prévisualisée ; et non-régression. #}
 <div class="flex flex-wrap gap-6 items-start">
   <form class="sous-carte flex-[1_1_340px] flex flex-col gap-3 lg:sticky lg:top-3" hx-post="/admin/regles/essai" hx-target="#resultat-essai" hx-swap="innerHTML">
     <h3>Entrée documentaire</h3>
     <label class="block"><span class="etiquette">Document</span>
       <select class="champ champ-sm" name="dossier">
-        <option value="">Exemple fictif (thèse) + faits saisis ci-dessous</option>
+        <option value="">Exemple fictif (thèse) + valeurs choisies ci-dessous</option>
         {% for d in dossiers %}<option value="{{ d.id }}" {% if d.id == dossier_essai %}selected{% endif %}>{{ d.document }}{% if d.regle %} · {{ d.regle }}{% endif %}{% if d.titre %} · {{ d.titre }}{% endif %}</option>{% endfor %}
       </select></label>
-    <p class="text-xs text-sourdine">Pour un dossier réel, ses codes d'API sont repris. Sinon, chaque fait accepte une valeur en clair ou un code brut (ex. <span class="font-mono">printed_original</span>).</p>
+    <p class="text-xs text-sourdine">Pour un dossier réel, ses codes d'API sont repris. Sinon, choisissez les valeurs lues par chaque étape.</p>
     <div class="grid gap-3 grid-cols-2">
-      {% for nom, f in vue.faits.items() %}
-      <label class="block"><span class="etiquette">{{ nom }}</span>
-        <input class="champ champ-sm" name="{{ nom }}" list="valeurs-{{ nom }}" autocomplete="off"
-               value="{{ defauts.get(nom) or (f.valeurs | list | first) }}" placeholder="(vide)">
-        <datalist id="valeurs-{{ nom }}">
-          {% for v, codes in f.valeurs.items() %}<option value="{{ v }}">{% for c in codes %}<option value="{{ c }}" label="code → {{ v }}">{% endfor %}{% endfor %}
-        </datalist></label>
+      {% for var, vals in vue.communes.items() %}
+      <label class="block"><span class="etiquette">{{ var }}</span>
+        <select class="champ champ-sm font-mono" name="{{ var }}">{% for v in vals %}<option>{{ v }}</option>{% endfor %}</select></label>
       {% endfor %}
+      {% for e in vue.etapes %}{% for var, vals in e.variables.items() %}
+      <label class="block"><span class="etiquette">{{ e.libelle }} · {{ var }}</span>
+        <select class="champ champ-sm font-mono" name="{{ e.id }}.{{ var }}">
+          {% for v in vals %}<option {% if v in ("no_academic_record_found", "no_print_duplicate_found", "accepted") %}selected{% endif %}>{{ v }}</option>{% endfor %}
+          <option value="">(vide)</option></select></label>
+      {% endfor %}{% endfor %}
     </div>
     <label class="block"><span class="etiquette">Notice à prévisualiser</span>
       <select class="champ champ-sm" name="profil">
-        <option value="">celle choisie par la décision</option>
+        <option value="">celle choisie par le pipeline</option>
         {% for p in vue.profils %}<option value="{{ p.profil }}">{{ p.libelle }}</option>{% endfor %}
       </select></label>
     <button class="btn-principal btn-sm self-start">Essayer</button>
   </form>
   <div class="flex-[999_1_520px] min-w-0 flex flex-col gap-6">
     <div id="resultat-essai" {% if dossier_essai %}hx-post="/admin/regles/essai" hx-trigger="load" hx-vals='{{ {"dossier": dossier_essai} | tojson }}'{% endif %}>
-      <p class="vide border border-dashed border-filet rounded-2xl">Choisissez un document puis « Essayer » : décisions appliquées, données préparées et notice prévisualisée s'affichent ici.</p>
+      <p class="vide border border-dashed border-filet rounded-2xl">Choisissez un document puis « Essayer » : parcours du pipeline, données préparées et notice prévisualisée s'affichent ici.</p>
     </div>
     <section class="sous-carte flex flex-col gap-3">
       <div class="flex flex-wrap items-center gap-3">

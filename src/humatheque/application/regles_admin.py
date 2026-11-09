@@ -1,5 +1,5 @@
-"""Administration des règles (SPEC §9.3, page « Règles ») : consultation, banc
-d'essai des décisions, aperçu d'un profil, modification des fichiers YAML.
+"""Administration des règles (SPEC §9.3, studio) : pipeline (arbre de décision par
+étape, édité nœud par nœud), banc d'essai, aperçu d'une notice, fichiers YAML.
 
 Une modification est vérifiée avant écriture (aucune erreur bloquante
 acceptée), la version précédente est archivée dans
@@ -19,10 +19,11 @@ from pydantic import BaseModel, Field
 from humatheque.application import ActionImpossible, Introuvable  # définies avant l'import de ce module
 from humatheque.contexte import construire, variables_profil
 from humatheque.generateur import vers_winibw
-from humatheque.regles.chargement import FICHIER_DECISIONS, ReglesInvalides, charger_regles, fichiers_regles
-from humatheque.regles.ecriture import remplacer_regles
-from humatheque.regles.modeles import EtatVerification, Fait, RegleDecision, ServiceSorties
-from humatheque.regles.moteur import Choix, choisir, conventions
+import yaml
+
+from humatheque.regles.chargement import FICHIER_PIPELINE, ReglesInvalides, charger_regles, fichiers_regles
+from humatheque.regles.modeles import RESULTATS, EtapePipeline, Noeud
+from humatheque.regles.moteur import Issue, evaluer
 from humatheque.regles.notice import generer
 from humatheque.regles.verificateur import Rapport, verifier, verifier_textes
 
@@ -51,16 +52,22 @@ class VueRegles(BaseModel):
     version: str
     emplacement: str
     rapport: Rapport
-    faits: dict[str, Fait]
-    services: list[ServiceSorties] = Field(default_factory=list)
-    actions: dict[str, dict[str, str]] = Field(default_factory=dict)
-    decisions: list[dict[str, Any]]
-    sinon: dict[str, Any]
+    communes: dict[str, list[str]]
+    etapes: list[EtapePipeline]
+    resultats: dict[str, str]
     profils: list[ProfilVue]
-    verifications: list[EtatVerification] = Field(default_factory=list)
     variables: list[dict[str, Any]]
     fichiers: list[str]
     journal: list[EntreeJournalRegles] = Field(default_factory=list)
+
+
+class Parcours(BaseModel):
+    """Banc d'essai : résultat de chaque étape, jusqu'au premier arrêt."""
+
+    etapes: list[Issue]
+    notice: str | None = Field(None, description="notice produite ou convertie")
+    resultat: str = ""
+    issue: str = ""
 
 
 class Apercu(BaseModel):
@@ -76,10 +83,10 @@ class Apercu(BaseModel):
 
 
 class BancEssai(BaseModel):
-    """Banc d'essai de bout en bout : décision, données préparées, notice."""
+    """Banc d'essai de bout en bout : parcours du pipeline, données préparées, notice."""
 
     source: str
-    choix: Choix
+    parcours: Parcours
     donnees: list[dict[str, Any]] = Field(default_factory=list, description="variable, source, valeur")
     apercu: Apercu | None = None
     profil_essaye: str | None = Field(None, description="profil de l'aperçu (décision ou choix explicite)")
@@ -115,20 +122,19 @@ class AdministrationRegles:
     # -------------------------------------------------------------- consultation
     def vue_regles(self: "Application") -> VueRegles:
         r = self.regles
+        atteintes: dict[str, list[str]] = {}
+        for e in r.etapes.values():
+            for n in _feuilles(e.branches):
+                if n.notice:
+                    atteintes.setdefault(n.notice, []).append(e.libelle)
         profils = [ProfilVue(profil=nom, libelle=v.libelle or nom, fichier=v.fichier,
-                             decisions=[d.nom for d in r.decisions if d.profil == nom]) for nom, v in r.variantes.items()]
+                             decisions=sorted(set(atteintes.get(nom, [])))) for nom, v in r.variantes.items()]
         exemple = self.exemple_variables()
         variables = [{"nom": n, **v.model_dump(exclude={"nom"}), "exemple": _apercu_valeur(exemple.get(n))}
                      for n, v in r.variables.items()]
-        actions = conventions()["actions"]
-        return VueRegles(version=r.version, emplacement=r.emplacement, rapport=self._rapport, faits=r.faits,
-                         services=list(r.services.values()), actions=actions,
-                         decisions=[{**d.model_dump(exclude_none=True), "condition": d.texte_condition,
-                                     "admises": {f: d.admises(f) for f in r.faits},
-                                     "autres": {f: d.admises(f) for f in d.quand if f not in r.faits},
-                                     "issue": (actions.get(d.alors) or {}).get("issue")} for d in r.decisions],
-                         sinon={**r.sinon, "issue": (actions.get(r.sinon.get("alors")) or {}).get("issue")},
-                         profils=profils, verifications=list(r.verifications.values()), variables=variables, fichiers=list(r.textes), journal=self.journal_regles())
+        return VueRegles(version=r.version, emplacement=r.emplacement, rapport=self._rapport, communes=r.communes,
+                         etapes=list(r.etapes.values()), resultats=RESULTATS, profils=profils, variables=variables,
+                         fichiers=list(r.textes), journal=self.journal_regles())
 
     def fichiers_regles(self: "Application") -> dict[str, str]:
         """Textes des fichiers de règles tels que chargés (API GET /api/v1/regles)."""
@@ -148,85 +154,108 @@ class AdministrationRegles:
         return sortie
 
     # -------------------------------------------------------------- banc d'essai
-    def faits_dossier(self: "Application", dossier_id: str) -> dict[str, Any]:
-        """Codes d'API du dossier (à défaut, valeurs des faits), pour le banc d'essai."""
-        from humatheque.decision.moteur import faits_du_dossier
+    def valeurs_dossier(self: "Application", dossier_id: str) -> dict[str, Any]:
+        """Codes lus par le pipeline pour un dossier (banc d'essai) : `étape.variable` → valeur."""
+        from humatheque.decision.moteur import ephe
 
         d = self._dossier(dossier_id)
-        if d.decision and d.decision.faits:
-            return {k: (d.decision.codes.get(k) if d.decision.codes.get(k) not in (None, "")
-                        and not c["corrige"] else v)
-                    for k, v, c in ((c["fait"], c["valeur"], c) for c in d.decision.chaine(self.regles))}
-        return faits_du_dossier(self.regles, d.document.type_document, d.provenance.valeur if d.provenance else None,
-                                d.etat_alma, d.etat_sudoc)
+        v: dict[str, Any] = {"type": d.document.type_document,
+                             "ephe": ephe(d.provenance_manuelle or (d.provenance.valeur if d.provenance else None))}
+        if d.alma:
+            v["alma.status"] = d.corrections.get("alma", d.alma.statut)
+        if d.sudoc:
+            v["sudoc.status"] = d.corrections.get("sudoc", d.sudoc.statut_service)
+            v["sudoc.thesis_state"] = d.sudoc.etat
+        if d.dewey:
+            v["dewey.status"] = d.dewey.statut
+        return v
 
-    def essayer_decision(self: "Application", faits: dict[str, Any]) -> Choix:
-        """Règle retenue pour ces faits, et évaluation de chaque condition. Chaque fait peut
-        être donné par sa valeur en clair ou par le code renvoyé par l'API (traduit)."""
-        vides = {k: None for k, v in faits.items() if v in (None, "")}
-        codes = {k: v for k, v in faits.items() if k not in vides}
-        return choisir(self.regles, vides, codes=codes, tout_evaluer=True)
+    def essayer_pipeline(self: "Application", valeurs: dict[str, Any]) -> Parcours:
+        """Parcours du pipeline pour des valeurs saisies : `type`, `ephe` et `étape.variable`
+        (ex. `sudoc.status`). Chaque étape est évaluée jusqu'au premier arrêt."""
+        communes = {k: (valeurs.get(k) or None) for k in self.regles.communes}
+        etapes, notice = [], None
+        for nom, e in self.regles.etapes.items():
+            propres = {k: (valeurs.get(f"{nom}.{k}") or None) for k in e.variables}
+            r = evaluer(self.regles, nom, {**communes, **propres})
+            etapes.append(r)
+            if r.resultat in ("conversion", "création"):
+                notice = notice or r.notice
+            if r.arret:
+                break
+        dernier = etapes[-1] if etapes else None
+        final = "à reprendre" if any("reprendre" in x.resultat for x in etapes) else "terminé"
+        return Parcours(etapes=etapes, notice=notice, resultat=dernier.texte if dernier else "", issue=final)
 
-    # -------------------------------------------------------------- tableau de décision (formulaire)
-    def regle_decision(self: "Application", nom: str) -> RegleDecision | None:
-        return next((r for r in self.regles.decisions if r.nom == nom), None)
+    # -------------------------------------------------------------- arbre du pipeline (édition par nœud)
+    def noeud(self: "Application", etape: str, chemin: str) -> Noeud | None:
+        """Nœud désigné par son chemin : « 0.2.1 » (rangs), « s » (sinon), « 0.s »… ; « » : nouveau."""
+        e = self._etape(etape)
+        if not chemin:
+            return None
+        return _trouver(e, chemin)
 
-    def _ecrire_decisions(self: "Application", regles: list[RegleDecision], sinon: dict[str, Any],
-                          auteur: str) -> EnregistrementRegles:
-        texte = remplacer_regles(self.texte_regles(FICHIER_DECISIONS), regles, sinon)
-        return self.enregistrer_regles(FICHIER_DECISIONS, texte, auteur)
+    def _etape(self: "Application", etape: str) -> EtapePipeline:
+        e = self.regles.etapes.get(etape)
+        if e is None:
+            raise Introuvable(f"étape {etape}")
+        return e
 
-    def enregistrer_decision(self: "Application", ancien_nom: str | None, champs: dict[str, Any], auteur: str,
-                             position: int | None = None) -> EnregistrementRegles:
-        """Ajoute (`ancien_nom` vide) ou modifie une règle ; « sinon » : action et motif seulement.
-        `champs` : nom, quand {fait: [valeurs]}, si, alors, profil, motif, a_valider."""
-        regles = list(self.regles.decisions)
-        if ancien_nom == "sinon":
-            sinon = {"alors": champs.get("alors") or "vérification", "motif": (champs.get("motif") or "").strip(),
-                     "verification": champs.get("verification") or ""}
-            return self._ecrire_decisions(regles, sinon, auteur)
-        quand = {f: (v[0] if len(v) == 1 else v) for f, v in (champs.get("quand") or {}).items() if v}
-        nouvelle = RegleDecision(nom=(champs.get("nom") or "").strip(), quand=quand,
-                                 alors=champs.get("alors") or "", profil=champs.get("profil") or None,
-                                 verification=champs.get("verification") or None,
-                                 motif=(champs.get("motif") or "").strip() or None,
-                                 a_valider=bool(champs.get("a_valider")))
-        if not nouvelle.nom:
-            raise ActionImpossible("le nom de la règle est requis")
-        if nouvelle.nom == "sinon":
-            raise ActionImpossible("« sinon » est réservé à la règle par défaut")
-        if self.regles.actions_sans_profil(nouvelle.alors):
-            nouvelle.profil = None
-        if nouvelle.alors != "vérification":
-            nouvelle.verification = None
-        index = next((i for i, r in enumerate(regles) if r.nom == ancien_nom), None) if ancien_nom else None
-        if ancien_nom and index is None:
-            raise Introuvable(f"règle « {ancien_nom} »")
-        if index is not None:
-            regles[index] = nouvelle
+    def modifier_arbre(self: "Application", etape: str, chemin: str, operation: str, auteur: str,
+                       noeud: Noeud | None = None) -> EnregistrementRegles:
+        """Opérations : `modifier` (remplace conditions et résultat, garde les sous-branches),
+        `ajouter` (branche après `chemin`, ou en tête si vide), `sous_branche`, `supprimer`,
+        `monter`, `descendre`. L'arbre est réécrit dans pipeline.yaml après vérification."""
+        etapes = {k: v.model_copy(deep=True) for k, v in self.regles.etapes.items()}
+        e = etapes.get(etape)
+        if e is None:
+            raise Introuvable(f"étape {etape}")
+        nouveau = noeud or Noeud(resultat="poursuite")
+        if operation == "modifier":
+            cible = _trouver(e, chemin)
+            if cible is None:
+                raise Introuvable(f"branche {chemin}")
+            garder = cible.branches
+            for k, v in nouveau.model_dump(exclude={"branches", "sinon"}).items():
+                setattr(cible, k, v)
+            if garder and not nouveau.resultat:
+                cible.branches = garder
+            elif nouveau.resultat:
+                cible.branches = []
+        elif operation == "sous_branche":
+            cible = _trouver(e, chemin)
+            if cible is None or chemin.endswith("s"):
+                raise ActionImpossible("une sous-branche s'ajoute sous une branche")
+            if not cible.branches:  # la branche devient un embranchement : son résultat passe à la sous-branche
+                nouveau = nouveau if noeud else Noeud(resultat=cible.resultat or "poursuite", notice=cible.notice,
+                                                      motif=cible.motif, alerte=cible.alerte)
+                cible.resultat = cible.notice = cible.motif = cible.alerte = None
+            cible.branches.append(nouveau)
         else:
-            regles.insert(len(regles) if position is None else max(0, min(position, len(regles))), nouvelle)
-        return self._ecrire_decisions(regles, dict(self.regles.sinon), auteur)
+            liste, i = _parent(e, chemin) if chemin else (e.branches, -1)
+            if operation == "ajouter":
+                liste.insert(i + 1, nouveau)
+            elif operation == "supprimer":
+                if i < 0 or chemin.endswith("s"):
+                    raise ActionImpossible("le « sinon » d'une étape ne se supprime pas")
+                liste.pop(i)
+            elif operation in ("monter", "descendre"):
+                j = i + (-1 if operation == "monter" else 1)
+                if not 0 <= j < len(liste):
+                    raise ActionImpossible("la branche est déjà à cette extrémité")
+                liste[i], liste[j] = liste[j], liste[i]
+            else:
+                raise ActionImpossible(f"opération « {operation} » inconnue")
+        return self._ecrire_pipeline(etapes, auteur)
 
-    def supprimer_decision(self: "Application", nom: str, auteur: str) -> EnregistrementRegles:
-        regles = [r for r in self.regles.decisions if r.nom != nom]
-        if len(regles) == len(self.regles.decisions):
-            raise Introuvable(f"règle « {nom} »")
-        return self._ecrire_decisions(regles, dict(self.regles.sinon), auteur)
+    def _ecrire_pipeline(self: "Application", etapes: dict[str, EtapePipeline], auteur: str) -> EnregistrementRegles:
+        texte = self.texte_regles(FICHIER_PIPELINE)
+        entete = "".join(l + "\n" for l in texte.splitlines() if l.startswith("#") or not l.strip()).split("\n\n")[0]
+        donnees = {"communes": self.regles.communes,
+                   "etapes": {k: _propre_etape(v) for k, v in etapes.items()}}
+        sortie = entete.rstrip() + "\n\n" + yaml.safe_dump(donnees, allow_unicode=True, sort_keys=False, width=110)
+        return self.enregistrer_regles(FICHIER_PIPELINE, sortie, auteur)
 
-    def deplacer_decision(self: "Application", nom: str, sens: int, auteur: str) -> EnregistrementRegles:
-        """Monte (sens -1) ou descend (+1) une règle : l'ordre décide."""
-        regles = list(self.regles.decisions)
-        i = next((i for i, r in enumerate(regles) if r.nom == nom), None)
-        if i is None:
-            raise Introuvable(f"règle « {nom} »")
-        j = i + (1 if sens > 0 else -1)
-        if not 0 <= j < len(regles):
-            raise ActionImpossible("la règle est déjà à cette extrémité")
-        regles[i], regles[j] = regles[j], regles[i]
-        return self._ecrire_decisions(regles, dict(self.regles.sinon), auteur)
-
-    # -------------------------------------------------------------- aperçu d'un profil
     def _variables_essai(self: "Application", dossier_id: str | None) -> tuple[dict[str, Any], str]:
         if dossier_id:
             d = self._dossier(dossier_id)
@@ -258,16 +287,16 @@ class AdministrationRegles:
                               "regles": [r.id for r in z.regles], "statut": z.regles[0].statut if z.regles else "",
                               "repli": any(r.id in n.replis for r in z.regles)} for z in n.zones_triees()])
 
-    def banc_essai(self: "Application", dossier_id: str | None = None, faits: dict[str, Any] | None = None,
+    def banc_essai(self: "Application", dossier_id: str | None = None, valeurs: dict[str, Any] | None = None,
                    profil: str | None = None) -> BancEssai:
-        """Décisions appliquées, données préparées et notice prévisualisée, d'un coup."""
-        choix = self.essayer_decision(self.faits_dossier(dossier_id) if dossier_id else (faits or {}))
+        """Parcours du pipeline, données préparées et notice prévisualisée, d'un coup."""
+        parcours = self.essayer_pipeline(self.valeurs_dossier(dossier_id) if dossier_id else (valeurs or {}))
         variables, source = self._variables_essai(dossier_id)
         donnees = [{"nom": n, "source": v.source, "valeur": variables.get(n), "disponible": v.disponible}
                    for n, v in self.regles.variables.items()]
-        cible = profil or (choix.profil if choix.suite in ("creer", "convertir") else None)
+        cible = profil or parcours.notice
         apercu = self.apercu_profil(cible, dossier_id) if cible in self.regles.variantes else None
-        return BancEssai(source=source, choix=choix, donnees=donnees, apercu=apercu, profil_essaye=cible)
+        return BancEssai(source=source, parcours=parcours, donnees=donnees, apercu=apercu, profil_essaye=cible)
 
     def non_regression(self: "Application", limite: int = 25) -> NonRegression:
         """Régénère, avec les règles chargées, les notices déjà produites (dossiers terminés) et
@@ -364,6 +393,71 @@ def _apercu_valeur(v: Any) -> str:
     if isinstance(v, list):
         return " | ".join(_apercu_valeur(x) for x in v)
     return str(v)
+
+
+def _feuilles(noeuds: list[Noeud]) -> list[Noeud]:
+    sortie = []
+    for n in noeuds:
+        sortie += _feuilles(n.branches) if n.branches else [n]
+        if n.sinon:
+            sortie.append(n.sinon)
+    return sortie
+
+
+def _trouver(e: EtapePipeline, chemin: str) -> Noeud | None:
+    liste, n = e.branches, None
+    for t in chemin.split("."):
+        if t == "s":
+            n = e.sinon if n is None else n.sinon
+        elif t.isdigit() and int(t) < len(liste):
+            n = liste[int(t)]
+        else:
+            return None
+        if n is None:
+            return None
+        liste = n.branches
+    return n
+
+
+def _parent(e: EtapePipeline, chemin: str) -> tuple[list[Noeud], int]:
+    """Liste contenant le nœud désigné, et son rang."""
+    *avant, dernier = chemin.split(".")
+    if not dernier.isdigit():
+        raise ActionImpossible("opération impossible sur un « sinon »")
+    liste = e.branches if not avant else (_trouver(e, ".".join(avant)) or Noeud()).branches
+    if int(dernier) >= len(liste):
+        raise Introuvable(f"branche {chemin}")
+    return liste, int(dernier)
+
+
+def _propre_noeud(n: Noeud) -> dict[str, Any]:
+    d: dict[str, Any] = {}
+    if n.si:
+        d["si"] = n.si
+    if n.sauf:
+        d["sauf"] = n.sauf
+    if n.branches:
+        d["branches"] = [_propre_noeud(x) for x in n.branches]
+    if n.sinon:
+        d["sinon"] = _propre_noeud(n.sinon)
+    for k in ("resultat", "notice", "motif", "alerte"):
+        if getattr(n, k):
+            d[k] = getattr(n, k)
+    return d
+
+
+def _propre_etape(e: EtapePipeline) -> dict[str, Any]:
+    d: dict[str, Any] = {"libelle": e.libelle}
+    if e.source:
+        d["source"] = e.source
+    if e.note:
+        d["note"] = e.note
+    if e.variables:
+        d["variables"] = e.variables
+    if e.branches:
+        d["branches"] = [_propre_noeud(n) for n in e.branches]
+    d["sinon"] = _propre_noeud(e.sinon)
+    return d
 
 
 class ReglesRefusees(ActionImpossible):

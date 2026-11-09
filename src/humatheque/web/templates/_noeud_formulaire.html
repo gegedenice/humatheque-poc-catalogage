@@ -1,0 +1,49 @@
+{# Formulaire d'une branche du pipeline : conditions (valeurs cochées par variable,
+   « une de » ou « aucune de ») et résultat. #}
+{% set n = noeud %}
+<form method="post" action="/admin/regles/noeud" hx-boost="false" class="sous-carte bg-white border border-filet my-2 ml-6 flex flex-col gap-3">
+  <input type="hidden" name="etape" value="{{ etape.id }}"><input type="hidden" name="chemin" value="{{ chemin }}">
+  <input type="hidden" name="operation" value="{{ operation }}">
+  <div class="flex items-center gap-2">
+    <h4 class="font-semibold flex-1">{{ {"modifier": "Modifier la branche", "ajouter": "Nouvelle branche", "sous_branche": "Nouvelle sous-branche (ET)"}[operation] }}{% if sinon %} « sinon »{% endif %} — {{ etape.libelle }}</h4>
+    <button type="button" class="btn-icone w-8 h-8" aria-label="Fermer" onclick="this.closest('form').remove()">✕</button>
+  </div>
+  {% if not sinon %}
+  <fieldset class="flex flex-col gap-2"><legend class="etiquette">Si… (cocher les valeurs ; rien de coché : variable indifférente)</legend>
+    {% for var, vals in possibles.items() if vals %}
+    {% set mode = "sauf" if var in n.sauf else "si" %}{% set cochees = n.liste(n.sauf[var]) if var in n.sauf else (n.liste(n.si[var]) if var in n.si else []) %}
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="font-mono text-sm w-28">{{ var }}</span>
+      <select class="champ champ-sm w-32" name="mode.{{ var }}" aria-label="mode pour {{ var }}">
+        <option value="si" {% if mode == "si" %}selected{% endif %}>= une de</option>
+        <option value="sauf" {% if mode == "sauf" %}selected{% endif %}>SAUF</option>
+      </select>
+      {% for v in vals %}
+      <label class="filtre h-7 px-2.5 text-xs font-mono has-[:checked]:bg-primaire-clair has-[:checked]:text-primaire-fonce has-[:checked]:border-transparent">
+        <input type="checkbox" class="sr-only" name="v.{{ var }}" value="{{ v }}" {% if v in cochees %}checked{% endif %}>{{ v }}</label>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+  <div class="grid gap-3 sm:grid-cols-3">
+    <label class="block"><span class="etiquette">Alors</span>
+      <select class="champ champ-sm" name="resultat">
+        {% if embranchement %}<option value="branches" selected>sous-branches (inchangées)</option>{% endif %}
+        {% for r, d in vue.resultats.items() %}<option value="{{ r }}" {% if not embranchement and n.resultat == r %}selected{% endif %} title="{{ d }}">{{ r }}</option>{% endfor %}
+      </select></label>
+    <label class="block"><span class="etiquette">Notice (conversion, création)</span>
+      <select class="champ champ-sm" name="notice">
+        <option value="">—</option>
+        {% for p in vue.profils %}<option value="{{ p.profil }}" {% if n.notice == p.profil %}selected{% endif %}>{{ p.profil }}</option>{% endfor %}
+      </select></label>
+    <label class="block"><span class="etiquette">Motif (affiché au dossier)</span>
+      <input class="champ champ-sm" name="motif" value="{{ n.motif or '' }}"></label>
+    <label class="block sm:col-span-3"><span class="etiquette">Texte de l'alerte (poursuite avec alerte)</span>
+      <input class="champ champ-sm" name="alerte" value="{{ n.alerte or '' }}"></label>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 justify-end">
+    <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+    <button class="btn-principal btn-sm">Enregistrer</button>
+  </div>
+</form>

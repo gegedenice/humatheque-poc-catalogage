@@ -4,14 +4,12 @@ est journalisée (qui / quand / quoi) ; le pipeline reprend ensuite par
 
 from __future__ import annotations
 
-from humatheque import issues
 
 import re
 
 from humatheque.config import charger_yaml
 from humatheque.services.idref import AlignementIdref, AlignementOrganisations
-from humatheque.regles.modeles import Regles
-from humatheque.workflow.modeles import ETAPES, Cloture, Dossier, Etape
+from humatheque.workflow.modeles import Cloture, Dossier, Etape
 
 # Statut d'un alignement ou d'une classe tranchés par un catalogueur
 # (config/contexte.yaml : statuts_idref_ppn).
@@ -41,81 +39,27 @@ def choisir_provenance(d: Dossier, valeur: str, auteur: str, commentaire: str = 
     return d
 
 
-def _sans_code_sudoc() -> str | None:
-    from humatheque.regles import charger_regles
-
-    return charger_regles().faits["sudoc"].sans_code
+# Faux positif (ALM-SUD-006) : le résultat est remplacé par le code « rien trouvé » de l'API,
+# et le traitement reprend à l'étape, sans rappeler le service.
+FAUX_POSITIF = {"alma": "no_academic_record_found", "sudoc": "no_print_duplicate_found"}
 
 
 def declarer_faux_positif(d: Dossier, service: str, commentaire: str, auteur: str) -> Dossier:
-    """Vérification Alma ou Sudoc jugée non pertinente (ALM-SUD-006) : état corrigé
-    (`absent` pour Alma, `rien` pour Sudoc) puis reprise à l'étape suivante."""
-    if service == "alma":
-        if not d.alma or d.etat_alma in (None, "absent"):
-            raise ResolutionImpossible("aucune notice Alma trouvée : rien à déclarer")
-        corrige, reprise = "absent", "sudoc"
-    elif service == "sudoc":
-        if not d.sudoc or d.etat_sudoc in (None, _sans_code_sudoc()):
-            raise ResolutionImpossible("aucun candidat Sudoc retenu : rien à déclarer")
-        corrige, reprise = _sans_code_sudoc(), "situation"
-    else:
+    """Résultat Alma ou Sudoc jugé non pertinent : on poursuit comme si rien n'avait été trouvé."""
+    if service not in FAUX_POSITIF:
         raise ResolutionImpossible(f"service « {service} » : alma ou sudoc attendu")
+    resultat = d.alma if service == "alma" else d.sudoc
+    avant = (d.alma.statut if d.alma else None) if service == "alma" else (d.sudoc.statut_service if d.sudoc else None)
+    if resultat is None or d.corrections.get(service, avant) == FAUX_POSITIF[service]:
+        raise ResolutionImpossible(f"aucun résultat {service} à déclarer comme faux positif")
     if not commentaire.strip():
         raise ResolutionImpossible("un commentaire est requis")
     _resoudre(d, service)
-    avant = d.etat_alma if service == "alma" else d.etat_sudoc
-    d.corrections[service] = corrige
-    if service == "alma":
-        d.etat_alma = corrige
-    else:
-        d.etat_sudoc = corrige
-    d.noter(service, "resolution", {"faux_positif": True, "avant": avant, "apres": corrige,
+    d.corrections[service] = FAUX_POSITIF[service]
+    d.noter(service, "resolution", {"faux_positif": True, "avant": avant, "apres": FAUX_POSITIF[service],
                                     "commentaire": commentaire}, auteur)
-    d.reinitialiser_depuis(reprise)
-    etape = d.etapes[service]
-    if etape.statut == "arret":  # arrêt sur la vérification elle-même : pas de nouvel appel
-        etape.statut, etape.routage, etape.motif = "ok", issues.TERMINE, f"faux positif déclaré : {commentaire}"
     d.decision = None
-    return d
-
-
-# Étape à reprendre après correction d'un fait (la première concernée) ; Alma et
-# Sudoc ne sont pas rappelés (leurs résultats sont gardés, l'état est corrigé).
-REPRISE_FAIT = {"alma": "alma", "sudoc": "sudoc"}
-
-
-def appliquer_choix(d: Dossier, regles: Regles, index: int, auteur: str, commentaire: str = "") -> Dossier:
-    """État de vérification (regles/verifications.yaml) : le catalogueur choisit une suite.
-    Faits corrigés → nouvelle décision ; action imposée → décision sans règle."""
-    if not d.decision or not d.decision.verification:
-        raise ResolutionImpossible("aucune vérification en attente pour ce document")
-    etat = regles.verifications.get(d.decision.verification)
-    if etat is None:
-        raise ResolutionImpossible(f"état de vérification « {d.decision.verification} » inconnu")
-    if not 0 <= index < len(etat.choix):
-        raise ResolutionImpossible(f"choix {index} introuvable pour « {etat.libelle} »")
-    c = etat.choix[index]
-    reprise = "situation"
-    for fait, valeur in c.faits.items():
-        if fait == "provenance":
-            d.provenance_manuelle = valeur
-            if d.provenance:  # la décision relit la provenance : pas besoin de refaire les vérifications
-                d.provenance = d.provenance.model_copy(update={"valeur": valeur, "regle": "choix_catalogueur"})
-        else:
-            d.corrections[fait] = valeur
-        if fait in REPRISE_FAIT and ETAPES.index(REPRISE_FAIT[fait]) < ETAPES.index(reprise):
-            reprise = REPRISE_FAIT[fait]
-    if c.action:
-        d.corrections["action"] = c.action
-        d.corrections["profil"] = c.profil or ""
-        d.corrections["choix"] = c.libelle
-    for e in d.exceptions:
-        e.resolue = True
-    d.noter("situation", "resolution", {"verification": etat.nom, "question": etat.question, "choix": c.libelle,
-                                        "faits": c.faits, "action": c.action, "profil": c.profil,
-                                        "commentaire": commentaire}, auteur)
-    d.decision = None
-    d.reinitialiser_depuis(reprise)
+    d.reinitialiser_depuis(service)
     return d
 
 

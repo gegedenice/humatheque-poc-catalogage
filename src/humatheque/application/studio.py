@@ -1,9 +1,8 @@
 """Studio de catalogage (SPEC §9.3) : édition de la notice structurée (socle et
-variantes), des vérifications humaines, banc d'essai de bout en bout et
-non-régression sur les notices déjà produites.
+variantes).
 
-Chaque enregistrement réécrit un seul fichier de `regles/` (socle, variante ou
-verifications.yaml) par `enregistrer_regles` : vérification, archive, journal,
+Chaque enregistrement réécrit un seul fichier de `regles/` (socle ou variante)
+par `enregistrer_regles` : vérification, archive, journal,
 rechargement. Aucune règle ici : seulement la lecture et l'écriture des objets
 configurés dans l'interface.
 """
@@ -16,8 +15,8 @@ import yaml
 from pydantic import BaseModel, Field
 
 from humatheque.application import ActionImpossible, Introuvable
-from humatheque.regles.chargement import FICHIER_SOCLE, FICHIER_VERIFICATIONS
-from humatheque.regles.modeles import EtatVerification, NoticeModele, Variante, ZoneRegle
+from humatheque.regles.chargement import FICHIER_SOCLE
+from humatheque.regles.modeles import NoticeModele, Variante, ZoneRegle
 from humatheque.regles.notice import RENDUS, productible
 
 if TYPE_CHECKING:
@@ -40,16 +39,6 @@ ENTETE_VARIANTE = """\
 # « Notice UNIMARC »). ajouter : zones propres à la variante ; remplacer :
 # zones du socle modifiées pour la variante (même id) ; retirer : ids du socle.
 """
-ENTETE_VERIFICATIONS = """\
-# Vérifications humaines : états « en attente » dans lesquels le traitement
-# s'arrête jusqu'à ce qu'un catalogueur choisise une suite (onglet « Reprise »
-# du dossier). Une règle de décision y mène par `alors: vérification` et
-# `verification: <nom>`. Fichier écrit par le studio (onglet « Vérifications »).
-#   faits : corrige des faits puis relance la décision
-#   action, profil : impose une action sans nouvelle décision
-"""
-
-
 class ZoneVue(BaseModel):
     zone: ZoneRegle
     origine: str = Field(description="socle, modifiée (variante), ajoutée (variante)")
@@ -218,32 +207,3 @@ class Studio:
             if mode not in RENDUS:
                 raise ActionImpossible(f"mode de rendu « {mode} » inconnu pour {t}")
         return self._ecrire_socle(list(self.regles.socle.zones), auteur, rendus)
-
-    # -------------------------------------------------------------- vérifications humaines
-    def enregistrer_verification(self: "Application", ancien_nom: str | None, etat: EtatVerification,
-                                 auteur: str) -> "EnregistrementRegles":
-        if not etat.nom.strip() or not etat.libelle.strip():
-            raise ActionImpossible("le nom et le libellé de l'état sont requis")
-        if not etat.choix:
-            raise ActionImpossible("au moins un choix est requis")
-        etats = dict(self.regles.verifications)
-        if ancien_nom and ancien_nom != etat.nom:
-            etats = {(etat.nom if k == ancien_nom else k): (etat if k == ancien_nom else v) for k, v in etats.items()}
-        else:
-            etats[etat.nom] = etat
-        return self._ecrire_verifications(etats, auteur)
-
-    def supprimer_verification(self: "Application", nom: str, auteur: str) -> "EnregistrementRegles":
-        if nom not in self.regles.verifications:
-            raise Introuvable(f"état {nom}")
-        return self._ecrire_verifications({k: v for k, v in self.regles.verifications.items() if k != nom}, auteur)
-
-    def _ecrire_verifications(self: "Application", etats: dict[str, EtatVerification],
-                              auteur: str) -> "EnregistrementRegles":
-        donnees = {}
-        for nom, e in etats.items():
-            d = e.model_dump(exclude_defaults=True, exclude={"nom"})
-            d["libelle"] = e.libelle
-            d["choix"] = [c.model_dump(exclude_defaults=True) | {"libelle": c.libelle} for c in e.choix]
-            donnees[nom] = {k: d[k] for k in ("libelle", "question", "montrer", "choix") if k in d}
-        return self.enregistrer_regles(FICHIER_VERIFICATIONS, _yaml(ENTETE_VERIFICATIONS, donnees), auteur)

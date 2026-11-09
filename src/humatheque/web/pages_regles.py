@@ -12,98 +12,112 @@ from fastapi.responses import RedirectResponse
 from urllib.parse import quote
 
 from humatheque.application import Introuvable, ReglesRefusees
-from humatheque.regles.modeles import ChoixVerification, EtatVerification, Partie, SousZoneRegle, ZoneRegle
+from humatheque.regles.modeles import Noeud, Partie, SousZoneRegle, ZoneRegle
 from humatheque.web.pages import COOKIE_AUTEUR, _app, _auteur, _rendre
 
 routeur = APIRouter(include_in_schema=False)
-ONGLETS = ("decisions", "verifications", "notice", "donnees", "essai", "modifier")
+ONGLETS = ("pipeline", "notice", "essai", "modifier")
 
 
-def _page(request: Request, onglet: str = "decisions", **contexte):
+def _page(request: Request, onglet: str = "pipeline", **contexte):
     a = _app(request)
-    onglet = onglet if onglet in ONGLETS else "decisions"
+    onglet = onglet if onglet in ONGLETS else "pipeline"
     contexte.setdefault("fichier", a.vue_regles().fichiers[0])
     if onglet == "modifier" and "texte" not in contexte:
         contexte["texte"] = a.texte_regles(contexte["fichier"])
-    from humatheque.regles.moteur import conventions
-
     if onglet == "notice":
         contexte["notice"] = a.vue_notice_modele(contexte.get("variante") or "socle")
     return _rendre(request, "admin_regles.html", vue=a.vue_regles(), onglet=onglet,
-                   dossiers=a.dossiers_pour_essai(), defauts=conventions()["completude"].get("fixes", {}), **contexte)
+                   dossiers=a.dossiers_pour_essai(), **contexte)
 
 
 @routeur.get("/admin/regles")
-def page_regles(request: Request, onglet: str = "decisions", fichier: str | None = None,
+def page_regles(request: Request, onglet: str = "pipeline", fichier: str | None = None,
                 profil: str | None = None, enregistre: str | None = None, variante: str = "socle",
-                zone: str | None = None, etat: str | None = None, dossier: str | None = None):
+                zone: str | None = None, dossier: str | None = None):
     contexte = {"profil": profil, "enregistre": enregistre, "variante": variante, "zone_ouverte": zone,
-                "etat_ouvert": etat, "dossier_essai": dossier}
+                "dossier_essai": dossier}
     if fichier:
         contexte["fichier"] = fichier
     return _page(request, onglet, **contexte)
 
 
-@routeur.get("/admin/regles/decision")
-def formulaire_decision(request: Request, nom: str = ""):
-    """Formulaire d'une règle du tableau de décision (vide : nouvelle règle)."""
+# ---------------------------------------------------------------- pipeline (arbre par étape)
+def _noeud_depuis_formulaire(f, possibles: dict[str, list[str]]) -> Noeud:
+    """Champs du formulaire d'une branche → Noeud. Pour chaque variable : valeurs cochées et
+    mode (« si » : une des valeurs ; « sauf » : aucune des valeurs)."""
+    si, sauf = {}, {}
+    for var in possibles:
+        vals = [str(v) for v in f.getlist(f"v.{var}")]
+        if not vals:
+            continue
+        val = vals[0] if len(vals) == 1 else vals
+        (sauf if str(f.get(f"mode.{var}") or "si") == "sauf" else si)[var] = val
+    sorte = str(f.get("resultat") or "")
+    d = {"si": si, "sauf": sauf, "motif": str(f.get("motif") or "").strip() or None}
+    if sorte and sorte != "branches":
+        d |= {"resultat": sorte, "notice": str(f.get("notice") or "") or None,
+              "alerte": str(f.get("alerte") or "").strip() or None}
+        if sorte not in ("conversion", "création"):
+            d["notice"] = None
+    return Noeud.model_validate(d)
+
+
+@routeur.get("/admin/regles/noeud")
+def formulaire_noeud(request: Request, etape: str, chemin: str = "", operation: str = "modifier"):
+    """Formulaire d'une branche : modifier, ajouter après, ajouter une sous-branche."""
     a = _app(request)
-    regle = {"nom": "sinon", **a.regles.sinon} if nom == "sinon" else a.regle_decision(nom) if nom else None
-    return _rendre(request, "_regles_formulaire.html", vue=a.vue_regles(), regle=regle, nom=nom,
-                   auteur=request.cookies.get(COOKIE_AUTEUR, ""))
+    from humatheque.regles.moteur import valeurs_possibles
+
+    n = a.noeud(etape, chemin) if operation == "modifier" else None
+    return _rendre(request, "_noeud_formulaire.html", etape=a.regles.etapes[etape], chemin=chemin,
+                   operation=operation, noeud=n or Noeud(resultat="poursuite"),
+                   possibles=valeurs_possibles(a.regles, etape), vue=a.vue_regles(),
+                   embranchement=bool(n and n.branches), sinon=chemin.endswith("s"))
 
 
-def _retour_decisions(request: Request, auteur: str, action, nom: str = ""):
-    try:
-        r = action()
-    except ReglesRefusees as e:
-        reponse = _page(request, "decisions", refus=e.rapport, ouvrir=nom)
-        reponse.status_code = 422
-        return reponse
-    reponse = RedirectResponse(f"/admin/regles?onglet=decisions&enregistre={r.archive}", status_code=303)
-    reponse.set_cookie(COOKIE_AUTEUR, auteur.strip(), max_age=3600 * 24 * 365, samesite="lax")
-    return reponse
+@routeur.post("/admin/regles/noeud")
+async def enregistrer_noeud(request: Request):
+    from humatheque.regles.moteur import valeurs_possibles
 
-
-@routeur.post("/admin/regles/decision")
-async def enregistrer_decision(request: Request):
     a = _app(request)
     f = await request.form()
+    etape, chemin = str(f.get("etape") or ""), str(f.get("chemin") or "")
+    operation = str(f.get("operation") or "modifier")
     auteur = _auteur(str(f.get("auteur") or ""))
-    ancien = str(f.get("ancien_nom") or "")
-    champs = {"nom": str(f.get("nom") or ""), "verification": str(f.get("verification") or ""),
-              "alors": str(f.get("alors") or ""), "profil": str(f.get("profil") or ""),
-              "motif": str(f.get("motif") or ""), "a_valider": bool(f.get("a_valider")),
-              "quand": {fait: [str(v) for v in f.getlist(f"quand.{fait}")] for fait in a.regles.faits}}
-    position = int(str(f.get("position"))) - 1 if str(f.get("position") or "").isdigit() else None
-    return _retour_decisions(request, auteur, lambda: a.enregistrer_decision(ancien or None, champs, auteur, position),
-                             ancien)
+    noeud = _noeud_depuis_formulaire(f, valeurs_possibles(a.regles, etape))
+    try:
+        r = a.modifier_arbre(etape, chemin, operation, auteur, noeud)
+    except ReglesRefusees as e:
+        reponse = _page(request, "pipeline", refus=e.rapport)
+        reponse.status_code = 422
+        return reponse
+    return _apres_enregistrement(f"/admin/regles?onglet=pipeline&enregistre={quote(r.archive)}#etape-{etape}", auteur)
 
 
-@routeur.post("/admin/regles/decision/supprimer")
-def supprimer_decision(request: Request, nom: Annotated[str, Form()], auteur: Annotated[str, Form()] = ""):
+@routeur.post("/admin/regles/noeud/operation")
+def operation_noeud(request: Request, etape: Annotated[str, Form()], chemin: Annotated[str, Form()],
+                    operation: Annotated[str, Form()], auteur: Annotated[str, Form()] = ""):
     a = _app(request)
     auteur = _auteur(auteur)
-    return _retour_decisions(request, auteur, lambda: a.supprimer_decision(nom, auteur))
-
-
-@routeur.post("/admin/regles/decision/deplacer")
-def deplacer_decision(request: Request, nom: Annotated[str, Form()], sens: Annotated[int, Form()],
-                      auteur: Annotated[str, Form()] = ""):
-    a = _app(request)
-    auteur = _auteur(auteur)
-    return _retour_decisions(request, auteur, lambda: a.deplacer_decision(nom, sens, auteur))
+    try:
+        r = a.modifier_arbre(etape, chemin, operation, auteur)
+    except ReglesRefusees as e:
+        reponse = _page(request, "pipeline", refus=e.rapport)
+        reponse.status_code = 422
+        return reponse
+    return _apres_enregistrement(f"/admin/regles?onglet=pipeline&enregistre={quote(r.archive)}#etape-{etape}", auteur)
 
 
 @routeur.post("/admin/regles/essai")
 async def essai(request: Request):
-    """Banc d'essai : dossier (codes d'API repris) ou exemple + faits saisis → décision, données, notice."""
+    """Banc d'essai : dossier (codes repris) ou exemple + valeurs saisies → parcours, données, notice."""
     a = _app(request)
     f = await request.form()
     dossier = str(f.get("dossier") or "")
-    faits = {k: str(f.get(k) or "") for k in a.regles.faits}
-    banc = a.banc_essai(dossier or None, faits, str(f.get("profil") or "") or None)
-    return _rendre(request, "_banc_resultat.html", banc=banc, choix=banc.choix)
+    valeurs = {k: str(v) for k, v in f.items() if k not in ("dossier", "profil")}
+    banc = a.banc_essai(dossier or None, valeurs, str(f.get("profil") or "") or None)
+    return _rendre(request, "_banc_resultat.html", banc=banc)
 
 
 @routeur.post("/admin/regles/non-regression")
@@ -300,86 +314,3 @@ def _apres_enregistrement(url: str, auteur: str):
     reponse = RedirectResponse(url, status_code=303)
     reponse.set_cookie(COOKIE_AUTEUR, auteur.strip(), max_age=3600 * 24 * 365, samesite="lax")
     return reponse
-
-
-# ---------------------------------------------------------------- vérifications humaines (états)
-def _etat_depuis_formulaire(f) -> EtatVerification:
-    choix = []
-    indices = sorted({int(k.split("-")[1]) for k in f.keys() if k.startswith("c-") and k.split("-")[1].isdigit()})
-    for i in indices:
-        p = f"c-{i}-"
-        effet = str(f.get(p + "effet") or "")
-        c: dict = {"libelle": str(f.get(p + "libelle") or ""), "description": str(f.get(p + "description") or "")}
-        sorte, _, reste = effet.partition(":")
-        if sorte == "fait":
-            fait, _, valeur = reste.partition("=")
-            c["faits"] = {fait: valeur}
-        elif sorte == "action":
-            action, _, profil = reste.partition(":")
-            c |= {"action": action, "profil": profil or None}
-        choix.append(ChoixVerification.model_validate(c))
-    return EtatVerification(nom=str(f.get("nom") or "").strip(), libelle=str(f.get("libelle") or "").strip(),
-                            question=str(f.get("question") or ""), montrer=str(f.get("montrer") or "") or None,
-                            choix=choix)
-
-
-def _formulaire_verification(request: Request, etat: EtatVerification, ancien_nom: str | None):
-    return _rendre(request, "_verification_formulaire.html", etat=etat, ancien_nom=ancien_nom,
-                   vue=_app(request).vue_regles())
-
-
-@routeur.get("/admin/regles/verification")
-def formulaire_verification(request: Request, nom: str = ""):
-    a = _app(request)
-    if not nom:
-        etat = EtatVerification(nom="", libelle="", choix=[ChoixVerification(libelle="", action="arrêt")])
-        return _formulaire_verification(request, etat, None)
-    if nom not in a.regles.verifications:
-        raise Introuvable(f"état {nom}")
-    return _formulaire_verification(request, a.regles.verifications[nom], nom)
-
-
-@routeur.post("/admin/regles/verification/brouillon")
-async def brouillon_verification(request: Request):
-    f = await request.form()
-    etat = _etat_depuis_formulaire(f)
-    choix = list(etat.choix)
-    nom, _, arg = str(f.get("action") or "").partition(":")
-    i = int(arg) if arg.isdigit() else -1
-    if nom == "ajouter":
-        choix.append(ChoixVerification(libelle="", action="arrêt"))
-    elif nom == "supprimer" and 0 <= i < len(choix):
-        choix.pop(i)
-    elif nom == "monter" and 0 < i < len(choix):
-        choix[i - 1], choix[i] = choix[i], choix[i - 1]
-    return _formulaire_verification(request, etat.model_copy(update={"choix": choix}),
-                                    str(f.get("ancien_nom") or "") or None)
-
-
-@routeur.post("/admin/regles/verification")
-async def enregistrer_verification(request: Request):
-    a = _app(request)
-    f = await request.form()
-    auteur = _auteur(str(f.get("auteur") or ""))
-    etat = _etat_depuis_formulaire(f)
-    try:
-        r = a.enregistrer_verification(str(f.get("ancien_nom") or "") or None, etat, auteur)
-    except ReglesRefusees as e:
-        reponse = _page(request, "verifications", refus=e.rapport)
-        reponse.status_code = 422
-        return reponse
-    return _apres_enregistrement(f"/admin/regles?onglet=verifications&enregistre={quote(r.archive)}", auteur)
-
-
-@routeur.post("/admin/regles/verification/supprimer")
-async def supprimer_verification(request: Request):
-    a = _app(request)
-    f = await request.form()
-    auteur = _auteur(str(f.get("auteur") or ""))
-    try:
-        r = a.supprimer_verification(str(f.get("ancien_nom") or ""), auteur)
-    except ReglesRefusees as e:
-        reponse = _page(request, "verifications", refus=e.rapport)
-        reponse.status_code = 422
-        return reponse
-    return _apres_enregistrement(f"/admin/regles?onglet=verifications&enregistre={quote(r.archive)}", auteur)

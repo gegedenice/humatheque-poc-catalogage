@@ -4,8 +4,8 @@ Démonstrateur du workflow de catalogage assisté des thèses et mémoires : à
 partir d'une ou plusieurs images d'un document, il produit une notice UNIMARC
 éditable, ou s'arrête avec un rapport expliquant pourquoi. Les règles de
 catalogage ne sont pas dans le code : elles sont dans `regles/` (fichiers YAML
-écrits par le **studio de catalogage** de l'interface : tableau de décision,
-vérifications humaines, notice structurée en zones et sous-zones).
+écrits par le **studio de catalogage** de l'interface : pipeline en arbre de
+décision sur les codes des API, notice structurée en zones et sous-zones).
 
 - Spécification fonctionnelle : [`docs/SPEC.md`](docs/SPEC.md)
 - Consignes de développement : [`CLAUDE.md`](CLAUDE.md)
@@ -71,26 +71,23 @@ l'avance.
 | `regles/variables.yaml` | données utilisables dans la notice (source, type, liste, disponible) |
 | `regles/notice/socle.yaml` | zones communes de la notice : sous-zones configurables (constante, donnée, composition, autorité ; repli ou vérification si absente), rendu des autorités |
 | `regles/notice/variantes/*.yaml` | thèse originale, thèse de reproduction, mémoire : zones ajoutées, remplacées, retirées |
-| `regles/verifications.yaml` | vérifications humaines : états d'attente, question, choix (corriger un fait ou imposer une action) |
-| `regles/decisions.yaml` | dictionnaire des faits (valeurs en clair ← codes de l'API), règles de décision (`quand: {fait: valeur}`, première qui correspond), `sinon` |
-| `regles/services.yaml` | sorties d'IdRef (personnes, structures), Dewey et de l'extraction : code → libellé, issue, alerte |
+| `regles/pipeline.yaml` | pipeline : provenance → Alma → Sudoc → IdRef → Dewey → création ; pour chaque étape, arbre de décision sur les codes renvoyés par l'API (`status`, `thesis_state`), résultats `stop`, `stop à reprendre`, `conversion`, `poursuite` (avec alerte, à reprendre), `création` |
 
 Format détaillé : `docs/SPEC.md` §8 ; référence : `reference/moteur-regles/`.
-`humatheque check-spec` les vérifie (erreurs, avertissements, cas non couverts).
+`humatheque check-spec` les vérifie (erreurs, avertissements, cas qui tombent dans « sinon »).
 
 **Issue d'un document** : Terminé (rien à faire : notice produite ou convertie,
 ou notice déjà au catalogue), À reprendre (un catalogueur tranche, onglet
-« Reprise » du dossier) ou Incident (panne technique). Elle découle de l'action
-de la règle de décision retenue (`création`, `conversion`, `arrêt` → terminé ;
-`vérification` → à reprendre) et des réponses des services, dont l'issue par
-code est dans `regles/services.yaml`.
+« Reprise » du dossier) ou Incident (panne technique). Elle découle des
+résultats du pipeline : `stop`, `conversion`, `création` → terminé ;
+`stop à reprendre`, `poursuite à reprendre` → à reprendre.
 
-**Studio de catalogage** (`/admin/regles`) : **Décisions** (tableau de décision
-par formulaire, codes d'API au survol), **Vérifications** (états d'attente et
-leurs choix), **Notice UNIMARC** (socle et variantes, éditeur de zones et de
-sous-zones avec aperçu immédiat), **Données** (faits, sorties des services,
-variables), **Banc d'essai** (un document → décisions, données préparées,
-notice avec provenance ; non-régression sur les notices déjà produites) et
+**Studio de catalogage** (`/admin/regles`) : **Pipeline** (étapes numérotées,
+arbre indenté SI / ET / OU / SAUF / SINON, branches modifiables sur place,
+étape suivante indiquée), **Notice UNIMARC** (socle et variantes, éditeur de
+zones et de sous-zones avec aperçu immédiat), **Banc d'essai** (un document →
+parcours du pipeline, données préparées, notice avec provenance ;
+non-régression sur les notices déjà produites) et
 **Fichiers** (YAML, experts). Chaque enregistrement refuse toute erreur
 bloquante du vérificateur, archive la version précédente dans
 `regles/archives/` (non versionné), journalise (`data/journal_regles.jsonl`) et
@@ -135,7 +132,7 @@ src/humatheque/
   contexte/          extraction → Contexte (clés = Sources)
   services/          clients alma, sudoc, idref, dewey
   qualification/     agrégation des thesis_state
-  decision/          provenance, faits et décision (decisions.yaml), issue des réponses de services
+  decision/          provenance, valeurs lues par le pipeline (pipeline.yaml), décision
   conversion/        notice Sudoc existante (copie en v1, ISO 2709)
   generateur/        notice d'un dossier (socle + variante), WinIBW et MARCXML
   workflow/          orchestrateur : un document → un dossier, reprises

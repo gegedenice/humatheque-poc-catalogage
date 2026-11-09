@@ -1,27 +1,13 @@
 {# Résultat du banc d'essai : trois temps, comme le traitement réel. #}
 {% from "_composants.html" import badge %}
-{% set choix = banc.choix %}
+
 <div class="flex flex-col gap-4" aria-live="polite">
   <p class="text-[13px] text-sourdine">Contexte : {{ banc.source }}</p>
 
   <section class="tuile flex flex-col gap-3">
-    <h3 class="flex items-center gap-2"><span class="text-auto">①</span> Décisions appliquées</h3>
-    {% include "_chaine_faits.html" %}
-    <div class="flex flex-wrap items-center gap-3 bg-tonal rounded-xl px-3 py-2">
-      <span class="text-sm">Règle retenue</span><span class="font-semibold">{{ choix.regle.nom }}</span>
-      <span class="puce bg-primaire-clair text-primaire-fonce">{{ choix.action }}</span>{{ badge(choix.issue) }}
-      {% if choix.profil %}<span class="text-sm">→ <span class="font-mono">{{ choix.profil }}</span></span>{% endif %}
-      {% if choix.regle.verification %}<a class="puce bg-decision-clair text-decision-fonce no-underline" href="/admin/regles?onglet=verifications&etat={{ choix.regle.verification }}">⧗ vérification : {{ choix.regle.verification }}</a>{% endif %}
-      {% if choix.motif != choix.regle.nom %}<span class="basis-full text-sm text-sourdine">{{ choix.motif }}</span>{% endif %}
-    </div>
-    <details><summary class="cursor-pointer text-sm text-sourdine">Évaluation de chaque règle</summary>
-      <ol class="flex flex-col gap-1 text-[13px] mt-2">
-        {% for e in choix.evaluations %}
-        <li class="flex items-baseline gap-2 rounded-lg px-2 py-1 {% if e.nom == choix.regle.nom %}bg-auto-clair{% endif %}">
-          <span class="w-5 text-center font-bold {{ 'text-auto' if e.vraie else 'text-contour' }}">{{ "✓" if e.vraie else ("·" if e.vraie is none else "✗") }}</span>
-          <span class="font-semibold w-64 flex-none">{{ e.nom }}</span><span class="text-xs text-sourdine break-words">{{ e.si }}</span>
-        </li>{% endfor %}
-      </ol></details>
+    <h3 class="flex items-center gap-2"><span class="text-auto">①</span> Parcours du pipeline</h3>
+    {% with etapes = banc.parcours.etapes %}{% include "_parcours.html" %}{% endwith %}
+    <p class="text-sm">Issue du document : {{ badge(banc.parcours.issue) }}{% if banc.parcours.notice %} · notice <span class="font-mono">{{ banc.parcours.notice }}</span>{% endif %}</p>
   </section>
 
   <section class="tuile flex flex-col gap-2">
@@ -40,7 +26,7 @@
   <section class="tuile flex flex-col gap-3">
     <h3 class="flex items-center gap-2"><span class="text-auto">③</span> Notice prévisualisée</h3>
     {% if banc.apercu %}{% set a = banc.apercu %}
-      <p class="text-[13px] text-sourdine">Variante <span class="font-mono">{{ a.profil }}</span>{% if not choix.profil or choix.profil != a.profil %} (choisie pour l'essai){% endif %}</p>
+      <p class="text-[13px] text-sourdine">Variante <span class="font-mono">{{ a.profil }}</span>{% if banc.parcours.notice != a.profil %} (choisie pour l'essai){% endif %}</p>
       <div class="defilant"><table class="tableau text-[13px]">
         <thead><tr><th>Zone produite</th><th>Provenance</th></tr></thead>
         <tbody>
@@ -57,7 +43,7 @@
       <details><summary class="cursor-pointer text-sm text-sourdine">Zones non couvertes ({{ a.non_couvertes | length }})</summary>
         <p class="text-xs font-mono mt-2">{{ a.non_couvertes | join(" · ") }}</p></details>
     {% else %}
-      <p class="text-sm text-sourdine">La décision ne produit pas de notice ({{ choix.action }}). Choisissez une notice à prévisualiser dans le formulaire pour l'examiner quand même.</p>
+      <p class="text-sm text-sourdine">Le pipeline s'arrête sans produire de notice ({{ banc.parcours.resultat }}). Choisissez une notice à prévisualiser dans le formulaire pour l'examiner quand même.</p>
     {% endif %}
   </section>
 </div>

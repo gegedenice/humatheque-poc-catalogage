@@ -1,27 +1,7 @@
 # Conventions de lecture des règles (SPEC §7, §8). Aucune règle UNIMARC ni aucune
 # décision ici : elles sont dans regles/ ; ce fichier dit seulement comment les lire.
 
-# Actions de decisions.yaml : suite du workflow et issue du document
-# (terminé : rien à faire ; à reprendre : un catalogueur doit trancher).
-actions:
-  création:     {suite: creer, issue: terminé}
-  conversion:   {suite: convertir, issue: terminé}
-  arrêt:        {suite: arreter, issue: terminé}
-  vérification: {suite: arreter, issue: à reprendre}
-
 # Attributs d'une variable selon son type (variables.yaml).
 attributs:
   personne: [forme, nom, prenom, ppn]
   organisme: [forme, ppn]
-
-
-# Contrôle de complétude du vérificateur (§8.4) : produit des valeurs de ces
-# faits, les autres fixés, en écartant les combinaisons incompatibles.
-completude:
-  faits: [type, provenance, sudoc]
-  fixes: {alma: absent}
-  # combinaisons impossibles (même forme que `quand` des règles)
-  incompatibles:
-    - {type: mémoire, provenance: [EPHE, hors EPHE, incertaine]}
-    - {type: thèse, provenance: sans objet}
-    - {sudoc: non vérifié}

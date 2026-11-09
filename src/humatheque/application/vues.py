@@ -145,9 +145,7 @@ class VueDossier(BaseModel):
     champs: list[ChampVue]
     exceptions_ouvertes: int
     telechargements: dict[str, str] = Field(default_factory=dict, description="libellé → nom de fichier")
-    chaine_decision: list[dict] = Field(default_factory=list, description="code de l'API → valeur du fait")
-    condition_decision: str | None = Field(None, description="condition en clair de la règle retenue")
-    verification: Any = Field(None, description="état de vérification en attente (EtatVerification)")
+    parcours: list[dict] = Field(default_factory=list, description="étapes du pipeline : valeurs, chemin, résultat")
 
 
 class VueLots(BaseModel):

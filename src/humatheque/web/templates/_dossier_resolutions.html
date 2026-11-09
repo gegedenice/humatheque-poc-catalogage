@@ -8,38 +8,22 @@
 {# Faux positif proposé seulement quand le document est à reprendre : une notice
    au-dessus du seuil arrête le workflow sans alerte (terminé, décision du 05/11). #}
 {% set a_decider = d.routage not in (none, "terminé") and not d.cloture %}
-{% set etat = vue.verification %}
-{% set faux_alma = a_decider and not etat and d.routage == "à reprendre" and d.alma and d.etat_alma not in (none, "absent") %}
-{% set faux_sudoc = a_decider and not etat and d.routage == "à reprendre" and not faux_alma and d.sudoc and d.etat_sudoc not in (none, "rien") %}
+{% set arret = d.decision.etape if d.decision else "" %}
+{% set faux_alma = a_decider and d.routage == "à reprendre" and arret == "alma" %}
+{% set faux_sudoc = a_decider and d.routage == "à reprendre" and arret == "sudoc" %}
+{% set provenance_a_choisir = a_decider and d.routage == "à reprendre" and arret == "provenance" %}
 {% if ouvertes or a_decider %}
 <div class="flex flex-col gap-3">
-  {% if etat %}
-  {# État de vérification configuré (regles/verifications.yaml) : question, éléments à examiner, choix. #}
-  <form method="post" action="/dossiers/{{ d.id }}/verification" class="sous-carte flex flex-col gap-3">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="puce bg-decision-clair text-decision-fonce">En attente de vérification</span>
-      <p class="font-semibold">{{ etat.libelle }}</p>
+  {% if provenance_a_choisir %}
+  <form method="post" action="/dossiers/{{ d.id }}/provenance" class="sous-carte space-y-2">
+    <p class="text-sm font-semibold">Établissement de soutenance absent ou ambigu</p>
+    <p class="text-xs text-sourdine">Extrait : « {{ (d.metadonnees or {}).get("granting_institution") or "—" }} ». Choisir reprend le traitement (Alma, Sudoc…).</p>
+    <div class="flex flex-wrap items-center gap-3">
+      <label class="text-sm"><input type="radio" class="accent-primaire" name="valeur" value="EPHE" required> EPHE</label>
+      <label class="text-sm"><input type="radio" class="accent-primaire" name="valeur" value="hors EPHE"> hors EPHE</label>
+      <input class="champ champ-sm flex-1 min-w-40" name="commentaire" placeholder="commentaire (facultatif)">
     </div>
-    {% if etat.question %}<p class="text-sm">{{ etat.question }}</p>{% endif %}
-    {% if etat.montrer == "alma" and d.alma and d.alma.candidats %}
-    <ul class="text-[13px] bg-white rounded-xl p-3 flex flex-col gap-1">
-      {% for c in d.alma.candidats[:5] %}<li><span class="font-mono">{% if c.lien_sudoc %}<a href="{{ c.lien_sudoc }}" target="_blank" rel="noopener">{{ c.ppn or c.mms_id }}</a>{% else %}{{ c.ppn or c.mms_id }}{% endif %}</span>
-        {{ c.titre or "" }}{% if c.annee %} ({{ c.annee }}){% endif %} <span class="text-sourdine">score {{ c.score }}{% if c.type %} · {{ c.type }}{% endif %}</span></li>{% endfor %}
-    </ul>
-    {% elif etat.montrer == "sudoc" and d.sudoc and d.sudoc.candidats %}
-    <ul class="text-[13px] bg-white rounded-xl p-3 flex flex-col gap-1">
-      {% for c in d.sudoc.candidats if c.retenu %}<li><span class="font-mono">{% if c.lien %}<a href="{{ c.lien }}" target="_blank" rel="noopener">{{ c.ppn }}</a>{% else %}{{ c.ppn }}{% endif %}</span>
-        {{ c.titre or "" }}{% if c.annee %} ({{ c.annee }}){% endif %} <span class="text-sourdine">score {{ c.score }} · <span class="font-mono">{{ c.thesis_state }}</span></span></li>{% endfor %}
-    </ul>
-    {% endif %}
-    <div class="flex flex-col gap-1.5" role="radiogroup" aria-label="{{ etat.libelle }}">
-      {% for c in etat.choix %}
-      <label class="flex items-baseline gap-2.5 text-sm cursor-pointer"><input class="accent-primaire" type="radio" name="choix" value="{{ loop.index0 }}" required>
-        <span><span class="font-medium">{{ c.libelle }}</span>{% if c.description %} <span class="text-sourdine text-xs">— {{ c.description }}</span>{% endif %}</span></label>
-      {% endfor %}
-    </div>
-    <input class="champ champ-sm" name="commentaire" placeholder="commentaire (facultatif)">
-    <div class="flex items-center gap-2 justify-end">{{ champ_auteur() }}<button class="btn-principal btn-sm">Valider et reprendre</button></div>
+    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Choisir et reprendre</button></div>
   </form>
   {% endif %}
   {% set ns_idref = namespace(n=0) %}
@@ -86,19 +70,22 @@
 
   {% if faux_alma %}
   <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">
-    <p class="text-sm font-semibold">Notice Alma non pertinente ?</p>
-    <p class="text-xs text-sourdine">Après contrôle, déclarer un faux positif reprend le traitement avec l'état Alma « absent ».</p>
+    <p class="text-sm font-semibold">Candidat Alma à vérifier{% if d.alma and d.alma.ppn %} (PPN {{ d.alma.ppn }}){% endif %}</p>
+    <p class="text-xs text-sourdine">Si la notice ne correspond pas, « ignorer » poursuit comme si Alma avait répondu <span class="font-mono">no_academic_record_found</span>.</p>
     <input type="hidden" name="service" value="alma">
     <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Déclarer un faux positif et reprendre</button></div>
+    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Ignorer ce résultat (faux positif) et poursuivre</button></div>
   </form>
   {% elif faux_sudoc %}
   <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">
-    <p class="text-sm font-semibold">Candidat(s) Sudoc non pertinent(s) ?</p>
-    <p class="text-xs text-sourdine">Déclarer un faux positif reprend le traitement avec l'état Sudoc « rien ».</p>
+    <p class="text-sm font-semibold">Résultat Sudoc à vérifier</p>
+    {% if d.sudoc %}<ul class="text-[13px] bg-white rounded-xl p-3 flex flex-col gap-1">
+      {% for c in d.sudoc.candidats if c.retenu %}<li><span class="font-mono">{% if c.lien %}<a href="{{ c.lien }}" target="_blank" rel="noopener">{{ c.ppn }}</a>{% else %}{{ c.ppn }}{% endif %}</span> {{ c.titre or "" }} <span class="text-sourdine">score {{ c.score }} · <span class="font-mono">{{ c.thesis_state }}</span></span></li>{% endfor %}
+    </ul>{% endif %}
+    <p class="text-xs text-sourdine">Si aucun candidat ne correspond, « ignorer » poursuit comme si le Sudoc avait répondu <span class="font-mono">no_print_duplicate_found</span>.</p>
     <input type="hidden" name="service" value="sudoc">
     <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Déclarer un faux positif et reprendre</button></div>
+    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Ignorer ce résultat (faux positif) et poursuivre</button></div>
   </form>
   {% endif %}
 

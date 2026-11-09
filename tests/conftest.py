@@ -66,18 +66,17 @@ class ReglesFabriquees:
             sz.update(champs)
         self.ecrire("notice/socle.yaml", p)
 
-    def modifier_decision(self, id_: str, **champs: Any) -> None:  # id_ : nom de la règle
-        d = self.lire("decisions.yaml")
-        cibles = [r for r in d["regles"] if r["nom"] == id_]
-        assert cibles, f"aucune décision « {id_} »"
-        for r in cibles:
-            r.update(champs)
-        self.ecrire("decisions.yaml", d)
+    def ajouter_branche(self, etape: str, noeud: dict, position: int | None = None) -> None:
+        """Ajoute une branche à la racine de l'arbre d'une étape de pipeline.yaml."""
+        d = self.lire("pipeline.yaml")
+        branches = d["etapes"][etape].setdefault("branches", [])
+        branches.insert(len(branches) if position is None else position, noeud)
+        self.ecrire("pipeline.yaml", d)
 
-    def ajouter_decision(self, regle: dict, position: int | None = None) -> None:
-        d = self.lire("decisions.yaml")
-        d["regles"].insert(len(d["regles"]) if position is None else position, regle)
-        self.ecrire("decisions.yaml", d)
+    def modifier_etape(self, etape: str, **champs: Any) -> None:
+        d = self.lire("pipeline.yaml")
+        d["etapes"][etape].update(champs)
+        self.ecrire("pipeline.yaml", d)
 
     def charger(self):
         from humatheque.regles import charger_regles

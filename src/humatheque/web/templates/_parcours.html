@@ -1,0 +1,16 @@
+{# Parcours du pipeline : une ligne par étape traversée — valeurs lues, branche suivie, résultat. #}
+{% set couleurs = {"stop": "bg-auto-clair text-auto-fonce", "stop à reprendre": "bg-decision-clair text-decision-fonce",
+                   "conversion": "bg-conversion-clair text-conversion-fonce", "poursuite": "bg-primaire-clair text-primaire-fonce",
+                   "poursuite avec alerte": "bg-primaire-clair text-primaire-fonce", "poursuite à reprendre": "bg-decision-clair text-decision-fonce",
+                   "création": "bg-auto-clair text-auto-fonce"} %}
+<ol class="flex flex-col gap-2">
+  {% for r in etapes %}
+  <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 bg-white rounded-xl px-3 py-2">
+    <span class="font-semibold w-36">{{ {"creation": "Création", "idref": "IdRef", "provenance": "Provenance", "alma": "Alma", "sudoc": "Sudoc", "dewey": "Dewey"}.get(r.etape, r.etape) }}{% if r.objet %} <span class="font-normal text-xs text-sourdine">{{ r.objet }}</span>{% endif %}</span>
+    <span class="font-mono text-xs text-sourdine flex-1 min-w-[12rem]">{% for k, v in r.valeurs.items() if v is not none %}{{ k }}={{ v }}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+    <span class="text-xs text-sourdine">{{ r.chemin | join(" › ") }}</span>
+    <span class="puce {{ couleurs.get(r.resultat, 'bg-rail') }}">{{ r.resultat }}{% if r.notice %} {{ r.notice }}{% endif %}</span>
+    {% if r.motif %}<span class="basis-full text-xs text-sourdine sm:pl-[9.75rem]">{{ r.motif }}</span>{% endif %}
+  </li>
+  {% else %}<li class="text-sm text-sourdine">Aucune étape du pipeline n'a encore été évaluée.</li>{% endfor %}
+</ol>

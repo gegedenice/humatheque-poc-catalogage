@@ -1,4 +1,4 @@
-"""Règles de catalogage (SPEC §7, §8) : `regles/*.yaml` + `Statuts_services`."""
+"""Règles de catalogage (SPEC §7, §8) : `regles/` (pipeline, notice, variables)."""
 
 from humatheque.regles.chargement import ReglesInvalides, charger_regles
 from humatheque.regles.modeles import Regles

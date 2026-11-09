@@ -1,18 +1,16 @@
 {% extends "base.html" %}
 {% from "_composants.html" import badge, vide %}
 {% block titre %}Studio de catalogage{% endblock %}
-{% block fil %}Administration · studio de catalogage (SPEC §8, §9.3){% endblock %}
+{% block fil %}Administration · studio de catalogage (SPEC §7, §8, §9.3){% endblock %}
 {% block entete %}<h1>Studio de catalogage</h1>{% endblock %}
 {% block entete_droite %}
 <span class="text-[13px] text-sourdine">Version <span class="font-mono">{{ vue.version }}</span></span>
 {% endblock %}
 {% block contenu %}
 {% include "_admin_onglets.html" %}
-{% set onglets = [("decisions", "Décisions", "Quand poursuivre, vérifier, convertir ou arrêter"),
-                  ("verifications", "Vérifications", "Interventions humaines et leurs suites"),
+{% set onglets = [("pipeline", "Pipeline", "Étapes et décisions : arrêter, convertir, poursuivre"),
                   ("notice", "Notice UNIMARC", "Zones, sous-zones, replis"),
-                  ("donnees", "Données", "Faits, sorties des services, variables"),
-                  ("essai", "Banc d'essai", "Décisions, données et notice sur un document"),
+                  ("essai", "Banc d'essai", "Parcours, données et notice sur un document"),
                   ("modifier", "Fichiers", "YAML, pour experts")] %}
 
 <section class="carte mb-6">
@@ -33,174 +31,19 @@
   </nav>
 
   <div class="p-5">
-  {% if enregistre and onglet != "decisions" and onglet != "modifier" %}
+  {% if enregistre and onglet != "modifier" %}
   <p class="avis bg-auto-clair text-auto-fonce mb-4">✓ Enregistré et rechargé (version <span class="font-mono">{{ vue.version }}</span>). Version précédente archivée : <span class="font-mono">regles/{{ enregistre }}</span></p>
   {% endif %}
-  {% if refus is defined and refus and onglet not in ("decisions", "modifier") %}
+  {% if refus is defined and refus and onglet != "modifier" %}
   <div class="carte-alerte mb-4"><h3 class="mb-2">Modification refusée : erreurs bloquantes</h3>
     {% with rapport = refus %}{% include "_regles_rapport.html" %}{% endwith %}</div>
   {% endif %}
-  {# ============================================================ décisions #}
-  {% if onglet == "decisions" %}
-    {% set faits = vue.faits.keys() | list %}
-    <div class="flex flex-wrap items-center gap-3 mb-3">
-      <p class="text-sm text-sourdine flex-1 min-w-[260px]">Tableau de décision (<span class="font-mono">decisions.yaml</span>) : lu de haut en bas, la première règle dont tous les faits correspondent l'emporte. Une case vide : fait indifférent. Survolez une valeur pour voir les codes d'API qui y mènent (dictionnaire : onglet <a href="/admin/regles?onglet=donnees">Données</a>) ; testez dans le <a href="/admin/regles?onglet=essai">banc d'essai</a>.</p>
-      <button class="btn-principal btn-sm" hx-get="/admin/regles/decision" hx-target="#formulaire-decision" hx-swap="innerHTML">+ Ajouter une règle</button>
-    </div>
-    {% if enregistre %}
-    <p class="avis bg-auto-clair text-auto-fonce mb-4">✓ Tableau enregistré et rechargé (version <span class="font-mono">{{ vue.version }}</span>). Version précédente archivée : <span class="font-mono">regles/{{ enregistre }}</span></p>
-    {% endif %}
-    {% if refus is defined and refus %}
-    <div class="carte-alerte mb-4"><h3 class="mb-2">Modification refusée : le tableau contiendrait des erreurs bloquantes</h3>
-      {% with rapport = refus %}{% include "_regles_rapport.html" %}{% endwith %}</div>
-    {% endif %}
-    <div id="formulaire-decision" class="mb-4" {% if ouvrir is defined and ouvrir %}hx-get="/admin/regles/decision?nom={{ ouvrir | urlencode }}" hx-trigger="load"{% endif %}></div>
-    <div class="defilant mb-6"><table class="tableau tableau-decision min-w-[980px]">
-      <thead><tr><th class="w-8">#</th><th>Règle</th>
-        {% for f in faits %}<th title="{{ vue.faits[f].question }}">{{ f }}</th>{% endfor %}
-        <th>Action</th><th>Profil ou motif</th><th>Issue</th><th class="w-28"><span class="sr-only">Actions</span></th></tr></thead>
-      <tbody>
-      {% for r in vue.decisions %}
-        <tr>
-          <td class="font-mono text-xs text-sourdine">{{ loop.index }}</td>
-          <td class="font-semibold">{{ r.nom }}{% if r.a_valider %}<br><span class="puce bg-decision-clair text-decision-fonce font-medium">à valider</span>{% endif %}
-</td>
-          {% for f in faits %}
-          <td>{% for v in r.admises[f] %}{% set codes = vue.faits[f].valeurs.get(v) or [] %}<span class="puce bg-tonal text-encre mr-1 mb-1 inline-block cursor-help" title="{{ ('codes : ' ~ codes | join(', ')) if codes else ('« ' ~ v ~ ' » : ' ~ ('tout code non listé' if v == vue.faits[f].code_inconnu else 'aucun code retenu' if v == vue.faits[f].sans_code else 'calculée par le démonstrateur')) }}">{{ v }}</span>{% else %}<span class="text-contour" title="indifférent">—</span>{% endfor %}</td>
-          {% endfor %}
-          <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ r.alors }}</span></td>
-          <td>{% if r.profil %}<a class="font-mono text-xs" href="/admin/regles?onglet=notice&variante={{ r.profil }}">{{ r.profil }}</a>{% endif %}
-            {% if r.verification %}<a class="puce bg-decision-clair text-decision-fonce no-underline" href="/admin/regles?onglet=verifications&etat={{ r.verification }}" title="état proposé au catalogueur">⧗ {{ (vue.verifications | selectattr("nom", "equalto", r.verification) | map(attribute="libelle") | first) or r.verification }}</a>{% endif %}
-            {% if r.motif %}<span class="block text-[13px]">{{ r.motif }}</span>{% endif %}</td>
-          <td>{{ badge(r.issue) }}</td>
-          <td class="whitespace-nowrap text-right">
-            <form method="post" action="/admin/regles/decision/deplacer" hx-boost="false" class="inline">
-              <input type="hidden" name="nom" value="{{ r.nom }}"><input type="hidden" name="auteur" value="{{ auteur }}">
-              <button class="btn-icone" name="sens" value="-1" title="Monter" aria-label="Monter « {{ r.nom }} »" {% if loop.first or not auteur %}disabled{% endif %}>↑</button>
-              <button class="btn-icone" name="sens" value="1" title="Descendre" aria-label="Descendre « {{ r.nom }} »" {% if loop.last or not auteur %}disabled{% endif %}>↓</button>
-            </form>
-            <button class="btn-icone" title="Modifier" aria-label="Modifier « {{ r.nom }} »" hx-get="/admin/regles/decision?nom={{ r.nom | urlencode }}" hx-target="#formulaire-decision" hx-swap="innerHTML">✎</button>
-          </td>
-        </tr>
-      {% endfor %}
-        <tr class="bg-tonal/60"><td></td><td class="font-semibold">sinon</td><td colspan="{{ faits | length }}" class="text-xs text-sourdine">aucune règle ne correspond</td>
-          <td><span class="puce bg-primaire-clair text-primaire-fonce">{{ vue.sinon.alors }}</span></td><td>{{ vue.sinon.motif or "" }}{% if vue.sinon.verification %} <a class="puce bg-decision-clair text-decision-fonce no-underline" href="/admin/regles?onglet=verifications&etat={{ vue.sinon.verification }}">⧗ {{ vue.sinon.verification }}</a>{% endif %}</td><td>{{ badge(vue.sinon.issue) }}</td>
-          <td class="text-right"><button class="btn-icone" title="Modifier" aria-label="Modifier « sinon »" hx-get="/admin/regles/decision?nom=sinon" hx-target="#formulaire-decision" hx-swap="innerHTML">✎</button></td></tr>
-      </tbody>
-    </table></div>
-    {% if not auteur %}<p class="text-xs text-sourdine -mt-4 mb-6">Monter / descendre : indiquez d'abord votre nom dans un formulaire (« Modifier »), il est ensuite retenu.</p>{% endif %}
-
-
-  {# ============================================================ vérifications #}
-  {% elif onglet == "verifications" %}
-    <div class="flex flex-wrap items-center gap-3 mb-4">
-      <p class="text-sm text-sourdine flex-1 min-w-[260px]">Une vérification est un <strong>état</strong> : le traitement s'arrête, le catalogueur répond à une question dans l'onglet « Reprise » du dossier, et le moteur reprend selon son choix — correction de faits (puis nouvelle décision) ou action imposée. Les règles de décision y mènent par l'action « vérification ».</p>
-      <button class="btn-principal btn-sm" hx-get="/admin/regles/verification" hx-target="#formulaire-verification" hx-swap="innerHTML">+ Ajouter un état</button>
-    </div>
-    <div id="formulaire-verification" class="mb-4" {% if etat_ouvert %}hx-get="/admin/regles/verification?nom={{ etat_ouvert | urlencode }}" hx-trigger="load"{% endif %}></div>
-    <div class="grid gap-4 lg:grid-cols-2">
-      {% for e in vue.verifications %}
-      <section class="sous-carte flex flex-col gap-2" id="etat-{{ e.nom }}">
-        <div class="flex items-start gap-2">
-          <div class="flex-1"><h3 class="flex items-center gap-2"><span class="puce bg-decision-clair text-decision-fonce">⧗</span> {{ e.libelle }}</h3>
-            <p class="text-xs text-sourdine font-mono">{{ e.nom }}</p></div>
-          <button class="btn-icone" title="Modifier" aria-label="Modifier « {{ e.libelle }} »" hx-get="/admin/regles/verification?nom={{ e.nom | urlencode }}" hx-target="#formulaire-verification" hx-swap="innerHTML">✎</button>
-        </div>
-        {% if e.question %}<p class="text-sm">{{ e.question }}</p>{% endif %}
-        {% if e.montrer %}<p class="text-xs text-sourdine">Montre les candidats {{ e.montrer }}</p>{% endif %}
-        <ul class="flex flex-col gap-1.5">
-          {% for c in e.choix %}
-          <li class="bg-white rounded-xl px-3 py-2 text-sm flex flex-wrap items-baseline gap-2"><span class="font-medium flex-1">{{ c.libelle }}</span>
-            {% if c.faits %}<span class="text-xs text-sourdine">corrige {% for f, v in c.faits.items() %}<span class="font-mono">{{ f }}</span> = {{ v }}{% if not loop.last %}, {% endif %}{% endfor %} puis décide</span>
-            {% else %}<span class="text-xs text-sourdine">impose <span class="puce bg-primaire-clair text-primaire-fonce">{{ c.action }}</span>{% if c.profil %} <span class="font-mono">{{ c.profil }}</span>{% endif %}</span>{% endif %}</li>
-          {% endfor %}
-        </ul>
-        {% set menant = vue.decisions | selectattr("verification", "equalto", e.nom) | map(attribute="nom") | list %}
-        <p class="text-xs text-sourdine">Atteint par : {{ (menant + (["sinon"] if vue.sinon.verification == e.nom else [])) | join(", ") or "aucune règle" }}</p>
-      </section>
-      {% else %}{{ vide("Aucun état de vérification.") }}{% endfor %}
-    </div>
-
-  {# ============================================================ notice #}
+  {% if onglet == "pipeline" %}
+    {% include "_pipeline.html" %}
   {% elif onglet == "notice" %}
     {% include "_notice_liste.html" %}
-
-  {# ============================================================ données #}
-  {% elif onglet == "donnees" %}
-    <p class="text-sm text-sourdine mb-4">Dictionnaire : pour chaque fait de décision (<span class="font-mono">decisions.yaml</span>) et chaque service d'enrichissement (<span class="font-mono">services.yaml</span>), les codes renvoyés par l'API et ce qu'ils deviennent. </p>
-    <h3 class="mb-2">Faits de décision</h3>
-    <div class="grid gap-4 lg:grid-cols-2 mb-6">
-      {% for nom, f in vue.faits.items() %}
-      <section class="sous-carte flex flex-col gap-2">
-        <div class="flex items-baseline gap-2"><h4 class="font-mono font-semibold">{{ nom }}</h4><span class="text-sm">{{ f.question }}</span></div>
-        <p class="text-xs text-sourdine">Source : {{ f.source or "—" }}</p>
-        <table class="tableau text-[13px]">
-          <thead><tr><th>Valeur</th><th>Codes de l'API</th></tr></thead>
-          <tbody>
-          {% for v, codes in f.valeurs.items() %}
-            <tr><td class="font-semibold">{{ v }}</td>
-              <td>{% for c in codes %}<span class="puce bg-white border border-filet font-mono text-xs font-normal mr-1 mb-1 inline-block">{{ c }}</span>{% endfor %}
-                {% if v == f.code_inconnu %}<span class="text-xs text-sourdine">tout code non listé</span>{% endif %}
-                {% if v == f.sans_code %}<span class="text-xs text-sourdine">{% if v == f.code_inconnu %} ; {% endif %}aucun code retenu</span>{% endif %}
-                {% if not codes and v != f.code_inconnu and v != f.sans_code %}<span class="text-xs text-sourdine">calculée par le démonstrateur</span>{% endif %}</td></tr>
-          {% endfor %}
-          {% if f.code_inconnu is none %}<tr><td class="text-sourdine">code non listé</td><td>{{ badge("incident") }}</td></tr>{% endif %}
-          </tbody>
-        </table>
-        {% if f.note %}<p class="text-xs text-sourdine">{{ f.note }}</p>{% endif %}
-      </section>
-      {% endfor %}
-    </div>
-    <h3 class="mb-2">Sorties des services d'enrichissement</h3>
-    <div class="grid gap-4 lg:grid-cols-2">
-      {% for svc in vue.services %}
-      <section class="sous-carte flex flex-col gap-2">
-        <div class="flex items-baseline gap-2"><h4 class="font-semibold">{{ svc.libelle or svc.nom }}</h4><span class="font-mono text-xs text-sourdine">{{ svc.nom }}</span>
-          <span class="flex-1"></span>{% if not svc.bloquant %}<span class="puce bg-rail text-sourdine" title="« à reprendre » n'arrête pas la génération">non bloquant</span>{% endif %}</div>
-        <p class="text-xs text-sourdine">Source : {{ svc.source or "—" }}</p>
-        <table class="tableau text-[13px]">
-          <thead><tr><th>Sortie</th><th>Codes</th><th>Issue</th><th>Effet</th></tr></thead>
-          <tbody>
-          {% for so in svc.sorties %}
-            <tr><td class="font-semibold">{{ so.libelle }}</td>
-              <td>{% for c in so.codes %}<span class="puce bg-white border border-filet font-mono text-xs font-normal mr-1 mb-1 inline-block">{{ c }}</span>{% endfor %}</td>
-              <td>{{ badge(so.issue) }}</td>
-              <td class="text-xs">{{ so.effet }}{% if so.alerte %}<br><span class="text-decision-fonce">alerte : {{ so.alerte }}</span>{% endif %}</td></tr>
-          {% endfor %}
-            <tr><td class="text-sourdine">code non listé, erreur HTTP</td><td></td><td>{{ badge("incident") }}</td><td></td></tr>
-          </tbody>
-        </table>
-        {% if svc.note %}<p class="text-xs text-sourdine">{{ svc.note }}</p>{% endif %}
-      </section>
-      {% endfor %}
-    </div>
-
-
-    <h3 class="mt-8 mb-2">Variables (données utilisables dans la notice)</h3>
-    <p class="text-sm text-sourdine mb-3"><span class="font-mono">variables.yaml</span> : variables utilisables dans les profils (<span class="font-mono">{variable}</span> ou <span class="font-mono">{variable.attribut}</span>). Exemple : thèse fictive de la référence (<span class="font-mono">reference/moteur-regles/exemple_contexte.json</span>).</p>
-    <div class="defilant"><table class="tableau min-w-[720px]">
-      <thead><tr><th>Variable</th><th>Source</th><th>Type</th><th>Liste</th><th>Disponible</th><th>Exemple</th><th>Description</th></tr></thead>
-      <tbody>
-      {% for v in vue.variables %}
-        <tr class="{% if not v.disponible %}text-sourdine{% endif %}">
-          <td class="font-mono font-semibold">{{ v.nom }}</td>
-          <td class="font-mono text-xs">{{ v.source }}</td>
-          <td>{{ v.type }}</td>
-          <td>{{ "oui" if v.liste else "" }}</td>
-          <td>{% if v.disponible %}<span class="text-auto">oui</span>{% else %}<span class="puce bg-rail text-sourdine">non</span>{% endif %}</td>
-          <td class="text-[13px] max-w-[18rem] break-words">{% if v.exemple %}{{ v.exemple }}{% else %}<span class="text-contour">—</span>{% endif %}</td>
-          <td class="text-[13px]">{{ v.description }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table></div>
-
-
-  {# ============================================================ banc d'essai #}
   {% elif onglet == "essai" %}
     {% include "_banc_essai.html" %}
-
-  {# ============================================================ fichiers #}
   {% else %}
     <p class="avis bg-tonal mb-4 text-sm">Mode expert : les fichiers YAML que le studio écrit. Préférez les autres onglets ; toute modification passe par le vérificateur.</p>
     <nav class="flex flex-wrap gap-2 mb-4" aria-label="Fichiers de règles">

@@ -28,7 +28,7 @@ Alma ou Orion, annotation et export de jeux de données (restent dans le POC).
 humatheque-catalogage/
   CLAUDE.md  docs/SPEC.md  pyproject.toml  .env.example
   Dockerfile  docker-compose.yml
-  regles/                   règles de catalogage (§8) : variables, decisions, verifications, services, notice/ (socle, variantes)
+  regles/                   règles de catalogage (§7, §8) : variables, pipeline, notice/ (socle, variantes)
   reference/                POC, maquette, mindmap, moteur-regles/ (lecture seule)
   src/humatheque/
     config.py               settings pydantic (env), chemins, seuils
@@ -42,7 +42,7 @@ humatheque-catalogage/
     services/               clients HTTP : alma, sudoc, idref, dewey
     qualification/          agrégation des thesis_state Sudoc en état du document (pas d'appel réseau)
     regles/                 chargement des règles YAML, moteur, vérificateur
-    decision/               décisions (tables), issue des réponses de services, provenance
+    decision/               provenance, valeurs lues par le pipeline, décision
     conversion/             conversion d'une notice Sudoc existante (copie en v1)
     generateur/             remplissage des profils + sérialisation
     workflow/               orchestrateur : un document → un Dossier
@@ -308,11 +308,10 @@ dans le dossier :
    - `ambigu` : correspondance partielle (par exemple « hautes études » sans
      « pratique »), ou EPHE présente seulement dans `co_tutelle_institutions`.
 
-   `absent` et `ambigu` donnent le fait `provenance = incertaine` ; le
-   traitement continue (Alma, Sudoc) et la décision mène à l'état de
-   vérification « Provenance à confirmer » (§7, décision du 08/11) : le
-   catalogueur choisit EPHE ou hors EPHE et la décision est reprise, sans
-   rappeler les services. La règle appliquée et la forme comparée sont
+   La provenance donne la variable `ephe` du pipeline (§7) : `oui` (EPHE),
+   `non` (hors EPHE), `absent`, `ambigu`. `absent` et `ambigu` → STOP – à
+   reprendre avant Alma (décision du 09/11) ; le catalogueur choisit EPHE ou
+   hors EPHE dans l'onglet « Reprise » et le traitement reprend. La règle appliquée et la forme comparée sont
    journalisées. **Modèle de décision** (optionnel, désactivé par défaut,
    `PROVENANCE_CONFIRMATION_LLM=false`) : un appel LLM texte peut confirmer la
    déduction ; en cas de désaccord avec la règle, le document part en décision.
@@ -344,26 +343,15 @@ dans le dossier :
      `duplicate_threshold` (`config/services.yaml`, décision du 05/11),
      envoyé au service : le statut du service et l'agrégation utilisent le
      même seuil ;
-   - correspondance `thesis_state` → `etat_sudoc` dans le dictionnaire des faits
-     (`regles/decisions.yaml`, fait `sudoc`, §7) :
-
-     | `thesis_state` | `etat_sudoc` |
-     |---|---|
-     | `printed_original` | `originale imprimée` |
-     | `printed_reproduction` | `reproduction imprimée` |
-     | `microfiche_reproduction` | `reproduction microfiche` |
-     | `electronic` | `électronique seule` |
-
-   - état du document = le plus fort parmi les candidats retenus, dans l'ordre
-     `originale imprimée > reproduction imprimée > reproduction microfiche >
-     électronique seule` ;
-   - un candidat retenu `unknown` donne `indéterminé` (la décision mène à
-     l'état de vérification « Sudoc : résultat à qualifier ») : cette notice
-     pourrait être l'originale, on ne tranche pas à sa place. **Exception** :
-     si une originale imprimée est déjà retenue, l'`unknown` ne change rien et
-     l'état reste `originale imprimée` ;
-   - aucun candidat retenu : `ambigu` si le statut du service est
-     `ambiguous_print_candidate`, sinon `rien` ;
+   - codes gardés tels quels (décision du 09/11, plus de traduction) ;
+     `thesis_state` du document = le plus fort parmi les candidats retenus,
+     dans l'ordre `printed_original > printed_reproduction >
+     microfiche_reproduction > electronic` (règle technique, dans le code) ;
+   - un candidat retenu `unknown` donne `thesis_state = unknown` : cette
+     notice pourrait être l'originale, on ne tranche pas à sa place.
+     **Exception** : si une originale imprimée est déjà retenue, l'`unknown`
+     ne change rien ;
+   - aucun candidat retenu : pas de `thesis_state` ; le `status` du service décide (§7) ;
    - erreur du service (réponse HTTP 4xx/5xx ou service injoignable ; le
      service n'a pas de statut `error`), ou `thesis_state` absent de la
      réponse (version du service antérieure) : issue « incident », sans repli.
@@ -420,123 +408,99 @@ croissant ; au-delà, le dossier reste en incident et se relance depuis
 l'interface. Tous les appels HTTP ont un délai maximal configurable (pas de
 `timeout=None` comme dans le POC).
 
-## 7. Décision
+## 7. Pipeline et décisions
 
-- **Dictionnaire des faits** (décision du 08/11) : `regles/decisions.yaml`
-  (`faits:`) décrit chaque fait de décision — question, source, note — et, pour
-  chaque valeur en clair, **les codes renvoyés par l'API** (ou calculés par le
-  démonstrateur) qui y mènent. C'est la seule traduction code → libellé ; les
-  anciens `config/etats_alma.yaml`, `config/etats_sudoc.yaml` et la section
-  `faits` de `config/regles.yaml` sont supprimés.
+Décision du 09/11 : **simple**. Le pipeline est décrit dans
+`regles/pipeline.yaml` (studio › Pipeline) : les étapes dans l'ordre, et pour
+chacune un **arbre de décision** sur les **codes renvoyés par l'API, sans
+traduction** (`academic_record_found`, `duplicate_found`, `printed_original`,
+`accepted`…). Plus de dictionnaire de faits, de règles nommées, d'états de
+vérification ni de distinction action / issue.
 
-  | Fait | Valeurs (codes) |
-  |---|---|
-  | `type` | thèse (`these`), mémoire (`memoire`) |
-  | `provenance` | EPHE, hors EPHE, incertaine (`absent`, `ambigu`), sans objet (`mémoire`) |
-  | `alma` (status d'alma-checker) | présent (`academic_record_found`), incertain (`ambiguous_academic_candidate`, `off_profile_match_only`), absent (`no_academic_record_found`) ; tout autre code : incident |
-  | `sudoc` (§6) | originale imprimée (`printed_original`), reproduction imprimée (`printed_reproduction`), reproduction microfiche (`microfiche_reproduction`), électronique seule (`electronic`), ambigu (`ambiguous_print_candidate`), indéterminé (`code_inconnu` : tout thesis_state non listé), rien (`sans_code` : aucun candidat retenu), non vérifié (Sudoc pas interrogé) |
+- **Variables** : à toutes les étapes, `type` (`these`, `memoire` : dossier
+  S3 TH / MM ou choix à l'envoi) et `ephe` (`oui`, `non`, `absent`, `ambigu`,
+  d'après `granting_institution`, §6) ; puis celles de l'étape : `status`
+  (Alma, Sudoc, IdRef, Dewey) et `thesis_state` (Sudoc). Les valeurs possibles
+  sont déclarées par étape, d'après l'OpenAPI des services.
+- **Arbre** : un nœud a des conditions `si` (ET entre variables, OU entre les
+  valeurs d'une liste) et `sauf` (valeurs exclues), puis des sous-branches
+  ou un résultat. Lecture de haut en bas : la première feuille qui correspond
+  l'emporte ; une branche dont aucune sous-branche ne correspond laisse la
+  lecture continuer ; à la fin, le `sinon` de l'étape.
+- **Résultats** (une seule notion) :
 
-  L'ordre des valeurs de `sudoc` est l'ordre de force du §6.
-- **Moteur** : `regles/decisions.yaml`, règles lues dans l'ordre, la première
-  qui correspond l'emporte ; `sinon` est obligatoire. Une règle s'écrit
-  `quand: {fait: valeur}` (ou une liste de valeurs admises) ; un fait non cité
-  est indifférent ; le vérificateur rejette un fait ou une valeur absents du
-  dictionnaire. Décision du 08/11 : plus d'expressions (`si`, rule-engine
-  retiré) ; un futur fait produit par un modèle sera déclaré dans le
-  dictionnaire avec ses valeurs, comme les autres.
-- **Traçabilité** : le dossier conserve, fait par fait, le code reçu de l'API et
-  la valeur retenue (`Decision.codes`) ; la chaîne « code → valeur → règle →
-  issue » est affichée dans le dossier et le banc d'essai (une valeur corrigée
-  par un catalogueur est signalée).
-- **Règles nommées** : chaque règle porte un `nom` en clair, qui sert
-  d'identifiant (unique) et s'affiche dans le dossier, le rapport et
-  l'administration (« Notice déjà dans Alma », « Thèse EPHE absente du Sudoc »…).
-  `à_valider: true` signale une règle encore en discussion (décision du 06/11 :
-  plus d'identifiants hérités de Grist).
-- **Actions et issue** : l'issue du document découle de l'action, sans champ
-  `routage` (décision du 06/11) :
-
-  | Action | Effet | Issue |
+  | Résultat | Effet | Issue |
   |---|---|---|
-  | `création` (profil) | la notice est produite | Terminé |
-  | `conversion` (profil cible) | la notice Sudoc est dérivée | Terminé |
-  | `arrêt` (motif) | rien à produire (notice déjà au catalogue) | Terminé |
-  | `vérification` (motif) | un catalogueur doit trancher | À reprendre |
+  | `stop` | arrêt, rien à faire | terminé |
+  | `stop à reprendre` | arrêt pour vérification manuelle | à reprendre |
+  | `conversion` (notice) | conversion de la notice Sudoc puis arrêt | terminé |
+  | `poursuite` | étape suivante | — |
+  | `poursuite avec alerte` | étape suivante, alerte au dossier | — |
+  | `poursuite à reprendre` | étape suivante, exception : document à reprendre à la fin | à reprendre |
+  | `création` (notice) | création de la notice | terminé |
 
-  Une panne technique donne l'issue **Incident**, sans règle. Décision du
-  05/11 : une notice trouvée au-dessus du seuil arrête sans alerte (terminé) ;
-  seul le cas incertain est à reprendre (Alma `incertain`, Sudoc `ambigu` /
-  `indéterminé`).
-- **`sinon`** : action `vérification`, motif « Situation non prévue », faits affichés.
-- **Action `conversion` : conversion, puis arrêt** (thèses et mémoires) :
-  - **notice source** : parmi les candidats Sudoc retenus dont l'état a
-    déterminé `etat_sudoc`, celui qui a le meilleur score ; sa notice UNIMARC est
-    lue via `https://www.sudoc.fr/{ppn}.xml` et convertie au format WinIBW ;
-  - **conversion en v1** : les règles ne sont pas encore définies. La notice
-    convertie est **une copie de la notice source**, avec l'alerte
-    `conversion_non_implementee` et le profil cible affiché. Le module
-    `conversion/` expose une fonction `convertir(notice_source, profil_cible)`
-    qui sera remplacée sans toucher au workflow ;
+  Une panne technique (service injoignable, réponse illisible, JSON
+  d'extraction invalide) donne **incident**, sans règle. L'issue du dossier
+  est la plus sévère de ses étapes (`incident > à reprendre > terminé`).
+- **Pipeline actuel** :
+
+  1. **Provenance** : `ephe = absent OU ambigu` → stop à reprendre ; sinon poursuite.
+  2. **Alma** (`status`) : `academic_record_found` → stop ;
+     `ambiguous_academic_candidate OU off_profile_match_only` → stop à reprendre ;
+     `no_academic_record_found` → poursuite ; sinon stop à reprendre.
+  3. **Sudoc** (`status`, `thesis_state`) :
+     - thèse, `duplicate_found` :
+       `printed_original` ET `ephe = non` → conversion these-reproduction-imprimee ;
+       `printed_reproduction` ET `ephe = oui` → conversion these-originale-imprimee ;
+       `microfiche_reproduction` ET `ephe = non` → conversion these-reproduction-imprimee ;
+       `microfiche_reproduction` ET `ephe = oui` (improbable) → conversion these-originale-imprimee ;
+       `unknown` → stop à reprendre ;
+     - thèse, `electronic_only` : `ephe = non` → conversion these-reproduction-imprimee ;
+       `ephe = oui` → conversion these-originale-imprimee ;
+     - mémoire : `duplicate_found` → stop ; `electronic_only` → conversion memoire-original-imprime ;
+     - `ambiguous_print_candidate` → stop à reprendre ; `no_print_duplicate_found` → poursuite ;
+     - sinon → stop à reprendre (non prévus : `printed_reproduction` hors EPHE ;
+       `printed_original` à l'EPHE, impossible ; `electronic` avec `duplicate_found`).
+  4. **IdRef** (`status`, pour chaque personne et organisme) : `accepted` →
+     poursuite ($3 = PPN) ; `low_confidence OU ambiguous` → poursuite à reprendre
+     ($a nom $b prénom en attendant ; candidats proposés) ; `not_found` →
+     poursuite avec alerte « non trouvé dans IdRef » ($a $b).
+  5. **Dewey** : aucune vérification → poursuite (`status` calculé :
+     `au_dessus_seuil`, `sous_seuil`, `aucune_classe`).
+  6. **Création de la notice** : thèse ET `ephe = oui` → these-originale-imprimee ;
+     thèse ET `ephe = non` → these-reproduction-imprimee ; mémoire → memoire-original-imprime.
+
+- **Conversion, puis arrêt** :
+  - **notice source** : parmi les candidats Sudoc retenus, celui du
+    `thesis_state` retenu avec le meilleur score ; sa notice UNIMARC est lue
+    via `https://www.sudoc.fr/{ppn}.xml` et convertie au format WinIBW ;
+  - **conversion en v1** : copie de la notice source, avec l'alerte
+    `conversion_non_implementee` et la notice cible affichée (`conversion/`,
+    remplaçable sans toucher au workflow) ;
   - **conservation** (ALM-SUD-F-002) : notice source et notice convertie sont
-    stockées dans le dossier et téléchargeables ;
-  - le rapport indique le PPN source, le profil cible et le lien vers le Sudoc.
-- Une action `arrêt` ou `vérification` arrête sans conversion. L'onglet
-  « Reprise » du dossier n'apparaît que pour un document à reprendre ou en
-  incident.
-- **Vérifications humaines = états configurables** (décision du 08/11,
-  `regles/verifications.yaml`, studio › Vérifications). Une règle
-  `alors: vérification` désigne un état (`verification: sudoc_a_qualifier`) ;
-  le document s'arrête « à reprendre » **en attente de vérification**. L'onglet
-  « Reprise » affiche la question, les candidats Alma ou Sudoc à examiner et
-  les choix configurés ; chaque choix :
-  - **corrige des faits** (`faits: {sudoc: rien}`) puis relance la décision —
-    le traitement reprend à l'étape du fait corrigé sans rappeler Alma ni
-    Sudoc (leurs résultats sont gardés) ;
-  - ou **impose une action** (`action: création`, `profil: …`) : décision
-    « Choix du catalogueur », sans règle.
-
-  Le choix, son auteur et son commentaire sont journalisés. États actuels :
-  Alma : candidat incertain ; Provenance à confirmer ; Sudoc : résultat à
-  qualifier (ambigu ou indéterminé) ; Situation non prévue (`sinon`).
-  « Traité hors outil » reste proposé pour tout document à reprendre.
-- **Sorties des services d'enrichissement** (décision du 08/11) :
-  `regles/services.yaml` liste, pour l'extraction, IdRef personnes
-  (`idref_personne`), IdRef structures (`idref_organisations`) et Dewey,
-  chaque sortie : libellé, codes, issue, alerte, effet. Une erreur HTTP
-  (4xx/5xx), un service injoignable ou un code non listé donnent « incident ».
-  Alma et Sudoc n'y figurent pas : leurs codes deviennent des faits (ci-dessus).
-
-  | Service | Sortie (codes) | Issue |
-  |---|---|---|
-  | IdRef personnes et structures | alignée (`accepted`) | terminé, PPN en `$3` |
-  | | confiance faible (`low_confidence`), ambiguë (`ambiguous`) | à reprendre, candidats proposés |
-  | | introuvable (`not_found`) | à reprendre, alerte « proto-notice d'autorité à créer » |
-  | Dewey (statut calculé : score de la 1re classe / `DEWEY_SEUIL`) | classe retenue (`au_dessus_seuil`) | terminé |
-  | | sous le seuil (`sous_seuil`), aucune classe (`aucune_classe`) | à reprendre |
-  | Extraction | JSON valide / invalide | terminé / incident |
-
-  IdRef et Dewey sont `bloquant: false` : « à reprendre » **n'arrête pas** la
-  génération (repli `$a{nom}$b{prenom}` ou zone omise, exception créée).
-- **Issue du dossier** : la plus sévère de ses étapes, dans l'ordre
-  `incident > à reprendre > terminé`. Les dossiers enregistrés avec l'ancien
-  routage sont relus avec la nouvelle issue (auto, sortie, conversion → terminé ;
-  décision → à reprendre).
+    stockées dans le dossier et téléchargeables.
+- **Traçabilité** : à chaque étape, le dossier journalise les valeurs lues,
+  le chemin suivi dans l'arbre et le résultat ; l'onglet du dossier affiche le
+  **parcours du pipeline**.
+- **Reprise** (document à reprendre) : actions fixes de l'onglet « Reprise » —
+  choisir EPHE / hors EPHE (provenance) ; **ignorer le résultat (faux positif)
+  et poursuivre** (ALM-SUD-006 : Alma → `no_academic_record_found`, Sudoc →
+  `no_print_duplicate_found`, sans rappeler le service) ; choisir le PPN IdRef ;
+  « traité hors outil ».
 
 ## 8. Règles et générateur
 
 ### 8.1 Où sont les règles
 
 Décision du 08/11 : les règles sont éditées dans le **studio de catalogage**
-(§9.3) ; les catalogueurs manipulent des décisions, des vérifications et des
+(§9.3) ; les catalogueurs manipulent l'arbre du pipeline et des
 zones de notice, jamais des expressions ni des chaînes UNIMARC à conditions.
 Le studio écrit des fichiers YAML versionnés, validés avant enregistrement.
 
 | Fichier | Contenu |
 |---|---|
 | `regles/variables.yaml` | Dictionnaire des variables : `source`, `type` (texte, personne, organisme), `liste`, `disponible`, `description` |
-| `regles/decisions.yaml` | Dictionnaire des faits (valeurs et codes d'API), tableau de décision (`quand`), `sinon` |
-| `regles/verifications.yaml` | Vérifications humaines : états, question, choix (§7) |
-| `regles/services.yaml` | Sorties des services d'enrichissement (IdRef personnes et structures, Dewey, extraction) : codes, issue, alerte |
+| `regles/pipeline.yaml` | Pipeline (§7) : étapes, variables lues (codes des API), arbre de décision et résultats |
 | `regles/notice/socle.yaml` | Socle commun de la notice : zones structurées, rendu des autorités |
 | `regles/notice/variantes/*.yaml` | Variantes (thèse originale imprimée, thèse de reproduction imprimée, mémoire original imprimé) : zones ajoutées, remplacées, retirées |
 
@@ -635,16 +599,14 @@ chaque enregistrement depuis le studio (§9.3), affiché dans l'interface.
 | erreur | Sous-zone sans valeur (zone active) ou avec deux sortes de valeur ; repli choisi sans valeur ; mode de rendu inconnu |
 | erreur | Variable absente de `variables.yaml` ; attribut impossible pour le type ; autorité qui n'est ni personne ni organisme ; zone répétée sur deux autorités |
 | erreur | Variante qui remplace ou retire une zone absente du socle, ou ajoute une zone déjà dans le socle |
-| erreur | Fait ou valeur de `quand` absent du dictionnaire ; code d'API listé pour deux valeurs (ou deux sorties) ; issue de sortie inconnue |
-| erreur | Profil inconnu dans une décision ; action inconnue ; nom de règle en double ; état de vérification inconnu |
-| erreur | Choix de vérification : à la fois (ou ni) faits et action ; valeur de fait inconnue ; profil inconnu |
-| avertissement | Variante atteinte par aucune décision ni vérification ; vérification sans état ; règle sans `quand` |
-| avertissement | **Cas non couvert** : combinaison des valeurs de faits (Alma absent) qui tombe dans `sinon` |
+| erreur | Pipeline : variable non lue par l'étape ; valeur absente des valeurs possibles ; résultat inconnu ; branche avec à la fois sous-branches et résultat (ou ni l'un ni l'autre) ; notice cible inconnue |
+| avertissement | Notice (variante) atteinte par aucune branche |
+| info | **Cas qui tombent dans « sinon »** : combinaisons des valeurs possibles d'une étape, réduites aux variables qui comptent |
 | info | Variable utilisée par aucune zone active |
 
-Avec les règles actuelles, le contrôle de complétude doit signaler 4 cas :
-thèse EPHE avec originale imprimée au Sudoc ; mémoire avec originale,
-reproduction imprimée ou reproduction microfiche au Sudoc.
+Avec les règles actuelles, 3 cas Sudoc tombent dans « sinon » (stop à
+reprendre) : `printed_reproduction` hors EPHE, `printed_original` à l'EPHE
+(impossible), `electronic` avec `duplicate_found`.
 
 ### 8.5 Sorties
 
@@ -724,31 +686,20 @@ défaut sur la version générée.
     réglages des lots automatiques (fournisseur, paramètres avancés ; proposés
     aussi par défaut dans le formulaire), déclencheurs (§3.1), état du
     planificateur.
-  - **`/admin/regles` Studio de catalogage** (décision du 08/11), une vue par
-    logique de travail, sans expression ni YAML à écrire :
-    - **Décisions** : tableau de décision, une colonne par fait, valeurs en
-      clair (codes d'API au survol) ; ajout, modification, suppression,
-      réordonnancement par formulaire ; action, profil ou état de
-      vérification ;
-    - **Vérifications** : états d'attente (question, candidats montrés,
-      choix : corriger un fait ou imposer une action), édités par formulaire ;
-    - **Notice UNIMARC** : socle commun et variantes ; liste des zones
-      (provenance socle / modifiée / ajoutée / retirée, à valider, obligatoire,
-      jamais produite) ; éditeur de zone : étiquette, indicateurs, libellé,
-      sous-zones listées puis paramétrées (sorte de valeur, donnée et sa
-      source, texte avant / après, plusieurs valeurs, si la valeur est
-      absente : omettre, repli, vérification humaine), aperçu immédiat de la
-      zone sur l'exemple ; enregistrement dans le socle ou pour la variante,
-      retour au socle, retrait ; rendu des autorités partagé ; aperçu de la
-      notice de la variante ;
-    - **Données** : dictionnaire des faits, sorties des services, variables
-      (source, exemple) ;
-    - **Banc d'essai** : un dossier réel (codes d'API repris) ou l'exemple
-      fictif avec des faits saisis → décisions appliquées (code → valeur →
-      règle), données préparées, notice prévisualisée avec la provenance de
-      chaque zone, vérifications et alertes ; **non-régression** : régénère les
-      notices déjà produites (25 au plus) et indique les zones qui changent
-      (« change la zone 328 sur 1 des 1 notices ») ;
+  - **`/admin/regles` Studio de catalogage** (décisions du 08/11 et du 09/11) :
+    - **Pipeline** : les étapes numérotées, chacune avec ce qu'elle lit et son
+      arbre indenté (SI … ET … OU … SAUF … ⟶ résultat → étape suivante ;
+      SINON) ; chaque branche se modifie sur place (✎), on ajoute une branche
+      après (+) ou une sous-branche (⤷), on monte, descend, supprime ; les
+      valeurs proposées sont les codes de l'API de l'étape ;
+    - **Notice UNIMARC** : socle commun et variantes ; liste des zones ;
+      éditeur de zone (sous-zones listées puis paramétrées : sorte de valeur,
+      donnée, texte avant / après, plusieurs valeurs, si absente : omettre,
+      repli, vérification humaine), aperçu immédiat ; rendu des autorités ;
+    - **Banc d'essai** : un dossier réel (codes repris) ou l'exemple fictif
+      avec des valeurs choisies → parcours du pipeline étape par étape,
+      données préparées, notice avec la provenance de chaque zone ;
+      **non-régression** sur les notices déjà produites ;
     - **Fichiers** (experts) : YAML dans Monaco, vérifier / enregistrer.
 
     Chaque enregistrement réécrit un seul fichier, refuse toute erreur
@@ -853,11 +804,12 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
    Tests de référence : 105 en une seule occurrence (`$bm$ba` ou `$bv$ba`), 328
    avec `$zReproduction de` en tête pour la reproduction, une 701 par
    rapporteur, repli `$a$b` sans PPN, un seul 200$g « A et B ».
-4. **Décision** : une ligne de test par règle de `decisions.yaml`, plus
-   `sinon` et « conversion puis arrêt ».
+4. **Pipeline** : un test par branche de `pipeline.yaml` (codes des API),
+   plus `sinon`, la lecture qui continue après un embranchement sans issue
+   et « conversion puis arrêt ».
 5. **Clients des services, agrégation `thesis_state` et workflow** de bout en bout
    (mocks). Agrégation testée par table : originale + reproduction → originale ;
-   reproduction + unknown → indéterminé ; originale + unknown → originale ;
+   reproduction + unknown → unknown ; originale + unknown → originale ;
    électronique seule ; aucun retenu + `ambiguous_print_candidate` → ambigu ;
    `thesis_state` absent → incident.
    « Thèse EPHE absente du Sudoc » produit une notice ; « Notice déjà dans
@@ -907,5 +859,5 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 | ALM-SUD-F-002, conversions Sudoc | §7, §9 | intégrée (conversion = copie de la source en v1 ; décision du 03/11) |
 | Alma : au moins une notice trouvée → arrêt | §6 | intégrée (décision du 03/11) |
 | Provenance déduite de `granting_institution` | §6, §7 | intégrée, modèle de décision optionnel (décision du 03/11) |
-| Conversion « reproduction via 105 $bm, EPHE » | — | coquille du wiki : la règle « Thèse EPHE, reproduction au Sudoc » de `decisions.yaml` fait foi |
+| Conversion « reproduction via 105 $bm, EPHE » | — | coquille du wiki : la branche Sudoc `printed_reproduction` ET `ephe = oui` de `pipeline.yaml` fait foi |
 | Mémoire trouvé au Sudoc | §7 | la spec fait foi : conversion si notice électronique (« Mémoire, notice électronique au Sudoc ») |

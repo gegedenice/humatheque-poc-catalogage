@@ -1,7 +1,8 @@
-"""Agrégation des thesis_state de sudoc-checker en état du document (SPEC §6 étape 4).
-
-Fonction pure, sans appel réseau ; correspondances code → valeur dans le
-dictionnaire des faits (`regles/decisions.yaml`, fait `sudoc`).
+"""Agrégation des candidats de sudoc-checker (SPEC §6 étape 4) : le `thesis_state`
+du document est celui du candidat retenu (score ≥ seuil) le plus fort, dans
+l'ordre `ORDRE` ; un `unknown` retenu l'emporte sauf si une originale imprimée
+est retenue (on ne tranche pas à la place du catalogueur). Les codes de l'API
+sont gardés tels quels. Fonction pure, sans appel réseau.
 """
 
 from __future__ import annotations
@@ -10,7 +11,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from humatheque.regles.modeles import Fait
 
 
 class CandidatSudoc(BaseModel):
@@ -18,7 +18,7 @@ class CandidatSudoc(BaseModel):
     score: float | None
     carrier: str | None = None
     thesis_state: str | None = None
-    etat: str | None = Field(None, description="etat_sudoc correspondant")
+    etat: str | None = Field(None, description="thesis_state reconnu (None : non listé)")
     retenu: bool
     titre: str | None = None
     auteurs: list[str] = Field(default_factory=list)
@@ -28,7 +28,7 @@ class CandidatSudoc(BaseModel):
 
 
 class Qualification(BaseModel):
-    etat: str | None = Field(None, description="None : incident")
+    etat: str | None = Field(None, description="thesis_state retenu pour le document (None : aucun candidat)")
     justification: str
     incident: bool = False
     statut_service: str | None = None
@@ -38,21 +38,12 @@ class Qualification(BaseModel):
     code: str | None = Field(None, description="code de l'API qui a déterminé l'état (thesis_state ou status)")
 
 
-def _explicite(fait: Fait, code: Any) -> str | None:
-    """Valeur dont `code` est listé explicitement (sans repli code_inconnu / sans_code)."""
-    return next((v for v, codes in fait.valeurs.items() if code is not None and str(code) in codes), None)
+# Ordre de force des thesis_state (le premier l'emporte) ; INCONNU : non qualifiable.
+ORDRE = ["printed_original", "printed_reproduction", "microfiche_reproduction", "electronic"]
+INCONNU = "unknown"
 
 
-def fait_sudoc(fait: Fait | None = None) -> Fait:
-    if fait is not None:
-        return fait
-    from humatheque.regles import charger_regles
-
-    return charger_regles().faits["sudoc"]
-
-
-def agreger(reponse: dict[str, Any], seuil: float, fait: Fait | None = None) -> Qualification:
-    fait = fait_sudoc(fait)
+def agreger(reponse: dict[str, Any], seuil: float) -> Qualification:
     statut = reponse.get("status")
     bruts = reponse.get("candidates")
     if bruts is None or not isinstance(bruts, list):
@@ -67,7 +58,7 @@ def agreger(reponse: dict[str, Any], seuil: float, fait: Fait | None = None) -> 
         these = c.get("thesis") or {}
         candidats.append(CandidatSudoc(
             ppn=c.get("ppn"), score=score, carrier=c.get("carrier"), thesis_state=c["thesis_state"],
-            etat=_explicite(fait, c["thesis_state"]),
+            etat=c["thesis_state"] if c["thesis_state"] in ORDRE else None,
             retenu=score is not None and score >= seuil,
             titre=c.get("title"), auteurs=c.get("authors") or [], annee=c.get("year"),
             type=these.get("type"), lien=c.get("url"),
@@ -76,18 +67,16 @@ def agreger(reponse: dict[str, Any], seuil: float, fait: Fait | None = None) -> 
     retenus = [c for c in candidats if c.retenu]
     base = dict(statut_service=statut, seuil=seuil, candidats=candidats)
     if not retenus:
-        etat = _explicite(fait, statut) or fait.sans_code
-        return Qualification(etat=etat, code=statut, justification=f"aucun candidat au-dessus du seuil {seuil} "
+        return Qualification(etat=None, code=statut, justification=f"aucun candidat au-dessus du seuil {seuil} "
                              f"(statut du service : {statut})", **base)
 
-    ordre: list[str] = list(fait.valeurs)
+    ordre: list[str] = ORDRE
     connus = [c for c in retenus if c.etat in ordre]
     plus_fort = min((ordre.index(c.etat) for c in connus), default=None)
     inconnus = [c for c in retenus if c.etat is None]
     if inconnus and plus_fort != 0:
         ppns = ", ".join(str(c.ppn) for c in inconnus)
-        return Qualification(etat=fait.code_inconnu, code=str(inconnus[0].thesis_state),
-                             incident=fait.code_inconnu is None, justification=f"candidat(s) retenu(s) non qualifiable(s) "
+        return Qualification(etat=INCONNU, code=str(inconnus[0].thesis_state), justification=f"candidat(s) retenu(s) non qualifiable(s) "
                              f"(thesis_state {', '.join(sorted({str(c.thesis_state) for c in inconnus}))}) : {ppns}",
                              **base)
     etat = ordre[plus_fort]

@@ -1,11 +1,11 @@
-"""Moteur des règles (SPEC §7, §8), d'après `reference/moteur-regles/moteur.py`.
+"""Moteur du pipeline (SPEC §7) : pour une étape, valeurs lues (codes renvoyés
+par l'API, type, ephe) → résultat de l'arbre de `regles/pipeline.yaml`.
 
-- `evaluer_decisions` / `choisir` : faits → première règle de `decisions.yaml`
-  qui correspond aux faits (`quand`), sinon `sinon` ;
-- la génération de la notice est dans `regles/notice.py` (zones structurées).
-
-Rien de métier ici : zones, codes, valeurs fixes et décisions viennent de
-`regles/` ; les conventions de lecture de `config/regles.yaml`.
+Parcours dans l'ordre de lecture de l'arbre : la première feuille qui
+correspond l'emporte. Une branche avec des sous-branches descend ; si aucune
+ne correspond, son `sinon` s'il existe, sinon la lecture continue aux branches
+suivantes ; à la fin, le `sinon` de l'étape. Le chemin parcouru est gardé.
+Aucune règle ici : seulement l'interprétation des nœuds.
 """
 
 from __future__ import annotations
@@ -15,8 +15,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from humatheque import issues
 from humatheque.config import charger_yaml
-from humatheque.regles.modeles import RegleDecision, Regles
+from humatheque.regles.modeles import EtapePipeline, Noeud, Regles
 
 
 @lru_cache
@@ -24,81 +25,81 @@ def conventions() -> dict[str, Any]:
     return charger_yaml("regles")
 
 
-# ------------------------------------------------------------------ décision
-class Evaluation(BaseModel):
-    nom: str
-    si: str = Field(description="condition en clair")
-    vraie: bool | None = Field(None, description="None : non évaluée (règle précédente retenue) ou erreur")
-    erreur: str | None = None
+class Issue(BaseModel):
+    """Résultat d'une étape : ce qui arrive au document, et pourquoi."""
+
+    etape: str
+    valeurs: dict[str, Any] = Field(default_factory=dict)
+    chemin: list[str] = Field(default_factory=list, description="conditions des nœuds traversés")
+    resultat: str
+    notice: str | None = None
+    motif: str | None = None
+    alerte: str | None = None
+    sinon: bool = Field(False, description="aucune branche ne correspond")
+
+    @property
+    def arret(self) -> bool:
+        return self.resultat in ("stop", "stop à reprendre", "conversion")
+
+    @property
+    def issue(self) -> str:
+        """Issue du document (terminé, à reprendre) qui découle du résultat."""
+        return issues.A_REPRENDRE if "reprendre" in self.resultat else issues.TERMINE
+
+    @property
+    def texte(self) -> str:
+        n = Noeud(resultat=self.resultat, notice=self.notice)
+        return n.texte_resultat
+
+    @property
+    def explication(self) -> str:
+        chemin = " → ".join(self.chemin) if self.chemin else "aucune branche"
+        return f"{chemin} : {self.texte}" + (f" ({self.motif})" if self.motif else "")
 
 
-class Traduction(BaseModel):
-    """Chaîne code d'API → valeur du fait (banc d'essai, dossier)."""
-
-    fait: str
-    code: Any = None
-    valeur: Any = None
-    connue: bool = Field(True, description="false : code ni listé ni rattrapé (code_inconnu)")
-
-
-class Choix(BaseModel):
-    """Règle retenue pour des faits, et évaluation de chaque condition (banc d'essai)."""
-
-    faits: dict[str, Any]
-    traductions: list[Traduction] = Field(default_factory=list)
-    regle: dict[str, Any] = Field(description="règle retenue (ou `sinon`, nom « sinon »)")
-    action: str
-    suite: str
-    issue: str = Field(description="terminé ou à reprendre")
-    profil: str | None = None
-    motif: str
-    evaluations: list[Evaluation] = Field(default_factory=list)
-
-
-def _action(alors: str) -> dict[str, str]:
-    from humatheque import issues
-
-    return conventions()["actions"].get(alors) or {"suite": "arreter", "issue": issues.A_REPRENDRE}
-
-
-def traduire(regles: Regles, codes: dict[str, Any]) -> list[Traduction]:
-    """Codes d'API (ou libellés) → valeurs des faits du dictionnaire (`decisions.yaml`)."""
-    sortie = []
-    for nom, code in codes.items():
-        f = regles.faits.get(nom)
-        if f is None:
-            sortie.append(Traduction(fait=nom, code=code, valeur=code, connue=False))
+def _parcourir(noeuds: list[Noeud], valeurs: dict[str, Any], chemin: list[str]) -> tuple[Noeud, list[str]] | None:
+    for n in noeuds:
+        if not n.correspond(valeurs):
             continue
-        valeur = f.traduire(code)
-        connue = valeur is not None and (code in (None, "") or str(code) in f.valeurs
-                                         or any(str(code) in c for c in f.valeurs.values()))
-        sortie.append(Traduction(fait=nom, code=code, valeur=valeur, connue=connue))
-    return sortie
+        ici = [*chemin, n.condition]
+        if not n.branches:
+            return n, ici
+        trouve = _parcourir(n.branches, valeurs, ici)
+        if trouve:
+            return trouve
+        if n.sinon is not None:
+            return n.sinon, [*ici, "sinon"]
+    return None
 
 
-def choisir(regles: Regles, faits: dict[str, Any], *, tout_evaluer: bool = False,
-            codes: dict[str, Any] | None = None) -> Choix:
-    """Première règle vraie ; `tout_evaluer` évalue aussi les suivantes (banc d'essai).
-    `codes` : codes d'API bruts, traduits en faits par le dictionnaire (prioritaires)."""
-    traductions = traduire(regles, codes) if codes else []
-    faits = {**faits, **{t.fait: t.valeur for t in traductions}}
-    retenue: RegleDecision | None = None
-    evaluations = []
-    for r in regles.decisions:
-        if retenue is not None and not tout_evaluer:
-            evaluations.append(Evaluation(nom=r.nom, si=r.texte_condition))
-            continue
-        vraie = r.correspond(faits)
-        evaluations.append(Evaluation(nom=r.nom, si=r.texte_condition, vraie=vraie))
-        if vraie and retenue is None:
-            retenue = r
-    if retenue is None:
-        donnees = {"nom": "sinon", **regles.sinon}
+def evaluer(regles: Regles, etape: str, valeurs: dict[str, Any]) -> Issue:
+    """Résultat de l'étape `etape` pour ces valeurs."""
+    e: EtapePipeline | None = regles.etapes.get(etape)
+    if e is None:  # étape non configurée : on poursuit
+        return Issue(etape=etape, valeurs=valeurs, resultat="poursuite", motif="étape non configurée")
+    trouve = _parcourir(e.branches, valeurs, [])
+    if trouve is None:
+        n, chemin, sinon = e.sinon, ["sinon"], True
     else:
-        donnees = retenue.model_dump(exclude_none=True, exclude_defaults=True, by_alias=True)
-        donnees["nom"] = retenue.nom
-    alors = str(donnees.get("alors", "vérification"))
-    a = _action(alors)
-    motif = str(donnees.get("motif") or donnees["nom"])
-    return Choix(faits=faits, traductions=traductions, regle=donnees, action=alors, suite=a["suite"], issue=a["issue"],
-                 profil=donnees.get("profil"), motif=motif, evaluations=evaluations)
+        (n, chemin), sinon = trouve, chemin_sinon(trouve[1])
+    return Issue(etape=etape, valeurs=valeurs, chemin=chemin, resultat=n.resultat or "stop à reprendre",
+                 notice=n.notice, motif=n.motif, alerte=n.alerte, sinon=sinon)
+
+
+def chemin_sinon(chemin: list[str]) -> bool:
+    return bool(chemin) and chemin[-1] == "sinon"
+
+
+def valeurs_possibles(regles: Regles, etape: str) -> dict[str, list[str]]:
+    """Variables lisibles à une étape : communes + celles de l'étape."""
+    e = regles.etapes.get(etape)
+    return {**regles.communes, **(e.variables if e else {})}
+
+
+def valeurs_utilisees(noeuds: list[Noeud]) -> set[str]:
+    sortie: set[str] = set()
+    for n in noeuds:
+        sortie |= set(n.si) | set(n.sauf) | valeurs_utilisees(n.branches)
+        if n.sinon:
+            sortie |= valeurs_utilisees([n.sinon])
+    return sortie

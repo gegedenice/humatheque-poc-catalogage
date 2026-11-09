@@ -19,7 +19,8 @@ from humatheque import issues
 from humatheque.config import charger_yaml, reglages
 from humatheque.contexte import ResultatsServices, construire, document_vide, normaliser_metadonnees
 from humatheque.conversion import ConversionEchec, convertir, depuis_iso, unimarc_xml_vers_iso, vers_winibw as iso_vers_winibw
-from humatheque.decision.moteur import decider, decision_imposee, faits_du_dossier, routage_final, routage_service
+from humatheque.decision.moteur import Decision, routage_final, valeurs_etape
+from humatheque.regles.moteur import Issue, evaluer
 from humatheque.decision.provenance import provenance as deduire_provenance
 from humatheque.extraction import (
     ExtractionInvalide, ImageIllisible, ImageInaccessible, InferenceIndisponible, extraire,
@@ -200,8 +201,7 @@ class Workflow:
         except ExtractionInvalide as e:
             d.etapes["extraction"].appels += e.appels
             d.etapes["extraction"].reponse = {"bruts": e.bruts}
-            rs = routage_service(self.services.regles, "extraction", "json_invalide")
-            return self._arret(rs.routage or issues.INCIDENT, str(e), "json_invalide")
+            return self._arret(issues.INCIDENT, str(e), "json_invalide")
 
         d.extraction = res
         d.etapes["extraction"].appels += res.appels
@@ -221,6 +221,41 @@ class Workflow:
         self._contexte(d)  # contexte partiel
         return Suite()
 
+    # ================================================================ pipeline (regles/pipeline.yaml)
+    def _valeurs(self, d: Dossier, **codes) -> dict:
+        return valeurs_etape(d.document.type_document, d.provenance.valeur if d.provenance else None, **codes)
+
+    def _issue(self, d: Dossier, etape: str, valeurs: dict, objet: str | None = None, ou: str | None = None) -> Issue:
+        """Résultat de l'étape dans le pipeline, journalisé (valeurs lues, chemin, résultat) ;
+        `ou` : étape du workflow (par défaut celle du pipeline)."""
+        r = evaluer(self.services.regles, etape, valeurs)
+        d.noter(ou or (etape if etape in d.etapes else "situation"), "decision",
+                {"etape": etape, **({"objet": objet} if objet else {}), "valeurs": valeurs, "chemin": r.chemin,
+                 "resultat": r.resultat, "notice": r.notice, "motif": r.motif})
+        return r
+
+    def _libelle(self, etape: str) -> str:
+        e = self.services.regles.etapes.get(etape)
+        return e.libelle if e else etape
+
+    def _appliquer(self, d: Dossier, r: Issue, objet: str | None = None, candidats: list | None = None,
+                   ou: str | None = None) -> Suite | None:
+        """Effet d'un résultat : arrêt (stop, stop à reprendre), alerte, exception ; None : on poursuit."""
+        libelle = self._libelle(r.etape)
+        if r.resultat in ("stop", "stop à reprendre"):
+            d.decision = Decision.depuis(r, libelle)
+            motif = d.decision.motif + (f" ({objet})" if objet else "")
+            if r.etape == "alma" and d.alma and d.alma.ppn:
+                motif += f" — PPN {d.alma.ppn}"
+            return self._arret(r.issue, motif)
+        if r.resultat == "poursuite avec alerte":
+            d.alerter(f"{objet} : {r.alerte or r.motif}" if objet else (r.alerte or r.motif or libelle))
+        elif r.resultat == "poursuite à reprendre":
+            d.exceptions.append(ExceptionDossier(etape=ou or r.etape, objet=objet or libelle,
+                                                 motif=f"{libelle} : {r.motif or r.resultat}",
+                                                 candidats=candidats or []))
+        return None
+
     def _etape_provenance(self, d: Dossier) -> Suite:
         m = d.metadonnees or {}
         p = deduire_provenance(m.get("granting_institution"), m.get("co_tutelle_institutions"),
@@ -230,30 +265,17 @@ class Workflow:
         d.provenance = p
         d.noter("provenance", "decision", {"valeur": p.valeur, "regle": p.regle,
                                            "forme_comparee": p.forme_comparee, "forme_reconnue": p.forme_reconnue})
-        # Provenance absente ou ambiguë : pas d'arrêt ici, la décision (fait « provenance »)
-        # mène à l'état de vérification configuré (regles/verifications.yaml).
-        return Suite()
+        return self._appliquer(d, self._issue(d, "provenance", self._valeurs(d))) or Suite()
 
     def _etape_alma(self, d: Dossier) -> Suite:
-        if "alma" in d.corrections and d.alma is not None:  # choix d'un catalogueur : pas de nouvel appel
+        if "alma" in d.corrections and d.alma is not None:  # faux positif déclaré : pas de nouvel appel
             res = d.alma
         else:
             res = self._appel(d, "alma", verifier_alma, self.services.alma, d.metadonnees, d.document.type_document,
-                              self.services.parametres("alma"), self.services.regles.faits["alma"])
+                              self.services.parametres("alma"))
         d.alma = res
-        if res.etat is None:
-            rs = routage_service(self.services.regles, "alma", res.statut)
-            inc = _cfg()["statut_inconnu"]
-            return self._arret(rs.routage or inc["routage"], f"alma-checker : {inc['motif']} « {res.statut} »",
-                               "service_indisponible")
-        d.etat_alma = d.corrections.get("alma", res.etat)
-        d.noter("alma", "decision", {"statut": res.statut, "etat": res.etat, "etat_retenu": d.etat_alma,
-                                     "ppn": res.ppn})
-        if d.etat_alma != "absent":
-            # Au moins une notice trouvée : Sudoc n'est pas interrogé, la situation S01 s'applique.
-            d.etapes["sudoc"] = Etape(nom="sudoc", statut="ignoree", motif="notice trouvée dans Alma")
-            d.etat_sudoc = _cfg()["etat_sudoc_non_verifie"]
-        return Suite()
+        d.etat_alma = d.corrections.get("alma", res.statut)
+        return self._appliquer(d, self._issue(d, "alma", self._valeurs(d, status=d.etat_alma))) or Suite()
 
     def _etape_sudoc(self, d: Dossier) -> Suite:
         parametres = self.services.parametres("sudoc")
@@ -261,43 +283,34 @@ class Workflow:
         seuil = parametres.get("duplicate_threshold")
         if seuil is None:
             raise _Incident("service_indisponible", _cfg()["motifs"]["seuil_sudoc"])
-        if "sudoc" in d.corrections and d.sudoc is not None:  # choix d'un catalogueur : pas de nouvel appel
+        if "sudoc" in d.corrections and d.sudoc is not None:  # faux positif déclaré : pas de nouvel appel
             q = d.sudoc
         else:
             reponse = self._appel(d, "sudoc", verifier_sudoc, self.services.sudoc, d.metadonnees,
                                   d.document.type_document, parametres)
-            q = agreger(reponse, float(seuil), self.services.regles.faits["sudoc"])
+            q = agreger(reponse, float(seuil))
         d.sudoc = q
-        d.noter("sudoc", "decision", {"etat": q.etat, "justification": q.justification, "ppn_source": q.ppn_source})
+        d.noter("sudoc", "decision", {"thesis_state": q.etat, "justification": q.justification,
+                                      "ppn_source": q.ppn_source})
         if q.incident:
             return self._arret(issues.INCIDENT, f"sudoc-checker : {q.justification}", "service_indisponible")
-        d.etat_sudoc = d.corrections.get("sudoc", q.etat)
-        # « indéterminé » n'arrête pas ici : la décision mène à l'état de vérification configuré.
-        return Suite()
+        statut = d.corrections.get("sudoc", q.statut_service)
+        d.etat_sudoc = None if "sudoc" in d.corrections else q.etat
+        r = self._issue(d, "sudoc", self._valeurs(d, status=statut, thesis_state=d.etat_sudoc))
+        if r.resultat == "conversion":
+            d.decision = Decision.depuis(r, self._libelle("sudoc"))
+            return Suite()
+        return self._appliquer(d, r) or Suite()
 
     def _etape_situation(self, d: Dossier) -> Suite:
-        faits = faits_du_dossier(self.services.regles, d.document.type_document,
-                                 d.provenance.valeur if d.provenance else None, d.etat_alma, d.etat_sudoc)
-        codes = {"type": d.document.type_document, "provenance": d.provenance.valeur if d.provenance else None,
-                 "alma": d.alma.statut if d.alma else None,
-                 "sudoc": d.sudoc.code if d.sudoc else None}
-        # Faits corrigés par un catalogueur (états de vérification) : prioritaires.
-        faits.update({k: v for k, v in d.corrections.items() if k in faits and k not in ("alma", "sudoc")})
-        if d.corrections.get("action"):
-            dec = decision_imposee(self.services.regles, faits, codes, d.corrections["action"],
-                                   d.corrections.get("profil") or None, d.corrections.get("choix", ""))
-        else:
-            dec = decider(self.services.regles, faits, codes)
-        d.decision = dec
-        d.noter("situation", "decision", dec.model_dump(exclude={"ligne"}))
-        if dec.suite == "creer":
-            return Suite(routage=dec.routage)
-        if dec.suite == "convertir":
-            return Suite(routage=dec.routage)
-        motif = dec.motif
-        if d.alma and d.etat_alma != "absent":
-            motif += f" — Alma : {d.alma.motif or d.alma.statut}" + (f" (PPN {d.alma.ppn})" if d.alma.ppn else "")
-        return self._arret(dec.routage, motif)
+        """Notice à produire : conversion décidée au Sudoc, sinon l'étape « création »."""
+        if d.decision and d.decision.suite == "convertir":
+            return Suite()
+        r = self._issue(d, "creation", self._valeurs(d), ou="situation")
+        if r.resultat == "création":
+            d.decision = Decision.depuis(r, self._libelle("creation"))
+            return Suite()
+        return self._appliquer(d, r) or Suite()
 
     def _etape_conversion(self, d: Dossier) -> Suite:
         dec = d.decision
@@ -349,15 +362,8 @@ class Workflow:
         return Suite()
 
     def _statut_idref(self, d: Dossier, etape: str, service: str, a, objet: str) -> Suite | None:
-        rs = routage_service(self.services.regles, service, a.statut)
-        d.alerter(*(f"{objet} : {x}" for x in rs.alertes))
-        if rs.bloquant:
-            return self._arret(rs.routage or issues.INCIDENT, f"{service} « {a.statut} » pour {objet}",
-                               "service_indisponible" if rs.routage == issues.INCIDENT else "arret")
-        if rs.exception:
-            d.exceptions.append(ExceptionDossier(etape=etape, objet=objet, motif=f"IdRef : {a.statut}",
-                                                 candidats=[c.model_dump() for c in a.candidats]))
-        return None
+        r = self._issue(d, "idref", self._valeurs(d, status=a.statut), objet, ou=etape)
+        return self._appliquer(d, r, objet, [c.model_dump() for c in a.candidats], ou=etape)
 
     def _etape_idref_organisations(self, d: Dossier) -> Suite:
         m = d.metadonnees or {}
@@ -382,13 +388,8 @@ class Workflow:
         res = self._appel(d, "dewey", classer, self.services.dewey, d.metadonnees, self.services.seuil_dewey,
                           self.services.parametres("dewey"))
         d.dewey = res
-        rs = routage_service(self.services.regles, "dewey", res.statut)
-        if rs.bloquant:
-            return self._arret(rs.routage or issues.INCIDENT, f"dewey-classifier « {res.statut} »")
-        if rs.exception:
-            d.exceptions.append(ExceptionDossier(etape="dewey", objet="classe Dewey", motif=f"Dewey : {res.statut}",
-                                                 candidats=[c.model_dump() for c in res.classes]))
-        return Suite()
+        r = self._issue(d, "dewey", self._valeurs(d, status=res.statut))
+        return self._appliquer(d, r, "classe Dewey", [c.model_dump() for c in res.classes]) or Suite()
 
     def _etape_generation(self, d: Dossier) -> Suite:
         ctx = self._contexte(d)
