@@ -40,21 +40,19 @@ def test_alma_route_selon_type_document(type_document, route):  # ING-T-005
     r = respx.post(f"{sim.ALMA_URL}{route}").respond(json=sim.fixture("alma"))
     res, appel = verifier_alma(_client("alma-checker", sim.ALMA_URL), META, type_document)
     assert r.called
-    assert (res.statut, res.etat, res.ppn) == ("academic_record_found", "présent", "229969437")
+    assert (res.statut, res.ppn) == ("academic_record_found", "229969437")
     assert res.candidats[0].type == "Thèse de doctorat" and res.candidats[0].annee == "2017"
     assert appel.requete["advisor"] == ["Gérard JORLAND"]
 
 
 @respx.mock
-@pytest.mark.parametrize("statut, etat", [
-    ("academic_record_found", "présent"), ("ambiguous_academic_candidate", "incertain"),
-    ("off_profile_match_only", "incertain"), ("no_academic_record_found", "absent"),
-    ("statut_futur", None),
-])
-def test_alma_etats(statut, etat):
+@pytest.mark.parametrize("statut", ["academic_record_found", "ambiguous_academic_candidate",
+                                    "off_profile_match_only", "no_academic_record_found", "statut_futur"])
+def test_alma_statut_garde_tel_quel(statut):
+    """Pas de traduction : le pipeline lit le status de l'API (regles/pipeline.yaml)."""
     respx.post(f"{sim.ALMA_URL}/check/thesis").respond(json=sim.alma(statut, ppn="111"))
     res, _ = verifier_alma(_client("alma-checker", sim.ALMA_URL), META, "these")
-    assert res.etat == etat
+    assert res.statut == res.etat == statut
 
 
 def test_payloads():

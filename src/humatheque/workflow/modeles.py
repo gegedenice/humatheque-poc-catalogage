@@ -159,3 +159,5 @@ class Dossier(BaseModel):
             self.etapes[n] = Etape(nom=n)
         self.exceptions = [e for e in self.exceptions if ETAPES.index(e.etape) < ETAPES.index(etape)]
         self.routage = self.motif_arret = self.etape_arret = None
+        if ETAPES.index(etape) <= ETAPES.index("sudoc"):  # la décision sera reprise par le pipeline
+            self.decision = None

@@ -43,12 +43,15 @@ def dossier(type_document="these", images=None):
                                               images=images if images is not None else [IMAGES["page"]]))
 
 
+ALMA_INCERTAIN = "Alma › status = ambiguous_academic_candidate OU off_profile_match_only"
+
+
 # ================================================================ scénarios du §11
 @respx.mock
 def test_s08_produit_une_notice(workflow):
     routes = simuler()
     d = workflow.executer(dossier())
-    assert d.decision.situation == "Thèse EPHE absente du Sudoc" and d.decision.profil_cible == "these-originale-imprimee"
+    assert d.decision.situation == "Création de la notice › type = these ET ephe = oui" and d.decision.profil_cible == "these-originale-imprimee"
     assert d.routage == "terminé" and d.etape_arret is None
     assert all(e.statut in ("ok", "ignoree") for e in d.etapes.values())
     lignes = d.notice_texte.splitlines()
@@ -81,17 +84,17 @@ def test_s08_sans_civilite_dans_200g(workflow):
 
 @respx.mock
 @pytest.mark.parametrize("statut, situation, routage", [
-    ("academic_record_found", "Notice déjà dans Alma", "terminé"),                 # au-dessus de match_threshold : arrêt sans alerte
-    ("ambiguous_academic_candidate", "Candidat Alma à vérifier", "à reprendre"),      # candidat incertain : à trancher
-    ("off_profile_match_only", "Candidat Alma à vérifier", "à reprendre"),
+    ("academic_record_found", "Alma › status = academic_record_found", "terminé"),  # STOP sans alerte
+    ("ambiguous_academic_candidate", ALMA_INCERTAIN, "à reprendre"),               # STOP – à reprendre
+    ("off_profile_match_only", ALMA_INCERTAIN, "à reprendre"),
 ])
 def test_s01_s14_arret_avec_ppn_alma(workflow, statut, situation, routage):  # ALM-SUD (décision du 05/11)
     routes = simuler(alma=sim.alma(statut, ppn="229969437"))
     d = workflow.executer(dossier())
     assert d.decision.situation == situation
-    assert (d.routage, d.etape_arret) == (routage, "situation")
+    assert (d.routage, d.etape_arret) == (routage, "alma")
     assert d.alma.ppn == "229969437" and "229969437" in d.motif_arret
-    assert not routes["sudoc"].called and d.etapes["sudoc"].statut == "ignoree"
+    assert not routes["sudoc"].called and d.etapes["sudoc"].statut == "a_faire"
     assert not routes["idref"].called and d.notice is None
 
 
@@ -99,7 +102,8 @@ def test_s01_s14_arret_avec_ppn_alma(workflow, statut, situation, routage):  # A
 def test_s06_conversion_copie_puis_arret(workflow):
     routes = simuler(sudoc=sim.sudoc([("229969437", 0.95, "electronic")], "electronic_only"))
     d = workflow.executer(dossier())
-    assert d.decision.situation == "Thèse EPHE, notice électronique au Sudoc" and d.decision.suite == "convertir"
+    assert d.decision.situation == "Sudoc › type = these › status = electronic_only ET ephe = oui"
+    assert d.decision.suite == "convertir"
     assert (d.routage, d.etape_arret) == ("terminé", "conversion")  # candidat retenu : sans alerte
     assert d.ppn_source == "229969437"
     assert d.notice_convertie.iso == d.notice_source_iso  # copie de la source (v1)
@@ -119,14 +123,14 @@ def test_s06_conversion_copie_puis_arret(workflow):
 def test_provenance_ambigue_arret_puis_reprise(workflow):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     d = workflow.executer(dossier())
-    # Pas d'arrêt anticipé : la décision mène à l'état de vérification « provenance »
-    assert (d.routage, d.etape_arret, d.decision.verification) == ("à reprendre", "situation", "provenance")
-    assert d.decision.situation == "Provenance à confirmer"
+    # Provenance ambiguë : STOP – à reprendre avant Alma
+    assert (d.routage, d.etape_arret) == ("à reprendre", "provenance")
+    assert d.decision.situation == "Provenance › ephe = absent OU ambigu" and not routes["alma"].called
 
     choisir_provenance(d, "EPHE", auteur="catalogueur", commentaire="EPHE, section IV")
     workflow.executer(d)
     assert d.provenance.valeur == "EPHE" and d.provenance.regle == "choix_catalogueur"
-    assert d.decision.situation == "Thèse EPHE absente du Sudoc" and d.notice is not None and d.routage == "terminé"
+    assert d.decision.situation == "Création de la notice › type = these ET ephe = oui" and d.notice is not None and d.routage == "terminé"
     assert routes["vlm"].call_count == 1  # extraction non rappelée (ING-F-007)
     assert any(e.type == "resolution" and e.auteur == "catalogueur" for e in d.journal)
 
@@ -141,25 +145,25 @@ def test_provenance_choix_invalide():
 def test_faux_positif_alma_reprise(workflow):  # ALM-SUD-006
     routes = simuler(alma=sim.alma("off_profile_match_only", ppn="111"))
     d = workflow.executer(dossier())
-    assert (d.routage, d.decision.situation) == ("à reprendre", "Candidat Alma à vérifier")
+    assert (d.routage, d.decision.situation) == ("à reprendre", ALMA_INCERTAIN)
     with pytest.raises(ResolutionImpossible):
         declarer_faux_positif(d, "alma", "", auteur="cat")
     declarer_faux_positif(d, "alma", "notice d'un autre ouvrage", auteur="cat")
     workflow.executer(d)
-    assert d.etat_alma == "absent" and d.decision.situation == "Thèse EPHE absente du Sudoc" and d.notice is not None
+    assert d.etat_alma == "no_academic_record_found" and d.decision.situation == "Création de la notice › type = these ET ephe = oui" and d.notice is not None
     assert routes["alma"].call_count == 1 and routes["sudoc"].call_count == 1
-    assert any(e.type == "resolution" and e.detail["avant"] == "incertain" for e in d.journal)
+    assert any(e.type == "resolution" and e.detail["avant"] == "off_profile_match_only" for e in d.journal)
 
 
 @respx.mock
 def test_sudoc_indetermine_puis_faux_positif(workflow):
     routes = simuler(sudoc=sim.sudoc([("1", 0.9, "printed_reproduction"), ("2", 0.8, "unknown")], "duplicate_found"))
     d = workflow.executer(dossier())
-    assert (d.routage, d.etape_arret, d.etat_sudoc) == ("à reprendre", "situation", "indéterminé")
-    assert d.decision.situation == "Résultat Sudoc à vérifier" and d.decision.verification == "sudoc_a_qualifier"
+    assert (d.routage, d.etape_arret, d.etat_sudoc) == ("à reprendre", "sudoc", "unknown")
+    assert d.decision.motif == "Sudoc : nature de la notice Sudoc non qualifiable"
     declarer_faux_positif(d, "sudoc", "candidats sans rapport", auteur="cat")
     workflow.executer(d)
-    assert d.etat_sudoc == "rien" and d.decision.situation == "Thèse EPHE absente du Sudoc"
+    assert d.etat_sudoc is None and d.decision.situation == "Création de la notice › type = these ET ephe = oui"
     assert routes["sudoc"].call_count == 1
 
 
@@ -262,7 +266,7 @@ def test_idref_decision_non_bloquante_avec_repli(workflow):
 def test_idref_not_found_proto_notice(workflow):
     simuler(idref_statut="not_found")
     d = workflow.executer(dossier())
-    assert any("proto-notice d'autorité à créer" in a for a in d.alertes)
+    assert any("non trouvé dans IdRef" in a for a in d.alertes) and d.routage == "terminé"  # poursuite avec alerte
 
 
 @respx.mock
@@ -279,13 +283,14 @@ def test_memoire_route_et_provenance(workflow):
     d = workflow.executer(dossier(type_document="memoire"))
     assert routes["alma"].calls[0].request.url.path == "/check/dissertation"
     assert routes["sudoc"].calls[0].request.url.path == "/check/dissertation"
-    assert d.provenance.valeur == "mémoire" and d.decision.situation == "Mémoire absent du Sudoc"
+    assert d.provenance.valeur == "mémoire" and d.decision.situation == "Création de la notice › type = memoire"
     assert "701 #1$3026940345$4003" in d.notice_texte.splitlines()
 
 
 @respx.mock
 def test_generation_echec(workflow, regles_fabriquees):
-    regles_fabriquees.modifier_decision("Thèse EPHE absente du Sudoc", profil="profil-fantome")
+    regles_fabriquees.modifier_etape("creation", branches=[{"si": {"type": "these"}, "resultat": "création",
+                                                            "notice": "profil-fantome"}])
     workflow.services.regles = regles_fabriquees.charger()
     simuler()
     d = workflow.executer(dossier())

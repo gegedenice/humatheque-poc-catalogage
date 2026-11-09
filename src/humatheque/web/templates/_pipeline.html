@@ -1,0 +1,91 @@
+{# Studio › Pipeline : les étapes dans l'ordre, chacune avec son arbre de décision
+   (codes renvoyés par l'API, sans traduction). Indentation = ET ; « OU » entre les
+   valeurs d'une variable ; « SAUF » = valeurs exclues. Chaque branche se modifie sur place. #}
+{% set couleurs = {"stop": "bg-auto-clair text-auto-fonce", "stop à reprendre": "bg-decision-clair text-decision-fonce",
+                   "conversion": "bg-conversion-clair text-conversion-fonce", "poursuite": "bg-primaire-clair text-primaire-fonce",
+                   "poursuite avec alerte": "bg-primaire-clair text-primaire-fonce ring-1 ring-decision",
+                   "poursuite à reprendre": "bg-decision-clair text-decision-fonce", "création": "bg-auto-clair text-auto-fonce"} %}
+{% set etapes = vue.etapes %}
+
+{% macro resultat(n, suivante) -%}
+  <span class="puce {{ couleurs.get(n.resultat, 'bg-rail') }} whitespace-nowrap" title="{{ vue.resultats.get(n.resultat, '') }}">{{ n.texte_resultat }}</span>
+  {% if n.resultat and n.resultat.startswith("poursuite") and suivante %}<span class="text-sourdine text-xs whitespace-nowrap">→ {{ suivante }}</span>{% endif %}
+  {% if n.alerte %}<span class="text-xs text-decision-fonce">alerte : {{ n.alerte }}</span>{% endif %}
+  {% if n.motif %}<span class="text-xs text-sourdine">{{ n.motif }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro condition(n) -%}
+  {% for k, v in n.si.items() %}{% if not loop.first %}<span class="text-xs font-semibold text-sourdine mx-1">ET</span>{% endif %}<span class="font-mono text-[13px]">{{ k }}</span> =
+    {% for x in (v if v is not string else [v]) %}{% if not loop.first %}<span class="text-xs font-semibold text-sourdine"> OU </span>{% endif %}<span class="puce bg-tonal text-encre font-mono font-medium">{{ x }}</span>{% endfor %}{% endfor %}
+  {% for k, v in n.sauf.items() %}<span class="text-xs font-semibold text-sortie mx-1">SAUF</span><span class="font-mono text-[13px]">{{ k }}</span> =
+    {% for x in (v if v is not string else [v]) %}{% if not loop.first %}<span class="text-xs font-semibold text-sourdine"> OU </span>{% endif %}<span class="puce bg-sortie-clair text-sortie-fonce font-mono font-medium">{{ x }}</span>{% endfor %}{% endfor %}
+{%- endmacro %}
+
+{% macro outils(e, chemin, premier, dernier, sinon=False) -%}
+  <span class="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 focus-within:opacity-100">
+    <button class="btn-icone w-8 h-8" title="Modifier" aria-label="Modifier la branche" hx-get="/admin/regles/noeud?etape={{ e.id }}&chemin={{ chemin }}&operation=modifier" hx-target="#form-{{ e.id }}-{{ chemin | replace('.', '_') }}" hx-swap="innerHTML">✎</button>
+    {% if not sinon %}
+    <button class="btn-icone w-8 h-8" title="Ajouter une sous-branche (ET)" aria-label="Ajouter une sous-branche" hx-get="/admin/regles/noeud?etape={{ e.id }}&chemin={{ chemin }}&operation=sous_branche" hx-target="#form-{{ e.id }}-{{ chemin | replace('.', '_') }}" hx-swap="innerHTML">⤷</button>
+    <button class="btn-icone w-8 h-8" title="Ajouter une branche après" aria-label="Ajouter une branche après" hx-get="/admin/regles/noeud?etape={{ e.id }}&chemin={{ chemin }}&operation=ajouter" hx-target="#form-{{ e.id }}-{{ chemin | replace('.', '_') }}" hx-swap="innerHTML">+</button>
+    <form method="post" action="/admin/regles/noeud/operation" hx-boost="false" class="flex">
+      <input type="hidden" name="etape" value="{{ e.id }}"><input type="hidden" name="chemin" value="{{ chemin }}"><input type="hidden" name="auteur" value="{{ auteur }}">
+      <button class="btn-icone w-8 h-8" name="operation" value="monter" title="Monter" aria-label="Monter" {% if premier or not auteur %}disabled{% endif %}>↑</button>
+      <button class="btn-icone w-8 h-8" name="operation" value="descendre" title="Descendre" aria-label="Descendre" {% if dernier or not auteur %}disabled{% endif %}>↓</button>
+      <button class="btn-icone w-8 h-8 text-sortie" name="operation" value="supprimer" title="Supprimer" aria-label="Supprimer la branche" {% if not auteur %}disabled{% endif %}
+              onclick="return confirm('Supprimer cette branche et ses sous-branches ?')">✕</button>
+    </form>
+    {% endif %}
+  </span>
+{%- endmacro %}
+
+{% macro arbre(e, noeuds, prefixe, suivante) -%}
+  <ul class="flex flex-col">
+  {% for n in noeuds %}{% set chemin = (prefixe ~ "." if prefixe else "") ~ loop.index0 %}
+    <li class="relative pl-6 before:absolute before:left-2 before:top-0 before:bottom-0 before:border-l-2 before:border-filet {% if loop.last %}before:h-5{% endif %}
+               after:absolute after:left-2 after:top-5 after:w-3 after:border-t-2 after:border-filet">
+      <div class="group flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-2 py-1.5 hover:bg-tonal">
+        <span class="text-xs font-semibold text-sourdine">SI</span>{{ condition(n) }}
+        {% if not n.branches %}<span class="text-contour">⟶</span>{{ resultat(n, suivante) }}{% endif %}
+        <span class="flex-1"></span>{{ outils(e, chemin, loop.first, loop.last) }}
+      </div>
+      <div id="form-{{ e.id }}-{{ chemin | replace('.', '_') }}"></div>
+      {% if n.branches %}{{ arbre(e, n.branches, chemin, suivante) }}{% endif %}
+      {% if n.sinon %}{% set cs = chemin ~ ".s" %}
+      <div class="group flex flex-wrap items-center gap-2 rounded-xl ml-6 px-2 py-1.5 hover:bg-tonal">
+        <span class="text-xs font-semibold text-sourdine">SINON</span><span class="text-contour">⟶</span>{{ resultat(n.sinon, suivante) }}
+        <span class="flex-1"></span>{{ outils(e, cs, True, True, True) }}</div>
+      <div id="form-{{ e.id }}-{{ cs | replace('.', '_') }}"></div>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+{%- endmacro %}
+
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <p class="text-sm text-sourdine flex-1 min-w-[280px]">Le pipeline, étape par étape. Chaque étape lit des valeurs — <span class="font-mono">type</span>, <span class="font-mono">ephe</span> et les codes renvoyés par son API — et suit la première branche qui correspond, de haut en bas. Une branche indentée ajoute une condition (<strong>ET</strong>) ; plusieurs valeurs : <strong>OU</strong> ; <strong class="text-sortie">SAUF</strong> : valeurs exclues.</p>
+  <details class="text-xs text-sourdine"><summary class="cursor-pointer">Résultats possibles</summary>
+    <ul class="mt-2 flex flex-col gap-1">{% for r, d in vue.resultats.items() %}<li><span class="puce {{ couleurs.get(r) }}">{{ r }}</span> {{ d }}</li>{% endfor %}</ul></details>
+</div>
+{% if not auteur %}<p class="avis bg-tonal text-sm mb-4">Pour monter, descendre ou supprimer une branche, indiquez d'abord votre nom dans un formulaire (✎) : il est ensuite retenu.</p>{% endif %}
+
+<ol class="flex flex-col gap-4">
+{% for e in etapes %}{% set suivante = etapes[loop.index].libelle if not loop.last else "" %}
+  <li class="sous-carte flex flex-col gap-2" id="etape-{{ e.id }}">
+    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span class="w-7 h-7 rounded-full bg-primaire text-white text-sm font-semibold flex items-center justify-center self-center">{{ loop.index }}</span>
+      <h3>{{ e.libelle }}</h3>
+      <span class="text-xs text-sourdine">{{ e.source }}</span>
+      <span class="flex-1"></span>
+      <span class="text-xs text-sourdine">lit :
+        {% for k, vals in (vue.communes.items() | list) + (e.variables.items() | list) %}<span class="font-mono" title="{{ vals | join(', ') }}">{{ k }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+      <button class="btn-discret btn-sm" hx-get="/admin/regles/noeud?etape={{ e.id }}&chemin=&operation=ajouter" hx-target="#form-{{ e.id }}-debut" hx-swap="innerHTML">+ Branche</button>
+    </div>
+    <div id="form-{{ e.id }}-debut"></div>
+    {% if e.branches %}{{ arbre(e, e.branches, "", suivante) }}{% endif %}
+    <div class="group flex flex-wrap items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-tonal {% if e.branches %}ml-6{% endif %}">
+      <span class="text-xs font-semibold text-sourdine">{{ "SINON" if e.branches else "TOUJOURS" }}</span><span class="text-contour">⟶</span>{{ resultat(e.sinon, suivante) }}
+      <span class="flex-1"></span>{{ outils(e, "s", True, True, True) }}</div>
+    <div id="form-{{ e.id }}-s"></div>
+  </li>
+{% endfor %}
+</ol>

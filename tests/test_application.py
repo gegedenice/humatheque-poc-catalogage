@@ -41,7 +41,7 @@ def test_documents_depuis_liste():
 
 def test_accueil_etat_de_la_spec(app):
     a = app.accueil()
-    assert a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 4  # les 4 cas non couverts
+    assert a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 0  # cas « sinon » : informations
     assert "vlm" in a.fournisseurs and a.lots == []
 
 
@@ -84,7 +84,8 @@ def test_notice_alma_certaine_hors_file(app, image):
     assert vue.file == [] and vue.indicateurs.par_routage == {"terminé": 1} and vue.indicateurs.en_attente == 0
     (ligne,) = app.store.lignes_du_lot(lot.id)
     d = app.vue_dossier(ligne.id).dossier
-    assert (d.decision.situation, d.etape_arret) == ("Notice déjà dans Alma", "situation") and "229969437" in d.motif_arret
+    assert (d.decision.situation, d.etape_arret) == ("Alma › status = academic_record_found", "alma")
+    assert "229969437" in d.motif_arret
 
 
 @respx.mock
@@ -94,7 +95,7 @@ def test_file_d_exceptions_filtres_et_reprise(app, image):
     vue = app.vue_lot(lot.id)
     assert vue.indicateurs.en_attente == 2 and vue.indicateurs.par_routage == {"à reprendre": 2}
     ligne = vue.file[0]
-    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("à reprendre", "situation", "Décision")
+    assert (ligne.routage, ligne.etape, ligne.etape_libelle) == ("à reprendre", "alma", "Vérification Alma")
     assert "229969437" in ligne.motif
     assert app.vue_lot(lot.id, "incidents").file == []
     assert len(app.vue_lot(lot.id, "a_reprendre").file) == 2
@@ -214,12 +215,13 @@ def test_provenance_puis_relance(app, image):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
-    d = app.vue_dossier(ligne.id).dossier  # provenance incertaine : état de vérification « provenance »
-    assert (d.etape_arret, d.decision.verification) == ("situation", "provenance")
+    d = app.vue_dossier(ligne.id).dossier  # provenance ambiguë : STOP – à reprendre avant Alma
+    assert (d.etape_arret, d.routage) == ("provenance", "à reprendre") and not routes["alma"].called
     with pytest.raises(ActionImpossible):
         app.choisir_provenance(ligne.id, "peut-être", auteur="cat")
     v = app.choisir_provenance(ligne.id, "hors EPHE", auteur="cat")
-    assert v.dossier.decision.situation == "Thèse hors EPHE absente du Sudoc" and v.dossier.notice_texte
+    assert v.dossier.decision.situation == "Création de la notice › type = these ET ephe = non"
+    assert v.dossier.notice_texte and v.dossier.decision.profil_cible == "these-reproduction-imprimee"
     app.relancer(ligne.id, depuis="extraction")
     assert routes["vlm"].call_count == 2
     with pytest.raises(ActionImpossible):
@@ -243,7 +245,7 @@ def test_exports_et_historique(app, image):
                                   source="minio"))
     lignes = list(csv.DictReader(io.StringIO(app.export_csv(lot.id))))
     assert [l["document"] for l in lignes] == ["TH/TH-01", "TH/TH-02"]
-    assert lignes[0]["issue"] == "terminé" and lignes[0]["regle_de_decision"] == "Thèse EPHE absente du Sudoc" and lignes[0]["version_spec"]
+    assert lignes[0]["issue"] == "terminé" and lignes[0]["regle_de_decision"] == "Création de la notice › type = these ET ephe = oui" and lignes[0]["version_spec"]
     notices = app.export_notices(lot.id)
     assert notices.count("008 $aAax3") == 2
     h = app.historique()

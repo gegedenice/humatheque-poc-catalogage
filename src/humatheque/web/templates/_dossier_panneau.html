@@ -110,24 +110,16 @@
 
       {% if d.provenance or d.decision %}
       <div class="sous-carte flex flex-col gap-2">
-        <h3>Provenance et décision</h3>
+        <h3>Provenance et pipeline</h3>
         {% if d.provenance %}
         <p class="text-sm">Provenance <span class="font-semibold">{{ d.provenance.valeur }}</span>
           <span class="text-xs text-sourdine">— règle {{ d.provenance.regle }}, forme comparée « {{ d.provenance.forme_comparee }} »{% if d.provenance.forme_reconnue %}, forme reconnue « {{ d.provenance.forme_reconnue }} »{% endif %}</span></p>
         {% endif %}
-        {% if d.decision %}
-        {% if d.decision.faits %}{% with chaine = vue.chaine_decision %}{% include "_chaine_faits.html" %}{% endwith %}{% endif %}
-        <p class="text-sm">Règle retenue <span class="font-semibold">{{ d.decision.situation or "sinon" }}</span> {{ badge(d.decision.routage) }}</p>
-        {% if d.decision.ligne %}
-        <dl class="text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 bg-white rounded-xl p-3">
-          {% if vue.condition_decision %}<dt class="text-sourdine">Quand</dt><dd class="break-words">{{ vue.condition_decision }}</dd>
-          {% elif d.decision.ligne.si %}<dt class="text-sourdine">Condition</dt><dd class="font-mono break-words">{{ d.decision.ligne.si }}</dd>{% endif %}
-          <dt class="text-sourdine">Action</dt><dd>{{ d.decision.ligne.alors or d.decision.action }}{% if d.decision.ligne.profil %} · profil {{ d.decision.ligne.profil }}{% endif %}</dd>
-          {% if d.decision.ligne.motif %}<dt class="text-sourdine">Motif</dt><dd>{{ d.decision.ligne.motif }}</dd>{% endif %}
-          {% if d.decision.ligne.get("à_valider") %}<dt class="text-sourdine">Règle</dt><dd><span class="puce bg-decision-clair text-decision-fonce">à valider</span></dd>{% endif %}
-        </dl>
+        {% if vue.parcours %}
+        <p class="etiquette mb-0">Parcours du pipeline</p>
+        {% with etapes = vue.parcours %}{% include "_parcours.html" %}{% endwith %}
         {% endif %}
-        {% endif %}
+        {% if d.decision %}<p class="text-sm">{{ d.decision.motif }} {{ badge(d.decision.routage) }}</p>{% endif %}
       </div>
       {% endif %}
 

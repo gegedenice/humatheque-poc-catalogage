@@ -1,195 +1,132 @@
-"""Moteur de décision (SPEC §7, §11 étape 4) : un test par règle de
-regles/decisions.yaml, plus `sinon`, le dictionnaire des faits (codes d'API →
-valeurs), l'issue des réponses de services (regles/services.yaml : IdRef
-personnes et structures, Dewey, extraction) et l'issue d'un dossier.
+"""Pipeline (SPEC §7, §11 étape 4) : un test par branche de regles/pipeline.yaml,
+écrites à partir des codes renvoyés par les API (sans traduction), plus le
+parcours (ordre de lecture, sinon) et l'issue d'un dossier.
 
-Issues : terminé (rien à faire), à reprendre (un catalogueur tranche),
-incident (panne technique). Décision du 05/11 : une notice trouvée au-dessus
-du seuil arrête sans alerte (terminé) ; seul le cas incertain est à reprendre.
+Résultats : stop, stop à reprendre, conversion (notice) puis stop, poursuite,
+poursuite avec alerte, poursuite à reprendre, création (notice).
 """
 
 import pytest
 
-from humatheque.decision.moteur import decider, faits_du_dossier, routage_final, routage_service
-from humatheque.regles.moteur import choisir
+from humatheque.decision.moteur import Decision, ephe, routage_final, valeurs_etape
+from humatheque.regles.moteur import evaluer
 
 TO, TR, MO = "these-originale-imprimee", "these-reproduction-imprimee", "memoire-original-imprime"
 FIN, REP = "terminé", "à reprendre"
 
 
-def _faits(type_, provenance, alma, sudoc):
-    return {"type": type_, "provenance": provenance, "alma": alma, "sudoc": sudoc}
+def _r(regles, etape, **valeurs):
+    r = evaluer(regles, etape, valeurs)
+    return (r.resultat, r.notice)
 
 
-# (faits) → (règle, suite, profil cible, issue)
-CAS = [
-    (("thèse", "EPHE", "présent", "non vérifié"), ("Notice déjà dans Alma", "arreter", None, FIN)),
-    (("mémoire", "sans objet", "présent", "non vérifié"), ("Notice déjà dans Alma", "arreter", None, FIN)),
-    (("thèse", "hors EPHE", "incertain", "non vérifié"), ("Candidat Alma à vérifier", "arreter", None, REP)),
-    (("thèse", "incertaine", "absent", "rien"), ("Provenance à confirmer", "arreter", None, REP)),
-    (("thèse", "EPHE", "absent", "ambigu"), ("Résultat Sudoc à vérifier", "arreter", None, REP)),
-    (("mémoire", "sans objet", "absent", "indéterminé"), ("Résultat Sudoc à vérifier", "arreter", None, REP)),
-    (("thèse", "hors EPHE", "absent", "originale imprimée"),
-     ("Thèse hors EPHE, originale imprimée au Sudoc", "convertir", TR, FIN)),
-    (("thèse", "hors EPHE", "absent", "électronique seule"),
-     ("Thèse hors EPHE, notice électronique au Sudoc", "convertir", TR, FIN)),
-    (("thèse", "hors EPHE", "absent", "reproduction imprimée"),
-     ("Thèse hors EPHE, reproduction imprimée déjà au Sudoc", "arreter", None, FIN)),
-    (("thèse", "hors EPHE", "absent", "reproduction microfiche"),
-     ("Thèse hors EPHE, reproduction microfiche au Sudoc", "convertir", TR, FIN)),
-    (("thèse", "EPHE", "absent", "électronique seule"), ("Thèse EPHE, notice électronique au Sudoc", "convertir", TO, FIN)),
-    (("thèse", "EPHE", "absent", "reproduction imprimée"), ("Thèse EPHE, reproduction au Sudoc", "convertir", TO, FIN)),
-    (("thèse", "EPHE", "absent", "reproduction microfiche"), ("Thèse EPHE, reproduction au Sudoc", "convertir", TO, FIN)),
-    (("thèse", "EPHE", "absent", "rien"), ("Thèse EPHE absente du Sudoc", "creer", TO, FIN)),
-    (("thèse", "hors EPHE", "absent", "rien"), ("Thèse hors EPHE absente du Sudoc", "creer", TR, FIN)),
-    (("mémoire", "sans objet", "absent", "rien"), ("Mémoire absent du Sudoc", "creer", MO, FIN)),
-    (("mémoire", "sans objet", "absent", "électronique seule"), ("Mémoire, notice électronique au Sudoc", "convertir", MO, FIN)),
+# ---------------------------------------------------------------- provenance
+@pytest.mark.parametrize("valeur, attendu", [("oui", "poursuite"), ("non", "poursuite"),
+                                             ("absent", "stop à reprendre"), ("ambigu", "stop à reprendre")])
+def test_provenance(regles, valeur, attendu):
+    assert _r(regles, "provenance", type="these", ephe=valeur)[0] == attendu
+
+
+# ---------------------------------------------------------------- Alma
+@pytest.mark.parametrize("status, attendu", [
+    ("academic_record_found", "stop"),
+    ("ambiguous_academic_candidate", "stop à reprendre"), ("off_profile_match_only", "stop à reprendre"),
+    ("no_academic_record_found", "poursuite"),
+    ("statut_fantome", "stop à reprendre"),  # sinon
+])
+def test_alma(regles, status, attendu):
+    assert _r(regles, "alma", type="these", ephe="oui", status=status)[0] == attendu
+
+
+# ---------------------------------------------------------------- Sudoc
+CAS_SUDOC = [
+    # (type, ephe, status, thesis_state) → (résultat, notice)
+    (("these", "non", "duplicate_found", "printed_original"), ("conversion", TR)),
+    (("these", "oui", "duplicate_found", "printed_reproduction"), ("conversion", TO)),
+    (("these", "non", "duplicate_found", "microfiche_reproduction"), ("conversion", TR)),
+    (("these", "oui", "duplicate_found", "microfiche_reproduction"), ("conversion", TO)),
+    (("these", "oui", "duplicate_found", "unknown"), ("stop à reprendre", None)),
+    (("these", "non", "electronic_only", None), ("conversion", TR)),
+    (("these", "oui", "electronic_only", None), ("conversion", TO)),
+    (("memoire", None, "electronic_only", None), ("conversion", MO)),
+    (("memoire", None, "duplicate_found", "printed_original"), ("stop", None)),
+    (("these", "oui", "ambiguous_print_candidate", None), ("stop à reprendre", None)),
+    (("memoire", None, "ambiguous_print_candidate", None), ("stop à reprendre", None)),
+    (("these", "oui", "no_print_duplicate_found", None), ("poursuite", None)),
+    (("memoire", None, "no_print_duplicate_found", None), ("poursuite", None)),
+    # non prévus (sinon) : printed_reproduction hors EPHE ; printed_original à l'EPHE (impossible)
+    (("these", "non", "duplicate_found", "printed_reproduction"), ("stop à reprendre", None)),
+    (("these", "oui", "duplicate_found", "printed_original"), ("stop à reprendre", None)),
 ]
 
 
-@pytest.mark.parametrize("faits, attendu", CAS)
-def test_regles_de_decision(regles, faits, attendu):
-    d = decider(regles, _faits(*faits))
-    assert (d.situation, d.suite, d.profil_cible, d.routage) == attendu
-    assert d.ligne["nom"] == attendu[0] and d.faits["type"] == faits[0]
+@pytest.mark.parametrize("valeurs, attendu", CAS_SUDOC, ids=[" ".join(str(x) for x in v) for v, _ in CAS_SUDOC])
+def test_sudoc(regles, valeurs, attendu):
+    t, e, status, state = valeurs
+    assert _r(regles, "sudoc", type=t, ephe=e, status=status, thesis_state=state) == attendu
 
 
-def test_toutes_les_regles_sont_testees(regles):
-    assert {r.nom for r in regles.decisions} == {a[0] for _, a in CAS}
+def test_branche_sans_sous_branche_vraie_continue(regles):
+    """Thèse + ambiguous_print_candidate : la branche « type = these » ne donne rien,
+    la lecture continue aux branches suivantes (pas de « sinon » prématuré)."""
+    r = evaluer(regles, "sudoc", {"type": "these", "ephe": "oui", "status": "ambiguous_print_candidate"})
+    assert r.chemin == ["status = ambiguous_print_candidate"] and not r.sinon
+    r = evaluer(regles, "sudoc", {"type": "these", "ephe": "non", "status": "duplicate_found",
+                                  "thesis_state": "printed_original"})
+    assert r.chemin == ["type = these", "status = duplicate_found", "thesis_state = printed_original ET ephe = non"]
 
 
-def test_sinon_situation_non_prevue(regles):
-    d = decider(regles, _faits("thèse", "EPHE", "absent", "originale imprimée"))
-    assert (d.situation, d.suite, d.routage) == ("sinon", "arreter", REP)
-    assert d.motif.startswith("Situation non prévue") and "sudoc = originale imprimée" in d.motif
-
-
-def test_motif_et_regle_a_valider(regles):
-    d = decider(regles, _faits("thèse", "incertaine", "absent", "rien"))
-    assert d.motif == "Provenance à confirmer : établissement de soutenance absent ou ambigu"
-    assert d.ligne.get("à_valider") is None
-    d = decider(regles, _faits("thèse", "hors EPHE", "incertain", "non vérifié"))
-    assert d.motif == "Candidat Alma à vérifier" and d.ligne["à_valider"] is True
-
-
-def test_premiere_regle_vraie(regles_fabriquees):
-    regles_fabriquees.ajouter_decision({"nom": "Test", "quand": {"sudoc": "rien"}, "alors": "vérification"}, 0)
-    r = regles_fabriquees.charger()
-    assert decider(r, _faits("thèse", "EPHE", "absent", "rien")).situation == "Test"
-    assert decider(r, _faits("thèse", "EPHE", "présent", "non vérifié")).situation == "Notice déjà dans Alma"
-
-
-def test_evaluation_de_chaque_condition(regles):
-    c = choisir(regles, _faits("thèse", "EPHE", "absent", "rien"), tout_evaluer=True)
-    vraies = [e.nom for e in c.evaluations if e.vraie]
-    assert c.regle["nom"] == "Thèse EPHE absente du Sudoc" and vraies == ["Thèse EPHE absente du Sudoc"]
-    assert all(e.vraie is not None for e in c.evaluations)
-    c = choisir(regles, _faits("thèse", "EPHE", "absent", "rien"))
-    assert [e.vraie for e in c.evaluations][-1] is None  # après la règle retenue : non évaluée
-
-
-@pytest.mark.parametrize("type_doc, provenance, attendu", [
-    ("these", "EPHE", ("thèse", "EPHE")), ("these", "hors EPHE", ("thèse", "hors EPHE")),
-    ("these", "absent", ("thèse", "incertaine")), ("these", "ambigu", ("thèse", "incertaine")),
-    ("memoire", "mémoire", ("mémoire", "sans objet")),
+# ---------------------------------------------------------------- IdRef, Dewey, création
+@pytest.mark.parametrize("status, attendu", [
+    ("accepted", "poursuite"), ("low_confidence", "poursuite à reprendre"),
+    ("ambiguous", "poursuite à reprendre"), ("not_found", "poursuite avec alerte"),
 ])
-def test_faits_du_dossier(regles, type_doc, provenance, attendu):
-    f = faits_du_dossier(regles, type_doc, provenance, "absent", "rien")
-    assert (f["type"], f["provenance"]) == attendu and (f["alma"], f["sudoc"]) == ("absent", "rien")
+def test_idref(regles, status, attendu):
+    r = evaluer(regles, "idref", {"type": "these", "ephe": "oui", "status": status})
+    assert r.resultat == attendu and not r.arret
+    if status == "not_found":
+        assert r.alerte == "non trouvé dans IdRef"
 
 
-# ---------------------------------------------------------------- dictionnaire des faits
-@pytest.mark.parametrize("fait, code, valeur", [
-    ("alma", "academic_record_found", "présent"), ("alma", "ambiguous_academic_candidate", "incertain"),
-    ("alma", "off_profile_match_only", "incertain"), ("alma", "no_academic_record_found", "absent"),
-    ("alma", "statut_fantome", None),  # pas de code_inconnu : incident
-    ("sudoc", "printed_original", "originale imprimée"), ("sudoc", "electronic", "électronique seule"),
-    ("sudoc", "ambiguous_print_candidate", "ambigu"), ("sudoc", "etat_fantome", "indéterminé"),
-    ("sudoc", None, "rien"), ("type", "these", "thèse"), ("provenance", "mémoire", "sans objet"),
-    ("sudoc", "rien", "rien"),  # un libellé est accepté tel quel
-])
-def test_dictionnaire_des_faits(regles, fait, code, valeur):
-    assert regles.faits[fait].traduire(code) == valeur
+@pytest.mark.parametrize("status", ["au_dessus_seuil", "sous_seuil", "aucune_classe"])
+def test_dewey_sans_verification(regles, status):
+    assert _r(regles, "dewey", type="these", ephe="oui", status=status) == ("poursuite", None)
 
 
-def test_quand_et_codes_bruts(regles):
-    """Les règles s'écrivent `quand: {fait: valeur}` ; le banc d'essai accepte les codes bruts."""
-    r = next(r for r in regles.decisions if r.nom == "Thèse EPHE, reproduction au Sudoc")
-    assert r.admises("sudoc") == ["reproduction imprimée", "reproduction microfiche"]
-    assert r.texte_condition == "type : thèse ; provenance : EPHE ; sudoc : reproduction imprimée ou reproduction microfiche"
-    c = choisir(regles, {}, codes={"type": "these", "provenance": "EPHE", "alma": "no_academic_record_found",
-                                   "sudoc": "microfiche_reproduction"})
-    assert c.regle["nom"] == "Thèse EPHE, reproduction au Sudoc"
-    assert [(t.fait, t.code, t.valeur) for t in c.traductions][-1] == ("sudoc", "microfiche_reproduction",
-                                                                      "reproduction microfiche")
+@pytest.mark.parametrize("t, e, notice", [("these", "oui", TO), ("these", "non", TR), ("memoire", None, MO)])
+def test_creation(regles, t, e, notice):
+    assert _r(regles, "creation", type=t, ephe=e) == ("création", notice)
 
 
-# ---------------------------------------------------------------- réponses des services
-def test_alma_et_sudoc_juges_par_les_faits(regles):
-    r = routage_service(regles, "sudoc", "printed_original")
-    assert r.routage is None and not r.bloquant and r.libelle == "originale imprimée"
+# ---------------------------------------------------------------- valeurs, décision, issue
+def test_valeurs_lues_sans_traduction():
+    assert valeurs_etape("these", "hors EPHE", status="duplicate_found") == {
+        "type": "these", "ephe": "non", "status": "duplicate_found"}
+    assert (ephe("EPHE"), ephe("absent"), ephe("ambigu"), ephe("mémoire")) == ("oui", "absent", "ambigu", None)
 
 
-@pytest.mark.parametrize("service", ["idref_personne", "idref_organisations"])
-@pytest.mark.parametrize("statut, libelle, issue, exception", [
-    ("accepted", "alignée", FIN, False), ("low_confidence", "confiance faible", REP, True),
-    ("ambiguous", "ambiguë", REP, True), ("not_found", "introuvable", REP, True),
-])
-def test_sorties_idref(regles, service, statut, libelle, issue, exception):
-    """Les 4 statuts d'idref-linker, personnes et structures : jamais bloquants."""
-    r = routage_service(regles, service, statut)
-    assert (r.libelle, r.routage, r.bloquant, r.exception) == (libelle, issue, False, exception)
-    assert r.alertes == (["proto-notice d'autorité à créer"] if statut == "not_found" else [])
+def test_decision_depuis_le_pipeline(regles):
+    r = evaluer(regles, "sudoc", {"type": "these", "ephe": "oui", "status": "electronic_only"})
+    d = Decision.depuis(r, "Sudoc")
+    assert (d.suite, d.profil_cible, d.routage, d.resultat) == ("convertir", TO, FIN, "conversion")
+    assert d.situation == "Sudoc › type = these › status = electronic_only ET ephe = oui"
+    r = evaluer(regles, "alma", {"type": "these", "ephe": "oui", "status": "off_profile_match_only"})
+    d = Decision.depuis(r, "Alma")
+    assert (d.suite, d.routage, d.motif) == ("arreter", REP, "Alma : candidat Alma à vérifier")
 
 
-@pytest.mark.parametrize("service, statut, issue, bloquant, exception", [
-    ("dewey", "au_dessus_seuil", FIN, False, False),
-    ("dewey", "sous_seuil", REP, False, True),
-    ("dewey", "aucune_classe", REP, False, True),
-    ("extraction", "json_valide", FIN, False, False),
-    ("extraction", "json_invalide", "incident", True, False),
-])
-def test_routage_service(regles, service, statut, issue, bloquant, exception):
-    r = routage_service(regles, service, statut)
-    assert (r.routage, r.bloquant, r.exception) == (issue, bloquant, exception)
+def test_ancienne_decision_relue():
+    d = Decision.model_validate({"situation": "S08", "action": "création", "suite": "creer", "routage": "auto",
+                                 "motif": "x", "profil_cible": TO})
+    assert d.resultat == "création" and d.profil_cible == TO
 
 
-@pytest.mark.parametrize("service, statut", [("dewey", "statut_fantome"), ("service_fantome", "accepted")])
-def test_statut_inconnu_incident(regles, service, statut):
-    r = routage_service(regles, service, statut)
-    assert (r.routage, r.bloquant) == ("incident", True)
-
-
-# ---------------------------------------------------------------- issue d'un dossier
 @pytest.mark.parametrize("routages, final", [
     ([FIN, REP, FIN], REP),
     ([REP, "incident"], "incident"),
     ([FIN, None], FIN),
     ([], FIN),
     (["auto", "décision", "sortie", "conversion"], REP),  # ancien vocabulaire traduit
-    (["sortie"], FIN),
 ])
 def test_routage_final(routages, final):
     assert routage_final(routages) == final
-
-
-def test_routage_final_inconnu():
-    with pytest.raises(ValueError):
-        routage_final([FIN, "peut-être"])
-
-
-def test_dossier_enregistre_avant_le_06_11_traduit():
-    """Un dossier enregistré avec l'ancien routage est relu avec la nouvelle issue."""
-    from humatheque.workflow.modeles import Dossier
-
-    brut = {"id": "D", "document": {"id": "x", "images": [], "type_document": "these"}, "routage": "décision",
-            "etapes": {"alma": {"nom": "alma", "statut": "arret", "routage": "sortie"}}}
-    d = Dossier.model_validate(brut)
-    assert d.routage == REP and d.etapes["alma"].routage == FIN
-
-
-def test_ancien_identifiant_de_regle_traduit():
-    from humatheque.decision.moteur import Decision
-
-    d = Decision.model_validate({"situation": "S12", "suite": "creer", "routage": "auto", "motif": "S12 : Créer"})
-    assert d.situation == "Mémoire absent du Sudoc"

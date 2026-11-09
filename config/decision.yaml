@@ -1,15 +1,5 @@
-# Moteur de décision (SPEC §7). Les décisions sont dans regles/decisions.yaml ;
-# les faits et les sorties des services dans regles/decisions.yaml et regles/services.yaml.
-
-# Code de service absent de regles/ : incident.
-statut_inconnu:
-  motif: statut de service inconnu
-
-# Valeur d'etat_sudoc quand sudoc-checker n'est pas appelé (notice trouvée
-# dans Alma : arrêt).
-etat_sudoc_non_verifie: non vérifié
-
-# Motifs d'arrêt du workflow (SPEC §3.1, §6).
+# Motifs d'arrêt techniques du workflow (SPEC §3.1, §6). Les décisions sont dans
+# regles/pipeline.yaml (§7).
 motifs:
   document_invalide: document invalide
   titre_absent: titre non extrait

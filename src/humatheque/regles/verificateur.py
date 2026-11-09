@@ -15,8 +15,8 @@ from pydantic import BaseModel
 
 from humatheque.regles.chargement import ReglesInvalides, charger_regles
 from humatheque.regles.modeles import Regles
-from humatheque.regles.modeles import RegleDecision, ZoneRegle
-from humatheque.regles.moteur import choisir, conventions
+from humatheque.regles.modeles import Noeud, ZoneRegle
+from humatheque.regles.moteur import conventions, evaluer, valeurs_possibles
 from humatheque.regles.notice import RENDUS
 
 Gravite = Literal["erreur", "avertissement", "info"]
@@ -25,7 +25,7 @@ Gravite = Literal["erreur", "avertissement", "info"]
 class Constat(BaseModel):
     gravite: Gravite
     code: str
-    table: str = ""     # fichier (profils/…, decisions.yaml…)
+    table: str = ""     # fichier (pipeline.yaml, notice/…)
     ligne: str = ""     # lieu dans le fichier
     message: str
 
@@ -124,103 +124,69 @@ def verifier(regles: Regles) -> Rapport:
     for n in sorted(set(regles.variables) - utilisees):
         signaler("info", "variable_inutilisee", "variables.yaml", n, f"{n} utilisée par aucune zone active")
 
-    # --- vérifications humaines
-    for nom, e in regles.verifications.items():
-        for c in e.choix:
-            ou = f"{nom} / {c.libelle}"
-            if bool(c.faits) == bool(c.action):
-                signaler("erreur", "choix_invalide", "verifications.yaml", ou, "un choix corrige des faits OU impose une action")
-            for f, v in c.faits.items():
-                if f not in regles.faits or v not in regles.faits[f].valeurs:
-                    signaler("erreur", "valeur_inconnue", "verifications.yaml", ou, f"{f} = « {v} » absent du dictionnaire")
-            if c.action and c.action not in conv["actions"]:
-                signaler("erreur", "action_inconnue", "verifications.yaml", ou, f"action « {c.action} » inconnue")
-            elif c.action and conv["actions"][c.action]["suite"] in ("creer", "convertir") \
-                    and c.profil not in regles.variantes:
-                signaler("erreur", "profil_inconnu", "verifications.yaml", ou, f"profil inconnu {c.profil}")
+    # --- pipeline
+    notices_atteintes: set[str] = set()
 
-    # --- décisions
-    vus: set[str] = set()
-    for r in regles.decisions:
-        lieu = f"« {r.nom} »"
-        if r.nom in vus:
-            signaler("erreur", "decision_doublon", "decisions.yaml", lieu, f"nom « {r.nom} » en double")
-        vus.add(r.nom)
-        for fait in r.quand:
-            if fait not in regles.faits:
-                signaler("erreur", "fait_inconnu", "decisions.yaml", lieu, f"fait « {fait} » absent du dictionnaire")
+    def noeud(etape: str, n: Noeud, ici: str, possibles: dict[str, list[str]]) -> None:
+        for cle, v in [*n.si.items(), *n.sauf.items()]:
+            if cle not in possibles:
+                signaler("erreur", "variable_inconnue", "pipeline.yaml", ici,
+                         f"« {cle} » n'est pas lue à l'étape {etape} ({', '.join(possibles)})")
                 continue
-            for v in r.admises(fait):
-                if v not in regles.faits[fait].valeurs:
-                    signaler("erreur", "valeur_inconnue", "decisions.yaml", lieu,
-                             f"{fait} : valeur « {v} » inconnue (valeurs : {', '.join(regles.faits[fait].valeurs)})")
-        if not r.quand:
-            signaler("avertissement", "regle_toujours_vraie", "decisions.yaml", lieu,
-                     "aucun fait dans « quand » : la règle s'applique toujours")
-        if r.verification and r.verification not in regles.verifications:
-            signaler("erreur", "verification_inconnue", "decisions.yaml", lieu,
-                     f"état de vérification « {r.verification} » absent de verifications.yaml")
-        if r.alors == "vérification" and not r.verification:
-            signaler("avertissement", "verification_sans_etat", "decisions.yaml", lieu,
-                     "vérification sans état : aucun choix ne sera proposé au catalogueur")
-        if r.alors not in conv["actions"]:
-            signaler("erreur", "action_inconnue", "decisions.yaml", lieu, f"action « {r.alors} » inconnue")
-        elif conv["actions"][r.alors]["suite"] in ("creer", "convertir") and r.profil not in regles.variantes:
-            signaler("erreur", "profil_inconnu", "decisions.yaml", lieu, f"profil inconnu {r.profil}")
-    if regles.sinon.get("verification") and regles.sinon["verification"] not in regles.verifications:
-        signaler("erreur", "verification_inconnue", "decisions.yaml", "sinon",
-                 f"état de vérification « {regles.sinon['verification']} » absent de verifications.yaml")
-    if regles.sinon.get("alors") and regles.sinon["alors"] not in conv["actions"]:
-        signaler("erreur", "action_inconnue", "decisions.yaml", "sinon", f"action « {regles.sinon['alors']} » inconnue")
-    atteints = {r.profil for r in regles.decisions}
-    atteints |= {c.profil for e in regles.verifications.values() for c in e.choix}
-    for p in sorted(set(regles.variantes) - atteints):
-        signaler("avertissement", "profil_non_atteint", regles.variantes[p].fichier, "", f"variante {p} atteinte par aucune décision")
+            for x in Noeud.liste(v):
+                if possibles[cle] and x not in possibles[cle]:
+                    signaler("erreur", "valeur_inconnue", "pipeline.yaml", ici,
+                             f"{cle} = « {x} » : valeur inconnue ({', '.join(possibles[cle])})")
+        if n.branches and n.resultat:
+            signaler("erreur", "noeud_ambigu", "pipeline.yaml", ici, "une branche a des sous-branches OU un résultat")
+        if not n.branches and not n.resultat:
+            signaler("erreur", "noeud_vide", "pipeline.yaml", ici, "branche sans résultat ni sous-branche")
+        if n.resultat in ("conversion", "création"):
+            if n.notice not in regles.variantes:
+                signaler("erreur", "notice_inconnue", "pipeline.yaml", ici, f"notice cible inconnue « {n.notice} »")
+            notices_atteintes.add(n.notice or "")
+        for i, f in enumerate(n.branches, start=1):
+            noeud(etape, f, f"{ici} › {f.condition}", possibles)
+        if n.sinon is not None:
+            noeud(etape, n.sinon, f"{ici} › sinon", possibles)
 
-    # --- dictionnaire des faits : un code ne mène qu'à une valeur
-    for nom, f in regles.faits.items():
-        vus_codes: dict[str, str] = {}
-        for valeur, codes in f.valeurs.items():
-            for c in codes:
-                if c in vus_codes and vus_codes[c] != valeur:
-                    signaler("erreur", "code_ambigu", "decisions.yaml", f"fait {nom}",
-                             f"code « {c} » listé pour « {vus_codes[c]} » et « {valeur} »")
-                vus_codes[c] = valeur
-        for cle in ("code_inconnu", "sans_code"):
-            v = getattr(f, cle)
-            if v is not None and v not in f.valeurs:
-                signaler("erreur", "valeur_inconnue", "decisions.yaml", f"fait {nom}", f"{cle} : « {v} » n'est pas une valeur")
+    for nom, e in regles.etapes.items():
+        possibles = valeurs_possibles(regles, nom)
+        for f in e.branches:
+            noeud(nom, f, f"{e.libelle} › {f.condition}", possibles)
+        noeud(nom, e.sinon, f"{e.libelle} › sinon", possibles)
+    for p in sorted(set(regles.variantes) - notices_atteintes):
+        signaler("avertissement", "notice_non_atteinte", regles.variantes[p].fichier, "",
+                 f"notice {p} atteinte par aucune branche du pipeline")
 
-    # --- sorties des services
-    from humatheque import issues
-
-    for nom, svc in regles.services.items():
-        vus_codes = {}
-        for so in svc.sorties:
-            if so.issue not in issues.ORDRE:
-                signaler("erreur", "issue_inconnue", "services.yaml", f"{nom} / {so.libelle}",
-                         f"issue « {so.issue} » inconnue ({', '.join(issues.ORDRE)})")
-            for c in so.codes:
-                if c in vus_codes:
-                    signaler("erreur", "code_ambigu", "services.yaml", nom,
-                             f"code « {c} » listé pour « {vus_codes[c]} » et « {so.libelle} »")
-                vus_codes[c] = so.libelle
-
-    # --- complétude
-    comp = conv["completude"]
-    noms = [n for n in comp["faits"] if n in regles.faits]
-    for combo in itertools.product(*(list(regles.faits[n].valeurs) for n in noms)):
-        faits = {**dict(zip(noms, combo)), **comp.get("fixes", {})}
-        if any(RegleDecision(nom="_", alors="_", quand=q).correspond(faits) for q in comp.get("incompatibles") or []):
+    # --- cas qui tombent dans le « sinon » d'une étape (combinaisons des valeurs possibles)
+    for nom, e in regles.etapes.items():
+        if not e.branches or e.sinon.resultat == "poursuite":
             continue
-        if choisir(regles, faits).regle["nom"] == "sinon":
-            signaler("avertissement", "cas_non_couvert", "decisions.yaml", "",
-                     "cas non couvert : " + ", ".join(f"{k} = {v}" for k, v in faits.items()))
+        for texte in cas_sinon(regles, nom):
+            signaler("info", "cas_sinon", "pipeline.yaml", e.libelle, f"tombe dans « sinon » : {texte}")
 
     for a in regles.avertissements:
         signaler("avertissement", "chargement", "", "", a)
 
     return Rapport(emplacement=regles.emplacement, version=regles.version, constats=constats)
+
+
+def cas_sinon(regles: Regles, etape: str) -> list[str]:
+    """Combinaisons qui tombent dans le « sinon » de l'étape, sans les variables sans effet."""
+    possibles = {k: v for k, v in valeurs_possibles(regles, etape).items() if v}
+    if etape != "provenance" and "ephe" in possibles:  # après la provenance, ephe vaut oui ou non
+        possibles["ephe"] = [x for x in possibles["ephe"] if x in ("oui", "non")]
+    cles = list(possibles)
+    sortie: set[str] = set()
+    for combo in itertools.product(*(possibles[k] for k in cles)):
+        valeurs = dict(zip(cles, combo))
+        if not evaluer(regles, etape, valeurs).sinon:
+            continue
+        utiles = {k: v for k, v in valeurs.items()
+                  if any(not evaluer(regles, etape, {**valeurs, k: autre}).sinon for autre in possibles[k] if autre != v)}
+        sortie.add(", ".join(f"{k} = {v}" for k, v in utiles.items()) or "toutes valeurs")
+    return sorted(sortie)
 
 
 def rapport_invalide(e: ReglesInvalides, emplacement: str) -> Rapport:

@@ -1,8 +1,8 @@
-"""Modèles des règles de catalogage (SPEC §8) : variables, faits et décisions,
-sorties des services, vérifications humaines, notice structurée (socle + variantes).
+"""Modèles des règles de catalogage (SPEC §7, §8) : variables, pipeline (étapes et
+arbre de décision sur les codes renvoyés par les API), notice structurée (socle + variantes).
 
 Les fichiers YAML sont validés à la lecture ; aucune expression : les
-conditions sont des tables (`quand`), les zones des objets configurables.
+conditions sont des nœuds d'arbre, les zones des objets configurables.
 """
 
 from __future__ import annotations
@@ -24,142 +24,103 @@ class Variable(BaseModel):
     description: str = ""
 
 
-class Fait(BaseModel):
-    """Un fait de décision (`decisions.yaml`, `faits`) : ses valeurs en clair et
-    les codes renvoyés par l'API (ou calculés par le démonstrateur) qui y mènent."""
-
-    nom: str
-    question: str = ""
-    source: str = Field("", description="d'où vient le code : service, champ de la réponse, calcul")
-    note: str = ""
-    valeurs: dict[str, list[str]] = Field(description="libellé → codes")
-    code_inconnu: str | None = Field(None, description="libellé d'un code non listé ; absent : incident")
-    sans_code: str | None = Field(None, description="libellé quand le service ne renvoie aucun code retenu")
-
-    @field_validator("valeurs", mode="before")
-    @classmethod
-    def _valeurs(cls, v: Any) -> Any:
-        if isinstance(v, list):  # ancienne forme : liste de libellés
-            return {str(x): [] for x in v}
-        if isinstance(v, dict):
-            return {str(k): ([str(c)] if isinstance(c, str) else [str(x) for x in (c or [])]) for k, c in v.items()}
-        return v
-
-    def traduire(self, code: Any) -> str | None:
-        """Libellé du fait pour un code d'API (un libellé est accepté tel quel)."""
-        if code is None or code == "":
-            return self.sans_code
-        code = str(code)
-        if code in self.valeurs:
-            return code
-        for libelle, codes in self.valeurs.items():
-            if code in codes:
-                return libelle
-        return self.code_inconnu
-
-
-class SortieService(BaseModel):
-    """Une sortie d'un service d'enrichissement (`services.yaml`)."""
-
-    model_config = ConfigDict(extra="allow")
-
-    libelle: str
-    codes: list[str]
-    issue: str
-    alerte: str | None = None
-    effet: str = ""
-
-    @field_validator("codes", mode="before")
-    @classmethod
-    def _codes(cls, v: Any) -> Any:
-        return [v] if isinstance(v, str) else v
-
-
-class ServiceSorties(BaseModel):
-    """Sorties d'un service (`services.yaml`) : code renvoyé → issue du document."""
-
-    nom: str
-    libelle: str = ""
-    source: str = ""
-    note: str = ""
-    bloquant: bool = Field(True, description="false : « à reprendre » n'arrête pas la génération")
-    sorties: list[SortieService]
-
-    def sortie(self, code: str) -> SortieService | None:
-        return next((s for s in self.sorties if code in s.codes or code == s.libelle), None)
-
-
+# ------------------------------------------------------------------ pipeline (étapes et arbre de décision)
+Resultat = Literal["stop", "stop à reprendre", "conversion", "poursuite", "poursuite avec alerte",
+                   "poursuite à reprendre", "création"]
+RESULTATS: dict[str, str] = {
+    "stop": "le traitement s'arrête : rien à faire (terminé)",
+    "stop à reprendre": "le traitement s'arrête pour une vérification manuelle (à reprendre)",
+    "conversion": "la notice Sudoc trouvée est convertie (notice cible), puis le traitement s'arrête (terminé)",
+    "poursuite": "le traitement passe à l'étape suivante",
+    "poursuite avec alerte": "le traitement continue ; une alerte est ajoutée au dossier",
+    "poursuite à reprendre": "le traitement continue ; le document sera à reprendre (vérification manuelle)",
+    "création": "la notice est créée (notice cible)",
+}
 Valeurs = str | list[str]
 
 
-class RegleDecision(BaseModel):
-    """Une règle de decisions.yaml, identifiée par son nom en clair.
+def _valeurs(v: Any) -> Any:
+    if v is None:
+        return {}
+    if isinstance(v, dict):
+        return {str(k): (str(x) if not isinstance(x, list) else [str(y) for y in x]) for k, x in v.items()}
+    return v
 
-    `quand` : fait → valeur (ou liste de valeurs admises), toutes requises ; un
-    fait non cité est indifférent."""
 
-    model_config = ConfigDict(extra="allow", populate_by_name=True)
+class Noeud(BaseModel):
+    """Un nœud de l'arbre : conditions (`si` : ET entre variables, OU entre valeurs ;
+    `sauf` : valeurs exclues), puis soit des sous-branches, soit un résultat."""
 
-    nom: str
-    quand: dict[str, Valeurs] = Field(default_factory=dict)
-    alors: str
-    profil: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    si: dict[str, Valeurs] = Field(default_factory=dict)
+    sauf: dict[str, Valeurs] = Field(default_factory=dict)
+    branches: list[Noeud] = Field(default_factory=list)
+    sinon: Noeud | None = Field(None, description="aucune sous-branche ne correspond")
+    resultat: Resultat | None = None
+    notice: str | None = Field(None, description="conversion, création : notice cible (variante)")
     motif: str | None = None
-    verification: str | None = Field(None, description="état de vérification (action vérification)")
-    a_valider: bool = Field(False, alias="à_valider", description="règle encore en discussion")
+    alerte: str | None = Field(None, description="poursuite avec alerte : texte de l'alerte")
 
-    @field_validator("nom", mode="before")
-    @classmethod
-    def _nom(cls, v: Any) -> Any:
-        return None if v is None else str(v).strip()
+    _si = field_validator("si", "sauf", mode="before")(classmethod(lambda cls, v: _valeurs(v)))
 
-    @field_validator("quand", mode="before")
-    @classmethod
-    def _quand(cls, v: Any) -> Any:
-        if v is None:
-            return {}
-        if isinstance(v, dict):
-            return {str(k): (str(x) if not isinstance(x, list) else [str(y) for y in x]) for k, x in v.items()}
-        return v
+    @staticmethod
+    def liste(v: Valeurs) -> list[str]:
+        return [v] if isinstance(v, str) else list(v)
 
-    def admises(self, fait: str) -> list[str]:
-        v = self.quand.get(fait)
-        return [] if v is None else ([v] if isinstance(v, str) else list(v))
-
-    def correspond(self, faits: dict[str, Any]) -> bool:
-        """Chaque fait cité a l'une des valeurs admises."""
-        return all(faits.get(f) in self.admises(f) for f in self.quand)
+    def correspond(self, valeurs: dict[str, Any]) -> bool:
+        def egal(var: str) -> Any:
+            x = valeurs.get(var)
+            return None if x is None else str(x)
+        return (all(egal(k) in self.liste(v) for k, v in self.si.items())
+                and not any(egal(k) in self.liste(v) for k, v in self.sauf.items()))
 
     @property
-    def texte_condition(self) -> str:
-        """Condition en clair : « type : thèse ; sudoc : rien ou ambigu »."""
-        parties = [f"{f} : {' ou '.join(self.admises(f))}" for f in self.quand]
-        return " ; ".join(parties) or "toujours"
+    def condition(self) -> str:
+        """Condition en clair : « status = a OU b ET EPHE = oui SAUF … »."""
+        parties = [f"{k} = {' OU '.join(self.liste(v))}" for k, v in self.si.items()]
+        parties += [f"SAUF {k} = {' OU '.join(self.liste(v))}" for k, v in self.sauf.items()]
+        return " ET ".join(parties) or "toujours"
+
+    @property
+    def texte_resultat(self) -> str:
+        if not self.resultat:
+            return ""
+        r = self.resultat.upper() if self.resultat in ("stop", "poursuite", "conversion", "création") else \
+            self.resultat.replace("stop", "STOP").replace("poursuite", "POURSUITE")
+        if self.notice:
+            r += f" {self.notice}" + (" puis STOP" if self.resultat == "conversion" else "")
+        return r
+
+
+class EtapePipeline(BaseModel):
+    """Une étape du pipeline : variables lues (codes renvoyés par l'API) et arbre."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    libelle: str
+    source: str = ""
+    variables: dict[str, list[str]] = Field(default_factory=dict, description="variable → valeurs possibles")
+    branches: list[Noeud] = Field(default_factory=list)
+    sinon: Noeud = Field(default_factory=lambda: Noeud(resultat="stop à reprendre", motif="cas non prévu"))
+    note: str = ""
 
 
 class Regles(BaseModel):
     """Règles chargées, avec leur provenance et leur version."""
 
     variables: dict[str, Variable]
+    communes: dict[str, list[str]] = Field(default_factory=dict, description="variables lues à toutes les étapes")
+    etapes: dict[str, EtapePipeline] = Field(default_factory=dict, description="pipeline, dans l'ordre")
     socle: Socle
     variantes: dict[str, Variante] = Field(default_factory=dict)
-    verifications: dict[str, EtatVerification] = Field(default_factory=dict)
-    faits: dict[str, Fait]
-    services: dict[str, ServiceSorties] = Field(default_factory=dict)
-    decisions: list[RegleDecision]
-    sinon: dict[str, Any]
 
     emplacement: str = Field(description="dossier des règles")
     horodatage: datetime
     empreinte: str = Field(description="SHA-256 (12 caractères) des fichiers de règles")
     avertissements: list[str] = Field(default_factory=list)
     textes: dict[str, str] = Field(default_factory=dict, description="chemin relatif → texte YAML lu")
-
-    def actions_sans_profil(self, alors: str) -> bool:
-        """Action qui ne produit pas de notice (arrêt, vérification) : pas de profil."""
-        from humatheque.regles.moteur import conventions
-
-        return (conventions()["actions"].get(alors) or {}).get("suite") not in ("creer", "convertir")
 
     @property
     def profils(self) -> dict[str, "NoticeModele"]:
@@ -340,35 +301,11 @@ class NoticeModele(BaseModel):
         return list(dict.fromkeys(v for z in self.zones if z.actif for v in z.variables()))
 
 
-# ------------------------------------------------------------------ vérifications humaines (états)
-class ChoixVerification(BaseModel):
-    """Un choix proposé au catalogueur : corriger des faits (puis nouvelle décision)
-    ou imposer une action (avec profil)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    libelle: str
-    faits: dict[str, str] = Field(default_factory=dict)
-    action: str | None = None
-    profil: str | None = None
-    description: str = ""
-
-
-class EtatVerification(BaseModel):
-    """État « en attente de vérification » : question posée et choix possibles."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    nom: str
-    libelle: str
-    question: str = ""
-    montrer: str | None = Field(None, description="candidats affichés : alma, sudoc")
-    choix: list[ChoixVerification]
-
-
 def resoudre(socle: Socle, v: Variante) -> NoticeModele:
     """Socle + variante : retirer, remplacer en place, ajouter à la fin (tri par étiquette à la sortie)."""
     remplacements = {z.id: z.model_copy(update={"origine": v.variante}) for z in v.remplacer}
     zones = [remplacements.get(z.id, z) for z in socle.zones if z.id not in set(v.retirer)]
     zones += [z.model_copy(update={"origine": v.variante}) for z in v.ajouter]
     return NoticeModele(profil=v.variante, libelle=v.libelle, fichier=v.fichier, zones=zones, rendus=socle.rendus)
+
+Regles.model_rebuild()

@@ -18,8 +18,10 @@ def _codes(rapport, gravite=None):
 def test_chargement_regles_reelles(regles):
     assert set(regles.profils) == {"these-originale-imprimee", "these-reproduction-imprimee",
                                    "memoire-original-imprime"}
-    assert len(regles.socle.zones) == 34 and set(regles.verifications) >= {"alma_incertain", "provenance"}
-    assert regles.decisions[0].nom == "Notice déjà dans Alma" and regles.sinon["alors"] == "vérification"
+    assert len(regles.socle.zones) == 34
+    assert list(regles.etapes) == ["provenance", "alma", "sudoc", "idref", "dewey", "creation"]
+    assert regles.etapes["alma"].variables["status"][0] == "academic_record_found"
+    assert regles.etapes["sudoc"].sinon.resultat == "stop à reprendre"
     assert regles.variables["auteur"].type == "personne" and regles.variables["directeur"].liste
     assert not regles.variables["numero_nnt"].disponible
     assert len(regles.empreinte) == 12 and regles.version.endswith(regles.empreinte)
@@ -29,31 +31,33 @@ def test_chargement_regles_reelles(regles):
     assert [(sz.code, sz.genre, sz.presence) for sz in z328.sous_zones][-1] == ("d", "variable", "repli « 19.. » si absente")
 
 
-def test_aucune_erreur_et_quatre_cas_non_couverts(regles):
+def test_aucune_erreur_et_cas_tombant_dans_sinon(regles):
+    """Cas Sudoc non prévus (stop à reprendre) : signalés, rien d'autre."""
     r = verifier(regles)
-    assert not r.erreurs
-    trous = [c.message for c in r.constats if c.code == "cas_non_couvert"]
-    assert len(trous) == 4
-    assert any("type = thèse, provenance = EPHE, sudoc = originale imprimée" in t for t in trous)
-    assert sum("type = mémoire" in t for t in trous) == 3
-    assert len(r.avertissements) == 4  # les cas non couverts, rien d'autre
-    assert {c.code for c in r.constats if c.gravite == "info"} == {"variable_inutilisee"}
+    assert not r.erreurs and not r.avertissements
+    cas = sorted(c.message for c in r.constats if c.code == "cas_sinon")
+    assert cas == [
+        "tombe dans « sinon » : type = these, ephe = non, status = duplicate_found, thesis_state = printed_reproduction",
+        "tombe dans « sinon » : type = these, ephe = oui, status = duplicate_found, thesis_state = printed_original",
+        "tombe dans « sinon » : type = these, status = duplicate_found, thesis_state = electronic",
+    ]
+    assert {c.code for c in r.constats if c.gravite == "info"} == {"variable_inutilisee", "cas_sinon"}
 
 
 def test_empreinte_stable_et_sensible(regles_fabriquees):
     a, b = regles_fabriquees.charger(), regles_fabriquees.charger()
     assert a.empreinte == b.empreinte
-    regles_fabriquees.modifier_decision("Thèse EPHE absente du Sudoc", motif="autre motif")
+    regles_fabriquees.modifier_etape("dewey", libelle="Classification Dewey")
     assert regles_fabriquees.charger().empreinte != a.empreinte
 
 
 # ---------------------------------------------------------------- défauts fabriqués (§8.4)
 def test_yaml_invalide_avec_ligne(regles_fabriquees):
-    regles_fabriquees.ecrire("decisions.yaml", regles_fabriquees.texte("decisions.yaml") + "\n  - {id: X, si: [\n")
+    regles_fabriquees.ecrire("pipeline.yaml", regles_fabriquees.texte("pipeline.yaml") + "\n  x: {si: [\n")
     with pytest.raises(ReglesInvalides) as e:
         regles_fabriquees.charger()
     (fichier, ligne, message), = e.value.problemes
-    assert fichier == "decisions.yaml" and ligne.startswith("ligne ") and "YAML invalide" in message
+    assert fichier == "pipeline.yaml" and ligne.startswith("ligne ") and "YAML invalide" in message
 
 
 def test_structure_absente(regles_fabriquees):
@@ -65,11 +69,9 @@ def test_structure_absente(regles_fabriquees):
         regles_fabriquees.charger()
 
 
-def test_sinon_obligatoire(regles_fabriquees):
-    d = regles_fabriquees.lire("decisions.yaml")
-    del d["sinon"]
-    regles_fabriquees.ecrire("decisions.yaml", d)
-    with pytest.raises(ReglesInvalides, match="sinon"):
+def test_pipeline_structure(regles_fabriquees):
+    regles_fabriquees.ecrire("pipeline.yaml", "etapes: [1]\n")
+    with pytest.raises(ReglesInvalides, match="clés communes et etapes attendues"):
         regles_fabriquees.charger()
 
 
@@ -110,65 +112,48 @@ def test_defauts_de_variante(regles_fabriquees):
     assert codes.count("zone_inconnue") == 2 and "zone_doublon" in codes
 
 
-def test_defauts_de_verification(regles_fabriquees):
-    e = regles_fabriquees.lire("verifications.yaml")
-    e["provenance"]["choix"].append({"libelle": "x", "faits": {"provenance": "Mars"}})
-    e["provenance"]["choix"].append({"libelle": "y", "action": "création", "profil": "fantome"})
-    e["provenance"]["choix"].append({"libelle": "z", "faits": {"alma": "absent"}, "action": "arrêt"})
-    regles_fabriquees.ecrire("verifications.yaml", e)
-    regles_fabriquees.modifier_decision("Candidat Alma à vérifier", verification="etat_fantome")
-    codes = _codes(verifier(regles_fabriquees.charger()), "erreur")
-    assert {"valeur_inconnue", "profil_inconnu", "choix_invalide", "verification_inconnue"} <= set(codes)
-
-
-@pytest.mark.parametrize("champs, code", [
-    ({"quand": {"sudoc": "inconnu"}}, "valeur_inconnue"),
-    ({"quand": {"fait_fantome": "x"}}, "fait_inconnu"),
-    ({"profil": "profil-fantome"}, "profil_inconnu"),
-    ({"alors": "suppression"}, "action_inconnue"),
+@pytest.mark.parametrize("noeud, code", [
+    ({"si": {"status": "statut_fantome"}, "resultat": "stop"}, "valeur_inconnue"),
+    ({"si": {"variable_fantome": "x"}, "resultat": "stop"}, "variable_inconnue"),
+    ({"si": {"status": "academic_record_found"}, "resultat": "création", "notice": "fantome"}, "notice_inconnue"),
+    ({"si": {"status": "academic_record_found"}}, "noeud_vide"),
+    ({"si": {"status": "academic_record_found"}, "resultat": "stop",
+      "branches": [{"resultat": "stop"}]}, "noeud_ambigu"),
+    ({"sauf": {"type": "roman"}, "resultat": "stop"}, "valeur_inconnue"),
 ])
-def test_defauts_de_decision(regles_fabriquees, champs, code):
-    regles_fabriquees.modifier_decision("Thèse EPHE absente du Sudoc", **champs)
+def test_defauts_de_pipeline(regles_fabriquees, noeud, code):
+    regles_fabriquees.ajouter_branche("alma", noeud, 0)
     assert code in _codes(verifier(regles_fabriquees.charger()), "erreur")
 
 
-def test_identifiant_de_decision_en_double(regles_fabriquees):
-    regles_fabriquees.ajouter_decision({"nom": "Thèse EPHE absente du Sudoc", "quand": {"type": "thèse"},
-                                        "alors": "arrêt"})
-    assert "decision_doublon" in _codes(verifier(regles_fabriquees.charger()), "erreur")
+def test_resultat_inconnu_refuse_au_chargement(regles_fabriquees):
+    regles_fabriquees.ajouter_branche("alma", {"si": {"status": "academic_record_found"}, "resultat": "arrêt"})
+    with pytest.raises(ReglesInvalides, match="resultat"):
+        regles_fabriquees.charger()
 
 
-def test_avertissements_et_infos(regles_fabriquees):
-    # variante atteinte par aucune décision ni vérification, vérification sans état
-    regles_fabriquees.modifier_decision("Mémoire absent du Sudoc", profil="these-originale-imprimee")
-    regles_fabriquees.modifier_decision("Mémoire, notice électronique au Sudoc", profil="these-originale-imprimee")
-    e = regles_fabriquees.lire("verifications.yaml")
-    del e["situation_non_prevue"]
-    regles_fabriquees.ecrire("verifications.yaml", e)
-    d = regles_fabriquees.lire("decisions.yaml")
-    d["sinon"] = {"alors": "vérification", "motif": "Situation non prévue"}
-    regles_fabriquees.ecrire("decisions.yaml", d)
-    regles_fabriquees.modifier_decision("Résultat Sudoc à vérifier", verification=None)
+def test_notice_non_atteinte(regles_fabriquees):
+    regles_fabriquees.modifier_etape("creation", branches=[{"si": {"type": "these"}, "resultat": "création",
+                                                            "notice": "these-originale-imprimee"}])
+    regles_fabriquees.modifier_etape("sudoc", branches=[])
     r = verifier(regles_fabriquees.charger())
-    assert {"profil_non_atteint", "verification_sans_etat"} <= set(_codes(r, "avertissement"))
-    assert "variable_inutilisee" in _codes(r, "info")
-    assert not r.bloquant
+    assert "notice_non_atteinte" in _codes(r, "avertissement") and not r.bloquant
 
 
-def test_cas_non_couvert_comble(regles_fabriquees):
-    regles_fabriquees.ajouter_decision({"nom": "Mémoire déjà au Sudoc", "quand": {"type": "mémoire"},
-                                        "alors": "vérification", "verification": "sudoc_a_qualifier"})
+def test_cas_sinon_comble(regles_fabriquees):
+    regles_fabriquees.ajouter_branche("sudoc", {"si": {"type": "these", "ephe": "non",
+                                                       "thesis_state": "printed_reproduction"}, "resultat": "stop"}, 0)
     r = verifier(regles_fabriquees.charger())
-    assert sum(c.code == "cas_non_couvert" for c in r.constats) == 1
+    assert sum(c.code == "cas_sinon" for c in r.constats) == 2
 
 
-# ---------------------------------------------------------------- brouillons (interface)
 def test_verifier_un_brouillon_sans_ecrire(regles_fabriquees):
-    texte = regles_fabriquees.texte("decisions.yaml").replace("quand: {alma: présent}", "quand: {alma: présente}")
-    r = verifier_textes({"decisions.yaml": texte}, regles_fabriquees.reglages)
+    texte = regles_fabriquees.texte("pipeline.yaml").replace("si: {status: academic_record_found}",
+                                                             "si: {status: academic_record_foundd}")
+    r = verifier_textes({"pipeline.yaml": texte}, regles_fabriquees.reglages)
     assert r.bloquant and "valeur_inconnue" in _codes(r)
-    assert regles_fabriquees.texte("decisions.yaml") != texte  # rien n'est écrit
-    r = verifier_textes({"decisions.yaml": "regles: [\n"}, regles_fabriquees.reglages)
+    assert regles_fabriquees.texte("pipeline.yaml") != texte  # rien n'est écrit
+    r = verifier_textes({"pipeline.yaml": "etapes: [\n"}, regles_fabriquees.reglages)
     assert _codes(r) == ["yaml_invalide"]
 
 

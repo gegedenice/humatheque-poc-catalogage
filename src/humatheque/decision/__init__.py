@@ -1,1 +1,1 @@
-"""Décision : provenance, tableau de décision de decisions.yaml, sorties des services (SPEC §6, §7)."""
+"""Décision : provenance, valeurs lues par le pipeline de regles/pipeline.yaml (SPEC §6, §7)."""

@@ -16,13 +16,10 @@ import yaml
 from pydantic import ValidationError
 
 from humatheque.config import Reglages, reglages as reglages_par_defaut
-from humatheque.regles.modeles import (EtatVerification, Fait, RegleDecision, Regles, ServiceSorties, Socle, Variable,
-                                      Variante, ZoneRegle)
+from humatheque.regles.modeles import EtapePipeline, Regles, Socle, Variable, Variante, ZoneRegle
 
 FICHIER_VARIABLES = "variables.yaml"
-FICHIER_DECISIONS = "decisions.yaml"
-FICHIER_SERVICES = "services.yaml"
-FICHIER_VERIFICATIONS = "verifications.yaml"
+FICHIER_PIPELINE = "pipeline.yaml"
 FICHIER_SOCLE = "notice/socle.yaml"
 DOSSIER_VARIANTES = "notice/variantes"
 
@@ -40,7 +37,7 @@ class ReglesInvalides(Exception):
 def fichiers_regles(dossier: Path) -> list[str]:
     """Chemins relatifs des fichiers de règles, dans l'ordre de lecture."""
     variantes = sorted(p.relative_to(dossier).as_posix() for p in (dossier / DOSSIER_VARIANTES).glob("*.yaml"))
-    return [FICHIER_VARIABLES, FICHIER_DECISIONS, FICHIER_SERVICES, FICHIER_VERIFICATIONS, FICHIER_SOCLE, *variantes]
+    return [FICHIER_VARIABLES, FICHIER_PIPELINE, FICHIER_SOCLE, *variantes]
 
 
 def lire_textes(dossier: Path) -> dict[str, str]:
@@ -104,46 +101,18 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
             except ValidationError as e:
                 problemes += _erreurs_pydantic(FICHIER_VARIABLES, str(nom), e)
 
-    # --- decisions.yaml
-    brut = _yaml(FICHIER_DECISIONS, textes.get(FICHIER_DECISIONS, ""))
-    faits: dict[str, Fait] = {}
-    decisions: list[RegleDecision] = []
-    sinon: dict[str, Any] = {}
-    if _attendu(FICHIER_DECISIONS, isinstance(brut, dict), "clés faits, regles et sinon attendues", problemes):
-        for k, v in (brut.get("faits") or {}).items():
-            donnees = {"valeurs": v} if isinstance(v, list) else (v or {})
+    # --- pipeline.yaml
+    brut = _yaml(FICHIER_PIPELINE, textes.get(FICHIER_PIPELINE, ""))
+    communes: dict[str, list[str]] = {}
+    etapes: dict[str, EtapePipeline] = {}
+    if _attendu(FICHIER_PIPELINE, isinstance(brut, dict) and isinstance(brut.get("etapes"), dict),
+                "clés communes et etapes attendues", problemes):
+        communes = {str(k): [str(x) for x in (v or [])] for k, v in (brut.get("communes") or {}).items()}
+        for nom, e in brut["etapes"].items():
             try:
-                faits[str(k)] = Fait.model_validate({**donnees, "nom": str(k)})
-            except ValidationError as e:
-                problemes += _erreurs_pydantic(FICHIER_DECISIONS, f"fait {k}", e)
-        _attendu(FICHIER_DECISIONS, isinstance(brut.get("regles"), list), "liste « regles » attendue", problemes)
-        for i, r in enumerate(brut.get("regles") or [], start=1):
-            try:
-                decisions.append(RegleDecision.model_validate(r))
-            except ValidationError as e:
-                problemes += _erreurs_pydantic(FICHIER_DECISIONS, f"règle {i}", e)
-        sinon = brut.get("sinon") or {}
-        _attendu(FICHIER_DECISIONS, bool(sinon), "« sinon » obligatoire", problemes)
-
-    # --- services.yaml
-    brut = _yaml(FICHIER_SERVICES, textes.get(FICHIER_SERVICES, ""))
-    services: dict[str, ServiceSorties] = {}
-    if _attendu(FICHIER_SERVICES, isinstance(brut, dict), "dictionnaire des services attendu", problemes):
-        for nom, v in brut.items():
-            try:
-                services[str(nom)] = ServiceSorties.model_validate({**(v or {}), "nom": str(nom)})
-            except ValidationError as e:
-                problemes += _erreurs_pydantic(FICHIER_SERVICES, str(nom), e)
-
-    # --- verifications.yaml
-    brut = _yaml(FICHIER_VERIFICATIONS, textes.get(FICHIER_VERIFICATIONS, "")) or {}
-    verifications: dict[str, EtatVerification] = {}
-    if _attendu(FICHIER_VERIFICATIONS, isinstance(brut, dict), "dictionnaire des états attendu", problemes):
-        for nom, v in brut.items():
-            try:
-                verifications[str(nom)] = EtatVerification.model_validate({**(v or {}), "nom": str(nom)})
-            except ValidationError as e:
-                problemes += _erreurs_pydantic(FICHIER_VERIFICATIONS, str(nom), e)
+                etapes[str(nom)] = EtapePipeline.model_validate({**(e or {}), "id": str(nom)})
+            except ValidationError as err:
+                problemes += _erreurs_pydantic(FICHIER_PIPELINE, f"étape {nom}", err)
 
     # --- notice/socle.yaml
     brut = _yaml(FICHIER_SOCLE, textes.get(FICHIER_SOCLE, ""))
@@ -174,8 +143,7 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
 
     if problemes:
         raise ReglesInvalides(problemes)
-    return Regles(variables=variables, faits=faits, services=services, decisions=decisions, socle=socle,
-                  variantes=variantes, verifications=verifications, sinon=sinon,
+    return Regles(variables=variables, communes=communes, etapes=etapes, socle=socle, variantes=variantes,
                   emplacement=emplacement, horodatage=datetime.now(UTC), empreinte=_empreinte(textes),
                   textes=dict(textes))
 

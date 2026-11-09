@@ -1,6 +1,6 @@
-"""Administration des règles (SPEC §9.3, page « Règles ») : consultation, banc
-d'essai, aperçu, vérification d'un brouillon, enregistrement (archive, journal,
-rechargement) et refus d'un brouillon en erreur ; API /api/v1/regles."""
+"""Administration des règles (SPEC §9.3, studio) : pipeline en arbre édité branche
+par branche, banc d'essai, aperçu, vérification d'un brouillon, enregistrement
+(archive, journal, rechargement) et refus d'un brouillon en erreur ; API /api/v1/regles."""
 
 import html
 
@@ -12,38 +12,115 @@ from services_simules import simuler
 from test_web import _televerser, app, client  # noqa: F401  (fixtures)
 
 PROFIL = "notice/socle.yaml"
+AUTEUR = {"auteur": "Camille"}
 
 
-def test_page_regles_onglets(client):
-    for onglet, attendu in [("decisions", "Banc d'essai"), ("notice", "Choisissez une zone"),
-                            ("donnees", "extraction.defense_year"), ("modifier", 'id="editeur-regles"')]:
-        r = client.get(f"/admin/regles?onglet={onglet}")
-        assert r.status_code == 200 and attendu in html.unescape(r.text), onglet
-    page = html.unescape(client.get("/admin/regles").text)
-    assert "Notice déjà dans Alma" in page and "cas non couvert" in page and "+ Ajouter une règle" in page
+def _txt(r):
+    return html.unescape(r.text)
+
+
+# ---------------------------------------------------------------- pages
+@pytest.mark.parametrize("onglet, attendu", [
+    ("pipeline", "Le pipeline, étape par étape"), ("notice", "Socle commun"), ("essai", "Non-régression"),
+    ("modifier", 'id="editeur-regles"'), ("decisions", "Le pipeline, étape par étape"),  # ancien lien
+])
+def test_onglets(client, onglet, attendu):
+    r = client.get(f"/admin/regles?onglet={onglet}")
+    assert r.status_code == 200 and attendu in _txt(r)
     assert "Règles de catalogage" in client.get("/admin").text  # sous-menu des deux pages
 
 
-def test_banc_d_essai(client):
-    r = client.post("/admin/regles/essai", data={"type": "thèse", "provenance": "hors EPHE", "alma": "absent",
-                                                "sudoc": "originale imprimée"})
-    texte = html.unescape(r.text)
-    assert r.status_code == 200 and "Thèse hors EPHE, originale imprimée au Sudoc" in texte and "conversion" in texte
-    assert texte.count("✓") >= 1 and "these-reproduction-imprimee" in texte
-    r = client.post("/admin/regles/essai", data={"type": "thèse", "provenance": "EPHE", "alma": "absent",
-                                                "sudoc": "originale imprimée"})
-    assert "sinon" in r.text
+def test_arbre_du_pipeline(client):
+    """Les étapes dans l'ordre, les codes de l'API tels quels, ET / OU / SINON, étape suivante."""
+    page = _txt(client.get("/admin/regles?onglet=pipeline"))
+    for attendu in ["Provenance", "Alma", "Sudoc", "IdRef", "Dewey", "Création de la notice",
+                    "academic_record_found", "ambiguous_academic_candidate", "off_profile_match_only",
+                    "duplicate_found", "printed_reproduction", "electronic_only", "no_print_duplicate_found",
+                    "low_confidence", "not_found", "CONVERSION these-reproduction-imprimee puis STOP",
+                    "STOP à reprendre", "POURSUITE avec alerte", "→ Sudoc", "SINON", "TOUJOURS"]:
+        assert attendu in page, attendu
+    assert ">ET<" in page and " OU " in page
+
+
+# ---------------------------------------------------------------- édition de l'arbre
+def test_formulaire_d_une_branche(client):
+    r = _txt(client.get("/admin/regles/noeud", params={"etape": "sudoc", "chemin": "0.0.1", "operation": "modifier"}))
+    assert "Modifier la branche" in r and 'value="printed_reproduction" checked' in r and 'value="oui" checked' in r
+    r = _txt(client.get("/admin/regles/noeud", params={"etape": "sudoc", "chemin": "0", "operation": "modifier"}))
+    assert "sous-branches (inchangées)" in r  # embranchement : son résultat est porté par ses sous-branches
+    r = _txt(client.get("/admin/regles/noeud", params={"etape": "alma", "chemin": "s", "operation": "modifier"}))
+    assert "« sinon »" in r and 'name="v.status"' not in r
+
+
+def test_modifier_ajouter_deplacer_supprimer(client, app):
+    # modifier : printed_reproduction + EPHE = non → stop (cas que la spécification ne couvrait pas)
+    r = client.post("/admin/regles/noeud", data={
+        "etape": "sudoc", "chemin": "0.0", "operation": "sous_branche", "v.thesis_state": "printed_reproduction",
+        "v.ephe": "non", "resultat": "stop", "motif": "reproduction déjà au Sudoc", **AUTEUR})
+    assert r.status_code == 303 and "onglet=pipeline" in r.headers["location"]
+    from humatheque.regles.moteur import evaluer
+    v = {"type": "these", "ephe": "non", "status": "duplicate_found", "thesis_state": "printed_reproduction"}
+    assert evaluer(app.regles, "sudoc", v).resultat == "stop"
+    assert "printed_reproduction" in app.texte_regles("pipeline.yaml") and "# Pipeline de traitement" in \
+        app.texte_regles("pipeline.yaml")  # en-tête conservé
+    # modifier une branche existante (SAUF) et ajouter une branche après
+    client.post("/admin/regles/noeud", data={"etape": "alma", "chemin": "0", "operation": "modifier",
+                                            "v.status": "academic_record_found", "mode.type": "sauf",
+                                            "v.type": "memoire", "resultat": "stop", **AUTEUR})
+    n = app.regles.etapes["alma"].branches[0]
+    assert (n.si, n.sauf) == ({"status": "academic_record_found"}, {"type": "memoire"})
+    assert n.condition == "status = academic_record_found ET SAUF type = memoire"
+    client.post("/admin/regles/noeud", data={"etape": "alma", "chemin": "0", "operation": "ajouter",
+                                            "v.status": "academic_record_found", "v.type": "memoire",
+                                            "resultat": "stop à reprendre", **AUTEUR})
+    assert app.regles.etapes["alma"].branches[1].resultat == "stop à reprendre"
+    # déplacer, supprimer
+    client.post("/admin/regles/noeud/operation", data={"etape": "alma", "chemin": "1", "operation": "monter", **AUTEUR})
+    assert app.regles.etapes["alma"].branches[0].resultat == "stop à reprendre"
+    client.post("/admin/regles/noeud/operation", data={"etape": "alma", "chemin": "0", "operation": "supprimer",
+                                                      **AUTEUR})
+    assert len(app.regles.etapes["alma"].branches) == 3
+    # sinon d'une étape
+    client.post("/admin/regles/noeud", data={"etape": "alma", "chemin": "s", "operation": "modifier",
+                                            "resultat": "stop à reprendre", "motif": "statut inconnu", **AUTEUR})
+    assert app.regles.etapes["alma"].sinon.motif == "statut inconnu"
+    assert len(app.journal_regles()) == 6
+
+
+def test_branche_invalide_refusee(client, app):
+    ancien = app.texte_regles("pipeline.yaml")
+    r = client.post("/admin/regles/noeud", data={"etape": "creation", "chemin": "0", "operation": "modifier",
+                                                "v.type": "these", "resultat": "création", "notice": "", **AUTEUR})
+    assert r.status_code == 422 and "notice cible inconnue" in _txt(r)
+    assert app.texte_regles("pipeline.yaml") == ancien
+    with pytest.raises(ActionImpossible, match="sinon"):
+        app.modifier_arbre("alma", "s", "supprimer", "C")
+
+
+# ---------------------------------------------------------------- banc d'essai
+def test_banc_d_essai_parcours(client):
+    r = _txt(client.post("/admin/regles/essai", data={
+        "type": "these", "ephe": "non", "alma.status": "no_academic_record_found",
+        "sudoc.status": "duplicate_found", "sudoc.thesis_state": "printed_original"}))
+    assert "Parcours du pipeline" in r and "conversion these-reproduction-imprimee" in r
+    assert "thesis_state=printed_original" in r and "Notice prévisualisée" in r
+    r = _txt(client.post("/admin/regles/essai", data={
+        "type": "these", "ephe": "oui", "alma.status": "no_academic_record_found",
+        "sudoc.status": "no_print_duplicate_found", "idref.status": "not_found", "dewey.status": "au_dessus_seuil"}))
+    for etape in ["Provenance", "Alma", "Sudoc", "IdRef", "Dewey", "Création"]:
+        assert etape in r, etape
+    assert "poursuite avec alerte" in r and "création these-originale-imprimee" in r and "328 (socle)" in r
 
 
 @respx.mock
-def test_banc_d_essai_et_apercu_depuis_un_dossier(client, app):
+def test_banc_d_essai_depuis_un_dossier(client, app):
     simuler()
     dossier = _televerser(client).headers["location"].rsplit("/", 1)[1]
-    assert app.faits_dossier(dossier)["sudoc"] == "rien"
-    r = client.post("/admin/regles/essai", data={"dossier": dossier})
-    assert "Thèse EPHE absente du Sudoc" in r.text and "dossier" in r.text
-    r = client.post("/admin/regles/apercu", data={"profil": "these-originale-imprimee", "dossier": dossier})
-    assert r.status_code == 200 and "700" in r.text and "Variables du contexte" in html.unescape(r.text)
+    assert app.valeurs_dossier(dossier)["sudoc.status"] == "no_print_duplicate_found"
+    r = _txt(client.post("/admin/regles/essai", data={"dossier": dossier}))
+    assert "création these-originale-imprimee" in r and "dossier" in r
+    page = _txt(client.get(f"/dossiers/{dossier}"))
+    assert "Parcours du pipeline" in page and "no_academic_record_found" in page
 
 
 def test_apercu_sur_l_exemple(client):
@@ -76,14 +153,14 @@ def test_enregistrer_archive_journalise_recharge(client, app):
 
 
 def test_enregistrer_refuse_un_brouillon_en_erreur(client, app):
-    ancien = app.texte_regles("decisions.yaml")
-    texte = ancien.replace("quand: {alma: présent}", "quand: {alma: présente}")
-    r = client.post("/admin/regles/enregistrer", data={"fichier": "decisions.yaml", "texte": texte, "auteur": "C"})
+    ancien = app.texte_regles("pipeline.yaml")
+    texte = ancien.replace("si: {status: academic_record_found}", "si: {status: academic_record_foundd}")
+    r = client.post("/admin/regles/enregistrer", data={"fichier": "pipeline.yaml", "texte": texte, "auteur": "C"})
     assert r.status_code == 422 and "Modification refusée" in html.unescape(r.text)
-    assert "quand: {alma: présente}" in html.unescape(r.text)  # le brouillon est conservé dans le formulaire
-    assert app.texte_regles("decisions.yaml") == ancien and app.journal_regles() == []
+    assert "academic_record_foundd" in html.unescape(r.text)  # le brouillon est conservé dans le formulaire
+    assert app.texte_regles("pipeline.yaml") == ancien and app.journal_regles() == []
     with pytest.raises(ReglesRefusees):
-        app.enregistrer_regles("decisions.yaml", "regles: [\n", "C")
+        app.enregistrer_regles("pipeline.yaml", "etapes: [\n", "C")
 
 
 def test_fichier_hors_regles_refuse(app):
@@ -96,104 +173,13 @@ def test_fichier_hors_regles_refuse(app):
 
 def test_api_regles(client):
     r = client.get("/api/v1/regles").json()
-    assert set(r["fichiers"]) >= {"variables.yaml", "decisions.yaml", PROFIL} and r["version"]
+    assert set(r["fichiers"]) >= {"variables.yaml", "pipeline.yaml", PROFIL} and r["version"]
     assert r["rapport"]["nb_erreurs"] == 0
-    c = client.post("/api/v1/regles/decision", json={"faits": {"type": "thèse", "provenance": "EPHE",
-                                                               "alma": "présent", "sudoc": "non vérifié"}}).json()
-    assert c["regle"]["nom"] == "Notice déjà dans Alma" and c["issue"] == "terminé"
+    c = client.post("/api/v1/regles/pipeline", json={"valeurs": {
+        "type": "these", "ephe": "oui", "alma.status": "academic_record_found"}}).json()
+    assert [e["etape"] for e in c["etapes"]] == ["provenance", "alma"] and c["etapes"][-1]["resultat"] == "stop"
+    assert c["issue"] == "terminé"
     a = client.post("/api/v1/regles/apercu", json={"profil": "memoire-original-imprime"}).json()
     assert "701 #1$3026594803$4003" in a["texte"]
 
 
-# ---------------------------------------------------------------- dictionnaire et tableau de décision
-def test_onglet_faits_et_sorties(client):
-    page = html.unescape(client.get("/admin/regles?onglet=donnees").text)
-    for attendu in ["academic_record_found", "printed_original", "tout code non listé", "aucun code retenu",
-                    "IdRef — personnes", "IdRef — structures", "low_confidence", "not_found",
-                    "proto-notice d'autorité à créer", "au_dessus_seuil", "aucune_classe", "non bloquant"]:
-        assert attendu in page, attendu
-
-
-def test_banc_d_essai_codes_bruts(client):
-    """Codes renvoyés par l'API saisis tels quels : traduits avant décision."""
-    r = client.post("/admin/regles/essai", data={"type": "these", "provenance": "hors EPHE",
-                                                "alma": "no_academic_record_found", "sudoc": "printed_original"})
-    texte = html.unescape(r.text)
-    assert "Thèse hors EPHE, originale imprimée au Sudoc" in texte
-    assert "printed_original" in texte and "originale imprimée" in texte and "no_academic_record_found" in texte
-    r = client.post("/admin/regles/essai", data={"type": "these", "provenance": "EPHE", "alma": "statut_fantome",
-                                                "sudoc": ""})
-    assert "code inconnu" in html.unescape(r.text) and "sinon" in r.text
-
-
-def test_formulaire_ajouter_modifier_deplacer_supprimer(client, app):
-    assert "Nouvelle règle" in html.unescape(client.get("/admin/regles/decision").text)
-    f = html.unescape(client.get("/admin/regles/decision", params={"nom": "Thèse EPHE, reproduction au Sudoc"}).text)
-    assert 'value="reproduction microfiche" checked' in f
-    n = len(app.regles.decisions)
-    # ajout en 2e position
-    r = client.post("/admin/regles/decision", data={
-        "ancien_nom": "", "nom": "Mémoire, originale au Sudoc", "position": "2", "quand.type": "mémoire",
-        "quand.sudoc": ["originale imprimée", "reproduction imprimée"], "alors": "vérification",
-        "motif": "à examiner", "a_valider": "1", "auteur": "Camille"})
-    assert r.status_code == 303 and "onglet=decisions&enregistre=archives/" in r.headers["location"]
-    regle = app.regles.decisions[1]
-    assert (regle.nom, regle.quand, regle.a_valider) == (
-        "Mémoire, originale au Sudoc", {"type": "mémoire", "sudoc": ["originale imprimée", "reproduction imprimée"]},
-        True) and len(app.regles.decisions) == n + 1
-    texte = app.texte_regles("decisions.yaml")
-    assert "quand: {type: mémoire, sudoc: [originale imprimée, reproduction imprimée]}" in texte
-    assert "printed_original" in texte and "# Règles de décision" in texte  # dictionnaire et en-tête conservés
-    # deux cas non couverts de moins (mémoire + originale / reproduction imprimée)
-    assert sum(c.code == "cas_non_couvert" for c in app._rapport.constats) == 2
-    # modification
-    client.post("/admin/regles/decision", data={"ancien_nom": "Mémoire, originale au Sudoc",
-                                                "nom": "Mémoire, imprimé au Sudoc", "quand.type": "mémoire",
-                                                "quand.sudoc": "originale imprimée", "alors": "arrêt", "profil": TO_,
-                                                "auteur": "Camille"})
-    regle = app.regles.decisions[1]
-    assert (regle.nom, regle.quand, regle.alors, regle.profil) == ("Mémoire, imprimé au Sudoc",
-                                                                    {"type": "mémoire", "sudoc": "originale imprimée"},
-                                                                    "arrêt", None)  # arrêt : pas de profil
-    # déplacement
-    client.post("/admin/regles/decision/deplacer", data={"nom": "Mémoire, imprimé au Sudoc", "sens": "-1",
-                                                         "auteur": "Camille"})
-    assert app.regles.decisions[0].nom == "Mémoire, imprimé au Sudoc"
-    # sinon
-    client.post("/admin/regles/decision", data={"ancien_nom": "sinon", "alors": "vérification",
-                                                "motif": "Cas imprévu", "auteur": "Camille"})
-    assert app.regles.sinon == {"alors": "vérification", "motif": "Cas imprévu"}
-    # suppression
-    client.post("/admin/regles/decision/supprimer", data={"nom": "Mémoire, imprimé au Sudoc", "auteur": "Camille"})
-    assert len(app.regles.decisions) == n and len(app.journal_regles()) == 5
-
-
-def test_formulaire_refuse_une_regle_invalide(client, app):
-    ancien = app.texte_regles("decisions.yaml")
-    r = client.post("/admin/regles/decision", data={"ancien_nom": "", "nom": "Création sans profil",
-                                                    "quand.type": "thèse", "alors": "création", "auteur": "C"})
-    assert r.status_code == 422 and "profil inconnu" in html.unescape(r.text)
-    assert app.texte_regles("decisions.yaml") == ancien
-    with pytest.raises(ActionImpossible, match="réservé"):
-        app.enregistrer_decision(None, {"nom": "sinon", "alors": "arrêt"}, "C")
-
-
-@respx.mock
-def test_chaine_code_fait_regle_dans_le_dossier(client, app):
-    simuler()
-    dossier = _televerser(client).headers["location"].rsplit("/", 1)[1]
-    d = app.store.dossier(dossier)
-    assert d.decision.codes["alma"] == "no_academic_record_found" and d.decision.codes["type"] == "these"
-    page = html.unescape(client.get(f"/dossiers/{dossier}").text)
-    assert "Code reçu" in page and "no_academic_record_found" in page and "Thèse EPHE absente du Sudoc" in page
-    assert "type : thèse ; provenance : EPHE ; sudoc : rien" in page
-
-
-TO_ = "these-originale-imprimee"
-
-
-def test_variables_source_et_exemple(client):
-    page = html.unescape(client.get("/admin/regles?onglet=donnees").text)
-    assert "<th>Exemple</th>" in page and "Biologie marine" in page and "forme Marie Durand" in page
-    zone = html.unescape(client.get("/admin/regles/notice/zone", params={"variante": "socle", "id": "328"}).text)
-    assert "extraction.discipline</span> · exemple : Biologie marine" in zone
