@@ -1,12 +1,6 @@
-# Normalisation des chaînes (module NOR, SPEC §4). Listes relisibles et
-# modifiables par les catalogueurs ; aucune règle de zone UNIMARC ici.
-
-# Formes élidées reconnues devant une apostrophe (en majuscules, sans accent).
-elisions: [L, D, J, M, N, S, T, C, QU, JUSQU, LORSQU, PUISQU, QUOIQU, PRESQU, QUELQU]
-
-# Séparateurs de segments pour la réaccentuation : un segment n'est traité que
-# s'il est entièrement en capitales (SPEC §4.1).
-separateurs_segments: ":;.!?()[]«»\"/"
+# Mise en forme des chaînes (SPEC §4) : découpage nom / prénom et titre de
+# classement. Casse, accents et civilités : par le VLM (prompt d'extraction).
+# Listes relisibles et modifiables ; aucune règle de zone UNIMARC ici.
 
 # Personnes (SPEC §4.3)
 # Mots de liaison entre civilités (« Monsieur le Professeur ») : retirés avec elles.

@@ -146,6 +146,7 @@ class VueDossier(BaseModel):
     exceptions_ouvertes: int
     telechargements: dict[str, str] = Field(default_factory=dict, description="libellé → nom de fichier")
     parcours: list[dict] = Field(default_factory=list, description="étapes du pipeline : valeurs, chemin, résultat")
+    alertes: list[Any] = Field(default_factory=list, description="groupes d'alertes à afficher (GroupeAlertes)")
 
 
 class VueLots(BaseModel):
@@ -173,7 +174,7 @@ class VueApercu(BaseModel):
     notice: str | None = Field(None, description="texte WinIBW de la notice finale")
     origine: str | None = Field(None, description="version validée / éditée / générée, ou notice convertie")
     profil: str | None = None
-    alertes: list[str] = Field(default_factory=list)
+    alertes: list[Any] = Field(default_factory=list, description="groupes d'alertes à afficher (GroupeAlertes)")
     telechargements: dict[str, str] = Field(default_factory=dict)
 
 

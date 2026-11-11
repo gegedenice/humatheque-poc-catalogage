@@ -72,16 +72,39 @@ class FournisseurOpenAICompatible:
             appel.duree = round(time.monotonic() - debut, 3)
 
 
-def fournisseur(nom: str, r: Reglages, client: httpx.Client | None = None) -> FournisseurOpenAICompatible:
-    """Fournisseur par nom : vlm (endpoint on-premise), openai, hf, albert."""
-    nom = (nom or r.vlm_fournisseur).strip().lower()
-    table = {
+SEPARATEUR_MODELE = "#"  # « hf#Qwen/Qwen2.5-VL-7B-Instruct » : fournisseur et modèle choisi
+
+
+def table_fournisseurs(r: Reglages) -> dict[str, tuple[str, str, str]]:
+    """Fournisseur → (URL, modèle de .env, clé) ; la clé n'est jamais affichée."""
+    return {
         "vlm": (r.vlm_api_url, r.vlm_model, ""),
         "openai": (r.openai_api_url, r.openai_model, r.openai_api_key.get_secret_value()),
         "hf": (r.hf_api_url, r.hf_model, r.hf_token.get_secret_value()),
         "albert": (r.albert_api_url, r.albert_model, r.albert_api_key.get_secret_value()),
     }
+
+
+def fournisseur(nom: str, r: Reglages, client: httpx.Client | None = None) -> FournisseurOpenAICompatible:
+    """Fournisseur par nom : vlm (endpoint on-premise), openai, hf, albert ; « nom#modèle »
+    remplace le modèle de .env (choix de l'administration)."""
+    nom, _, modele_choisi = (nom or r.vlm_fournisseur).partition(SEPARATEUR_MODELE)
+    nom = nom.strip().lower()
+    table = table_fournisseurs(r)
     if nom not in table:
         raise ValueError(f"fournisseur VLM inconnu : {nom} (admis : {', '.join(table)})")
     url, modele, cle = table[nom]
-    return FournisseurOpenAICompatible(nom, url, modele, cle, r.vlm_timeout, client=client)
+    return FournisseurOpenAICompatible(nom, url, modele_choisi.strip() or modele, cle, r.vlm_timeout, client=client)
+
+
+def lister_modeles(nom: str, r: Reglages, timeout: float = 10) -> list[str]:
+    """Modèles accessibles chez un fournisseur (`GET …/models` des API OpenAI-compatibles)."""
+    url, _, cle = table_fournisseurs(r)[nom]
+    if not url:
+        raise ValueError("URL non configurée")
+    base = url.rsplit("/chat/completions", 1)[0]
+    rep = httpx.get(f"{base}/models", headers={"Authorization": f"Bearer {cle}"} if cle else {}, timeout=timeout)
+    rep.raise_for_status()
+    donnees = rep.json()
+    liste = donnees.get("data", donnees) if isinstance(donnees, dict) else donnees
+    return sorted({str(m.get("id")) for m in liste if isinstance(m, dict) and m.get("id")})

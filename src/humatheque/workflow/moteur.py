@@ -249,7 +249,8 @@ class Workflow:
                 motif += f" — PPN {d.alma.ppn}"
             return self._arret(r.issue, motif)
         if r.resultat == "poursuite avec alerte":
-            d.alerter(f"{objet} : {r.alerte or r.motif}" if objet else (r.alerte or r.motif or libelle))
+            # « pipeline:<étape>:<texte>|<objet> » : regroupé à l'affichage (application/alertes.py)
+            d.alerter(f"pipeline:{r.etape}:{r.alerte or r.motif or libelle}|{objet or ''}")
         elif r.resultat == "poursuite à reprendre":
             d.exceptions.append(ExceptionDossier(etape=ou or r.etape, objet=objet or libelle,
                                                  motif=f"{libelle} : {r.motif or r.resultat}",

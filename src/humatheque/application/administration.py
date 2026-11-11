@@ -48,10 +48,22 @@ class ReglagesAdmin(BaseModel):
     dans le formulaire)."""
 
     fournisseur: str
+    modeles: dict[str, str] = Field(default_factory=dict,
+                                    description="fournisseur → modèle choisi (absent : modèle de .env)")
     reglages_services: dict[str, dict[str, Any]] = Field(default_factory=dict)
     declencheurs: Declencheurs = Field(default_factory=Declencheurs)
     maj_le: datetime | None = None
     auteur: str | None = None
+
+
+class FournisseurVue(BaseModel):
+    """Un fournisseur VLM : configuration de .env (sans la clé) et modèle retenu."""
+
+    nom: str
+    url: str
+    modele_env: str
+    modele: str = Field(description="modèle utilisé : choix de l'administration, sinon .env")
+    cle: bool = Field(description="clé configurée (jamais affichée)")
 
 
 class Sante(BaseModel):
@@ -102,6 +114,32 @@ class Administration:
             mode="json", exclude={"maj_le", "auteur"})
         self.store.ecrire_reglage_admin(CLE_REGLAGES, valeur, auteur.strip())
         return self.reglages_admin()
+
+    # -------------------------------------------------------------- modèles VLM
+    def fournisseurs_vlm(self: "Application") -> list[FournisseurVue]:
+        from humatheque.extraction.fournisseurs import table_fournisseurs
+
+        choix = self.reglages_admin().modeles
+        return [FournisseurVue(nom=n, url=u, modele_env=m, modele=choix.get(n) or m, cle=bool(c))
+                for n, (u, m, c) in table_fournisseurs(self.reglages).items()]
+
+    def modeles_accessibles(self: "Application", fournisseur: str) -> list[str]:
+        """Modèles proposés par l'API du fournisseur (liste vide si injoignable)."""
+        from humatheque.extraction.fournisseurs import lister_modeles
+
+        try:
+            return lister_modeles(fournisseur, self.reglages)
+        except Exception:  # noqa: BLE001 — affichage : le modèle de .env reste proposé
+            return []
+
+    def fournisseur_effectif(self: "Application", fournisseur: str | None) -> tuple[str, str]:
+        """(fournisseur, modèle) utilisés pour un lot : modèle choisi en administration, sinon .env."""
+        from humatheque.extraction.fournisseurs import table_fournisseurs
+
+        nom = (fournisseur or self.reglages_admin().fournisseur or self.reglages.vlm_fournisseur).lower()
+        table = table_fournisseurs(self.reglages)
+        modele = self.reglages_admin().modeles.get(nom) or (table[nom][1] if nom in table else "")
+        return nom, modele
 
     def renouveler_jeton(self: "Application", auteur: str) -> ReglagesAdmin:
         r = self.reglages_admin()

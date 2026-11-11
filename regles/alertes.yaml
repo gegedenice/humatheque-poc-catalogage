@@ -1,0 +1,36 @@
+# Alertes affichées au-dessus de la notice (dossier, aperçu), par famille.
+# Toutes les alertes restent dans le journal du dossier et le rapport CSV ; ici,
+# seulement le libellé affiché et si la famille est montrée (studio › Alertes).
+# Le texte des alertes du pipeline (ex. « non trouvé dans IdRef ») se règle dans
+# l'onglet Pipeline (branche « poursuite avec alerte »).
+familles:
+  pipeline:
+    libelle: Alertes du pipeline
+    afficher: true
+  zone_obligatoire:
+    libelle: Zone obligatoire non produite
+    afficher: true
+  conversion_non_implementee:
+    libelle: Conversion non implémentée (copie de la notice source)
+    afficher: true
+  annee_invalide:
+    libelle: Année de soutenance illisible
+    afficher: true
+  caractere_dollar:
+    libelle: Caractère $ dans une valeur
+    afficher: true
+  extraction_divergente:
+    libelle: Valeurs différentes selon les images
+    afficher: true
+  document_invalide:
+    libelle: Document invalide
+    afficher: true
+  langue_sans_articles:
+    libelle: Langue sans table d'articles (pas de @ dans le titre)
+    afficher: true
+  anciennes:
+    libelle: Anciennes alertes (normalisation Python, proto-notice, bouchon)
+    afficher: false
+  autres:
+    libelle: Autres alertes
+    afficher: true

@@ -6,7 +6,6 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
     HUMATHEQUE_RACINE=/app \
-    REACCENTUE_CACHE=/opt/humatheque/reaccentue-cache.pz \
     HOST=0.0.0.0
 
 WORKDIR /app
@@ -36,8 +35,6 @@ RUN --mount=type=secret,id=ca,required=false \
     if [ -f /run/secrets/ca ]; then export SSL_CERT_FILE=/run/secrets/ca; fi; \
     uv sync --frozen --no-dev
 
-# Cache du dictionnaire reaccentue, construit au build (SPEC §4.1)
-RUN mkdir -p /opt/humatheque && uv run --no-sync humatheque cache-reaccentue
 
 # Feuille de style : exécutable autonome Tailwind, version figée (SPEC §10)
 ARG TAILWIND_VERSION=v3.4.17

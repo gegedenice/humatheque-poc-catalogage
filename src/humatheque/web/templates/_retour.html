@@ -1,0 +1,5 @@
+{# Boutons de retour : document → lot → liste des lots. #}
+<nav class="flex flex-wrap items-center gap-2 mb-3" aria-label="Retour">
+  {% if retour_lot %}<a class="btn-tonal btn-sm" href="/lots/{{ retour_lot }}">← Retour au lot</a>{% endif %}
+  <a class="btn-discret btn-sm" href="/lots">← Tous les lots</a>
+</nav>

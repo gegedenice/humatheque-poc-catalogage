@@ -23,10 +23,6 @@ uv run humatheque check-spec
 uv run humatheque serve   # http://127.0.0.1:8000
 ```
 
-Le premier traitement construit le cache du dictionnaire de réaccentuation
-(environ 15 s) dans `data/` ; `uv run humatheque cache-reaccentue` le fait à
-l'avance.
-
 ## Commandes
 
 | Commande | Rôle |
@@ -37,7 +33,6 @@ l'avance.
 | `humatheque run-batch fichier.txt [--type …] [--notice]` | traite un fichier d'URL (format `minio_urls.txt`, suffixe « FAIT » ignoré) |
 | `humatheque scan-minio [--lancer-nouveaux]` | liste les dossiers du bucket S3 et leur dernier statut |
 | `humatheque css [--watch]` | compile la feuille Tailwind (exécutable autonome, téléchargé dans `.cache/`) |
-| `humatheque cache-reaccentue` | construit le cache du dictionnaire de réaccentuation |
 | `uv run pytest` | tests (services simulés par respx, aucun appel réseau) |
 
 ## Configuration (`.env`)
@@ -71,6 +66,7 @@ l'avance.
 | `regles/variables.yaml` | données utilisables dans la notice (source, type, liste, disponible) |
 | `regles/notice/socle.yaml` | zones communes de la notice : sous-zones configurables (constante, donnée, composition, autorité ; repli ou vérification si absente), rendu des autorités |
 | `regles/notice/variantes/*.yaml` | thèse originale, thèse de reproduction, mémoire : zones ajoutées, remplacées, retirées |
+| `regles/alertes.yaml` | alertes affichées au-dessus de la notice : libellé et affichage par famille |
 | `regles/pipeline.yaml` | pipeline : provenance → Alma → Sudoc → IdRef → Dewey → création ; pour chaque étape, arbre de décision sur les codes renvoyés par l'API (`status`, `thesis_state`), résultats `stop`, `stop à reprendre`, `conversion`, `poursuite` (avec alerte, à reprendre), `création` |
 
 Format détaillé : `docs/SPEC.md` §8 ; référence : `reference/moteur-regles/`.
@@ -97,15 +93,23 @@ recharge les règles. Les fichiers modifiés sont ceux du dépôt (volume
 ## Administration
 
 La page `/admin` (« Services et déclencheurs ») affiche la santé des services, les réglages des lots
-automatiques (fournisseur VLM, paramètres avancés) et les trois déclencheurs :
+automatiques (fournisseur VLM, modèle de chaque fournisseur — celui de `.env` ou
+un autre choisi dans la liste renvoyée par l'API —, paramètres avancés) et les trois déclencheurs :
 balayage périodique, traitement à heure fixe (cron) et évènements S3. Pour les
 évènements, déclarer dans les notifications du bucket (webhook, évènements
 `s3:ObjectCreated:*`) l'URL affichée, qui porte un jeton. Le planificateur
 tourne dans l'application (`humatheque serve`) : une seule instance.
 
-Les règles métier lues hors de `regles/` sont dans `config/*.yaml` (états
-Sudoc et Alma, provenance, listes de civilités et d'articles, prompts
-d'extraction, conventions de lecture des règles…).
+La page `/admin/prompts` affiche et modifie les prompts d'extraction
+(`config/prompts/`, archivés et journalisés), avec à côté la correspondance
+« champ du prompt → variable de la notice → transformation ». La casse, les
+accents et les civilités sont pris en charge par le VLM ; en Python ne restent
+que le `@` du titre de classement, la minuscule du sous-titre et le découpage
+nom / prénom.
+
+Les autres réglages lus hors de `regles/` sont dans `config/*.yaml` (provenance,
+civilités et articles, services…). Les alertes affichées au-dessus des notices
+se règlent dans le studio, onglet « Alertes » (`regles/alertes.yaml`).
 
 ## Docker Compose
 
@@ -114,9 +118,9 @@ cp .env.example .env
 docker compose up -d      # application : http://localhost:8000
 ```
 
-- `app` est construite depuis le `Dockerfile` (`python:3.12-slim`, uv, cache
-  de réaccentuation et CSS construits au build) ; données dans `./data`.
-- `./regles` est monté en volume : les modifications faites depuis
+- `app` est construite depuis le `Dockerfile` (`python:3.12-slim`, uv, CSS
+  construite au build) ; données dans `./data`.
+- `./regles` et `./config/prompts` sont montés en volume : les modifications faites depuis
   Administration › Règles restent dans le dépôt (à commiter).
 - Derrière un proxy qui re-chiffre TLS, fournir son certificat au build :
   `docker build --secret id=ca,src=/chemin/ca.crt .`
@@ -127,7 +131,7 @@ docker compose up -d      # application : http://localhost:8000
 src/humatheque/
   config.py          réglages (.env)            cli.py        ligne de commande
   regles/            chargement des règles YAML, décision (tables), notice structurée, vérificateur
-  texte_unimarc/     module NOR : réaccentuation, casse, personnes, titre de classement
+  texte_unimarc/     titre de classement (@), minuscule du sous-titre, nom / prénom
   extraction/        VLM multi-images, fournisseurs interchangeables
   contexte/          extraction → Contexte (clés = Sources)
   services/          clients alma, sudoc, idref, dewey

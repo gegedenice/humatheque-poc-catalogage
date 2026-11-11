@@ -1,8 +1,7 @@
 """Ligne de commande `humatheque`.
 
 Sous-commandes : `serve`, `check-spec`, `run-url`, `run-batch`, `scan-minio`,
-`css`, `cache-reaccentue` (cache du dictionnaire, appelé au
-build Docker).
+`css`.
 """
 
 from __future__ import annotations
@@ -42,15 +41,6 @@ def check_spec(args: argparse.Namespace) -> int:
     else:
         _afficher(rapport)
     return 1 if rapport.bloquant else 0
-
-
-def cache_reaccentue(args: argparse.Namespace) -> int:
-    from humatheque.texte_unimarc.ressources import NOM_CACHE, dictionnaire
-
-    d = dictionnaire()
-    print(f"Cache {reglages().reaccentue_cache or reglages().dossier_data / NOM_CACHE} : {len(d.formes)} formes, "
-          f"{len(d.bigrammes)} bigrammes, {len(d.noms_propres)} noms propres")
-    return 0
 
 
 # Exécutable autonome Tailwind (sans Node), version figée.
@@ -153,9 +143,6 @@ def construire_parseur() -> argparse.ArgumentParser:
     c.add_argument("--dossier", type=Path, default=None, help="dossier des règles (défaut : REGLES_DIR=regles)")
     c.add_argument("--json", action="store_true", help="rapport au format JSON")
     c.set_defaults(fonction=check_spec)
-
-    c = sous.add_parser("cache-reaccentue", help="construit le cache du dictionnaire reaccentue dans data/")
-    c.set_defaults(fonction=cache_reaccentue)
 
     c = sous.add_parser("serve", help="lance l'interface web (port 8000)")
     c.add_argument("--host", default=os.getenv("HOST", "127.0.0.1"))

@@ -1,0 +1,10 @@
+{# Alertes d'un dossier, regroupées par famille (regles/alertes.yaml, studio › Alertes). #}
+{% if groupes %}
+<ul class="flex flex-col gap-1.5" aria-label="Alertes">
+  {% for g in groupes %}
+  <li class="rounded-xl bg-decision-clair text-decision-fonce px-3 py-1.5 text-[13px]">
+    <span class="font-semibold">{{ g.libelle }}</span>{% if g.elements %} : {{ g.elements | join(" · ") }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

@@ -11,4 +11,6 @@ services:
       - ./data:/app/data
       # Règles modifiées depuis Administration › Règles : écrites dans le dépôt (à commiter)
       - ./regles:/app/regles
+      # Prompts modifiés depuis Administration › Prompts : écrits dans le dépôt (à commiter)
+      - ./config/prompts:/app/config/prompts
     restart: unless-stopped

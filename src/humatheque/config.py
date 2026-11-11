@@ -93,9 +93,6 @@ class Reglages(BaseSettings):
     # Mot de passe de l'application (vide = pas d'authentification)
     mot_de_passe: SecretStr = SecretStr("")
 
-    # Cache du dictionnaire reaccentue (défaut : data/reaccentue-cache.pz). L'image
-    # Docker le construit au build hors du volume data/.
-    reaccentue_cache: Path | None = None
 
     @field_validator("dewey_seuil", mode="before")
     @classmethod

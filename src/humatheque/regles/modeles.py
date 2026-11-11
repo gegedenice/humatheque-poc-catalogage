@@ -21,6 +21,7 @@ class Variable(BaseModel):
     type: Literal["texte", "personne", "organisme"] = "texte"
     liste: bool = False
     disponible: bool = True
+    transformation: str = Field("", description="ce que fait le démonstrateur entre le prompt et la notice")
     description: str = ""
 
 
@@ -107,6 +108,15 @@ class EtapePipeline(BaseModel):
     note: str = ""
 
 
+class FamilleAlerte(BaseModel):
+    """Famille d'alertes (regles/alertes.yaml) : libellé affiché, montrée ou non."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    libelle: str
+    afficher: bool = True
+
+
 class Regles(BaseModel):
     """Règles chargées, avec leur provenance et leur version."""
 
@@ -115,6 +125,7 @@ class Regles(BaseModel):
     etapes: dict[str, EtapePipeline] = Field(default_factory=dict, description="pipeline, dans l'ordre")
     socle: Socle
     variantes: dict[str, Variante] = Field(default_factory=dict)
+    alertes: dict[str, FamilleAlerte] = Field(default_factory=dict, description="familles d'alertes affichées")
 
     emplacement: str = Field(description="dossier des règles")
     horodatage: datetime

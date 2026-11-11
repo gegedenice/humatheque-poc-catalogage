@@ -1,10 +1,9 @@
-Prompts d'extraction externalisés (VLM-T-005), versionnés avec le code. Le
-nom et l'empreinte SHA-256 du prompt utilisé sont enregistrés dans chaque
-dossier.
+Prompts d'extraction (VLM-T-005), versionnés avec le code et modifiables dans
+l'interface (Administration › Prompts). Le nom et l'empreinte SHA-256 du prompt
+utilisé sont enregistrés dans chaque dossier.
 
-Origine : `build_eval_prompt` du POC (schéma v2), modifié selon SPEC §5 :
-- supprimés : règle « all-caps → sentence case », casse des noms de
-  personnes, retrait des civilités (relèvent du module NOR, VLM-T-003) ;
-- ajoutés : « Transcribe every value exactly as printed (case, accents,
-  civilities). », champ `abstract` (VLM-T-002, ING-T-002), mention de
-  plusieurs images d'un même document (VLM-T-001).
+Décision du 11/11 : retour aux prompts initiaux de l'atelier. La normalisation
+lexicale est confiée au VLM (capitales → casse de phrase avec accents, noms de
+personnes en casse de phrase, civilités retirées). En Python ne restent que le
+`@` du titre de classement, la minuscule initiale du sous-titre et le découpage
+nom / prénom des personnes (SPEC §4).
