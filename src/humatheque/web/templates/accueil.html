@@ -1,9 +1,8 @@
 {% extends "base.html" %}
 {% from "_composants.html" import badge, vide, repartition %}
-{% from "_reglages.html" import parametres_avances %}
-{% block titre %}Nouveau traitement{% endblock %}
+{% block titre %}Accueil{% endblock %}
 {% block fil %}Accueil{% endblock %}
-{% block entete %}<h1>Nouveau traitement</h1>{% endblock %}
+{% block entete %}<h1>Catalogage assisté des thèses et mémoires</h1>{% endblock %}
 {% block contenu %}
 {% if nouveaux_lots %}
 <div role="status" class="avis bg-incident-clair text-incident-fonce flex flex-wrap items-center gap-x-3 gap-y-1 mb-6">
@@ -13,96 +12,24 @@
 </div>
 {% endif %}
 
+
+{% macro widget(href, titre, valeur, detail, icone) -%}
+  <a href="{{ href }}" class="kpi no-underline text-encre hover:text-encre hover:bg-tonal transition-colors">
+    <span class="flex items-center justify-between gap-2"><span class="kpi-libelle">{{ titre }}</span>
+      <span class="w-10 h-10 rounded-full bg-primaire-clair text-primaire-fonce flex items-center justify-center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ icone | safe }}</svg></span></span>
+    <span class="text-4xl font-semibold leading-none">{{ valeur }}</span>
+    <span class="text-[13px] text-sourdine">{{ detail }}</span>
+  </a>
+{%- endmacro %}
+<section aria-label="Accès rapides" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] mb-6">
+  {{ widget("/lots", "Lots traités", synthese.lots, synthese.documents ~ " document(s) traité(s)" ~ (" · " ~ synthese.a_reprendre ~ " à reprendre" if synthese.a_reprendre else ""), '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>') }}
+  {{ widget("/historique", "Historique", synthese.ingestions, "balayages et traitements enregistrés", '<path d="M4 7a8 8 0 1 1-1 5"/><path d="M4 3v4h4M12 8v4l3 2"/>') }}
+  {{ widget("/traiter", "Chargement manuel", "+", "téléverser des images ou coller des URL", '<path d="M12 5v14M5 12h14"/>') }}
+  {{ widget("/admin", "Administration", "⚙" if not vue.spec.nb_erreurs else "!", "services, prompts, règles" ~ (" · " ~ vue.spec.nb_erreurs ~ " erreur(s) dans les règles" if vue.spec.nb_erreurs else ""), '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>') }}
+</section>
+
 <div class="flex flex-wrap gap-6 items-start">
-  <form class="carte flex-[999_1_560px] min-w-0 flex flex-col gap-5" method="post" action="/lots" enctype="multipart/form-data" hx-boost="false">
-    <div>
-      <h2 class="mb-1">Images du ou des documents</h2>
-      <p class="text-sm text-sourdine">Un document donne un dossier suivi pas à pas (mode 1) ; plusieurs documents forment un lot traité en tâche de fond (mode 2).</p>
-    </div>
-
-    <div data-onglets class="flex flex-col gap-4">
-      <div role="tablist" aria-label="Source des images" class="segmente flex-wrap h-auto rounded-[20px]">
-        {% for cle, libelle in [("fichiers", "Fichiers"), ("dossiers", "Dossiers"), ("url", "URL"), ("liste", "Liste d'URL")] %}
-        <button type="button" role="tab" id="onglet-{{ cle }}" aria-controls="source-{{ cle }}" aria-selected="{{ 'true' if loop.first else 'false' }}"
-                class="flex-1 min-w-[7rem] h-10 text-sm border-l border-contour first:border-l-0 text-sourdine aria-selected:bg-primaire-clair aria-selected:text-primaire-fonce aria-selected:font-semibold">{{ libelle }}</button>
-        {% endfor %}
-      </div>
-
-      <div role="tabpanel" id="source-fichiers" aria-labelledby="onglet-fichiers" class="flex flex-col gap-3">
-        <label class="relative flex flex-col items-center justify-center gap-2.5 min-h-[200px] rounded-tuile border-2 border-dashed border-[#a9b4d9] bg-tonal text-center p-6 cursor-pointer hover:bg-primaire-clair/40" data-depot>
-          <span aria-hidden="true" class="w-14 h-14 rounded-2xl bg-primaire-clair flex items-center justify-center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1f3b82" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4m-5 5 5-5 5 5M4 20h16"/></svg></span>
-          <span class="text-base font-semibold">Déposez les images ici</span>
-          <span class="text-[13px] text-sourdine">ou cliquez pour parcourir · une ou plusieurs images</span>
-          <input class="absolute inset-0 opacity-0 cursor-pointer" id="images" type="file" name="images" accept="image/*" multiple aria-label="Téléverser des images">
-        </label>
-        <ul class="flex flex-wrap gap-2" data-liste-fichiers="images" aria-live="polite"></ul>
-        <label class="interrupteur text-sm">
-          <input type="checkbox" name="un_seul_document" value="true" checked><span class="piste" aria-hidden="true"></span>
-          Les fichiers forment un seul document multi-images (sinon : un document par fichier)
-        </label>
-      </div>
-
-      <div role="tabpanel" id="source-dossiers" aria-labelledby="onglet-dossiers" class="flex flex-col gap-3" hidden>
-        <label class="relative flex flex-col items-center justify-center gap-2.5 min-h-[200px] rounded-tuile border-2 border-dashed border-[#a9b4d9] bg-tonal text-center p-6 cursor-pointer hover:bg-primaire-clair/40">
-          <span aria-hidden="true" class="w-14 h-14 rounded-2xl bg-primaire-clair flex items-center justify-center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1f3b82" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10H3z"/></svg></span>
-          <span class="text-base font-semibold">Choisir des dossiers</span>
-          <span class="text-[13px] text-sourdine">un dossier = un document · les sous-dossiers <span class="font-mono">TH/</span> et <span class="font-mono">MM/</span> donnent le type</span>
-          <input class="absolute inset-0 opacity-0 cursor-pointer" id="dossiers" type="file" name="dossiers" webkitdirectory multiple aria-label="Téléverser des dossiers">
-        </label>
-        <ul class="flex flex-wrap gap-2" data-liste-fichiers="dossiers" aria-live="polite"></ul>
-      </div>
-
-      <div role="tabpanel" id="source-url" aria-labelledby="onglet-url" hidden>
-        <label class="etiquette" for="url">Une URL d'image (un document d'une image)</label>
-        <input class="champ" id="url" type="url" name="url" placeholder="https://…/page_titre.jpg">
-      </div>
-
-      <div role="tabpanel" id="source-liste" aria-labelledby="onglet-liste" hidden>
-        <label class="etiquette" for="liste_urls">Une liste d'URL, une par ligne (un document par ligne, suffixe « FAIT » ignoré)</label>
-        <textarea class="champ font-mono text-xs" id="liste_urls" name="liste_urls" rows="6"></textarea>
-      </div>
-    </div>
-
-    <div class="grid gap-4 sm:grid-cols-2">
-      <fieldset>
-        <legend class="etiquette">Type de document</legend>
-        <div class="segmente" role="radiogroup">
-          <label><input type="radio" name="type_document" value="these" checked>Thèse</label>
-          <label><input type="radio" name="type_document" value="memoire">Mémoire</label>
-        </div>
-      </fieldset>
-      <div>
-        <label class="etiquette" for="fournisseur">Fournisseur VLM</label>
-        <select class="champ champ-sm rounded-full" id="fournisseur" name="fournisseur">
-          {% for f in vue.fournisseurs %}
-          <option value="{{ f }}" {% if f == vue.fournisseur_defaut %}selected{% endif %}>{{ f }}{% if f == vue.fournisseur_defaut %} (défaut){% endif %}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    {{ parametres_avances(vue.reglables) }}
-    <p class="text-[13px] text-sourdine">La provenance (EPHE ou hors EPHE) n'est pas saisie : elle est déduite de l'établissement de soutenance. Pour un dossier TH / MM, le type vient du dossier.</p>
-    <div class="flex justify-end">
-      <button class="btn-principal btn-grand" type="submit" {% if vue.spec.nb_erreurs %}disabled title="La spécification contient des erreurs bloquantes"{% endif %}>
-        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Lancer le traitement</button>
-    </div>
-  </form>
-
-  <aside class="flex-[1_1_360px] min-w-0 flex flex-col gap-6">
-    {% with spec = vue.spec %}{% include "_spec.html" %}{% endwith %}
-    <section class="carte">
-      <div class="flex items-center justify-between gap-2 mb-2">
-        <h2 class="mb-0">Bucket S3</h2>
-      </div>
-      <div id="bucket">
-        <p class="text-[13px] text-sourdine mb-3">Liste les dossiers du bucket (un dossier = un document) avec leur dernier statut.</p>
-        <button class="btn-tonal btn-sm" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Balayer le bucket</button>
-      </div>
-    </section>
-  </aside>
-</div>
-
-<section class="carte mt-6">
+<section class="carte flex-[999_1_560px] min-w-0">
   <div class="flex items-center justify-between gap-2 mb-3">
     <h2 class="mb-0">Derniers traitements</h2>
     <a class="btn-discret btn-sm" href="/historique">Tout l'historique →</a>
@@ -128,4 +55,16 @@
   </div>
   {% else %}{{ vide("Aucun traitement pour l'instant. Déposez des images ou balayez le bucket pour commencer.") }}{% endif %}
 </section>
+  <aside class="flex-[1_1_340px] min-w-0">
+    <section class="carte">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <h2 class="mb-0">Bucket S3</h2>
+      </div>
+      <div id="bucket">
+        <p class="text-[13px] text-sourdine mb-3">Liste les dossiers du bucket (un dossier = un document) avec leur dernier statut.</p>
+        <button class="btn-tonal btn-sm" hx-post="/minio/balayer" hx-target="#bucket" hx-swap="outerHTML">Balayer le bucket</button>
+      </div>
+    </section>
+  </aside>
+</div>
 {% endblock %}

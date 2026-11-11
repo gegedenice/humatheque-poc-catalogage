@@ -4,7 +4,7 @@
 {% block fil %}Accueil{% endblock %}
 {% block entete %}<h1>Lots</h1>{% endblock %}
 {% block entete_droite %}
-<a class="btn-principal" href="/"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nouveau traitement</a>
+<a class="btn-principal" href="/traiter"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nouveau traitement</a>
 {% endblock %}
 {% block contenu %}
 {% set filtres = {"etat": vue.etat, "declencheur": vue.declencheur, "type_document": vue.type_document} %}

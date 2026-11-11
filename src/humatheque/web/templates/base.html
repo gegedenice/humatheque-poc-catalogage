@@ -8,7 +8,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block titre %}Catalogage assisté{% endblock %} · humatheque</title>
+  <title>{% block titre %}Catalogage assisté{% endblock %} · Humathèque POC catalogage</title>
   <link rel="stylesheet" href="/static/css/app.css?v={{ v_css }}">
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/js/app.js" defer></script>
@@ -22,12 +22,18 @@
   <script src="/static/js/editeur-regles.js?v={{ v_js }}" defer></script>
   {% block tete %}{% endblock %}
 </head>
-<body hx-boost="true" class="min-h-screen md:flex">
+<body hx-boost="true" class="min-h-screen flex flex-col">
+  <div class="bg-primaire text-white">
+    <a href="/" class="flex items-center gap-3 h-11 px-4 md:px-6 no-underline text-white hover:text-white w-fit">
+      <span class="font-semibold tracking-tight">Humathèque</span><span class="text-white/80">POC catalogage</span></a>
+  </div>
+  <div class="flex-1 md:flex">
   {% block rail %}
   <nav aria-label="Navigation principale" class="bg-rail md:w-24 flex-none">
    <div class="flex md:flex-col items-center gap-3 md:gap-4 px-3 py-2 md:px-0 md:py-5 md:sticky md:top-0">
-    <a href="/" aria-label="humatheque · accueil" class="w-12 h-12 rounded-[14px] bg-primaire text-white flex items-center justify-center text-xl font-bold no-underline hover:text-white md:mb-3">h</a>
-    {{ lien_rail("/", "Traiter", chemin == "/", '<path d="M12 5v14M5 12h14"/>') }}
+    <a href="/" aria-label="Humathèque · accueil" class="w-12 h-12 rounded-[14px] bg-primaire text-white flex items-center justify-center text-xl font-bold no-underline hover:text-white md:mb-3">h</a>
+    {{ lien_rail("/", "Accueil", chemin == "/", '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>') }}
+    {{ lien_rail("/traiter", "Traiter", chemin.startswith("/traiter"), '<path d="M12 5v14M5 12h14"/>') }}
     {{ lien_rail("/lots", "Lots", chemin.startswith(("/lots", "/dossiers")), '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>') }}
     {{ lien_rail("/historique", "Historique", chemin.startswith("/historique"), '<path d="M4 7a8 8 0 1 1-1 5"/><path d="M4 3v4h4M12 8v4l3 2"/>') }}
     {{ lien_rail("/admin", "Admin", chemin.startswith("/admin"), '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>') }}
@@ -54,6 +60,7 @@
     <main class="w-full max-w-[1400px] px-4 md:px-8 pt-2 pb-16">
       {% block contenu %}{% endblock %}
     </main>
+  </div>
   </div>
   {% block scripts %}{% endblock %}
 </body>

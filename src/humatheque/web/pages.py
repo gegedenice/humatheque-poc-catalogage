@@ -47,9 +47,15 @@ def accueil(request: Request):
     except ValueError:
         visite = None
     nouveaux = a.lots_automatiques_depuis(visite) if visite else []
-    r = _rendre(request, "accueil.html", vue=a.accueil(), nouveaux_lots=nouveaux)
+    r = _rendre(request, "accueil.html", vue=a.accueil(), nouveaux_lots=nouveaux, synthese=a.synthese_accueil())
     r.set_cookie(COOKIE_VISITE, datetime.now(UTC).isoformat(), max_age=3600 * 24 * 365, samesite="lax")
     return r
+
+
+@routeur.get("/traiter")
+def traiter(request: Request):
+    """Chargement manuel : téléversement, URL, choix du fournisseur et paramètres avancés."""
+    return _rendre(request, "traiter.html", vue=_app(request).accueil())
 
 
 @routeur.post("/spec/recharger")

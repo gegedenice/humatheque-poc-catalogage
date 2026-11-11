@@ -39,12 +39,20 @@ def _televerser(client, n=1, un_seul=False):
 
 # ---------------------------------------------------------------- pages
 def test_accueil(client):
+    """Accueil : bandeau, widgets (lots, historique, chargement manuel, admin),
+    derniers traitements, balayage du bucket ; le formulaire est sur /traiter."""
     r = client.get("/")
     texte = html.unescape(r.text)
     assert r.status_code == 200
-    assert "Nouveau traitement" in texte and "Règles chargées" in texte
-    assert "aucune erreur bloquante" in texte and "Aucun traitement pour l'instant" in texte
+    assert "Humathèque" in texte and "POC catalogage" in texte
+    for w in ["Lots traités", "Historique", "Chargement manuel", "Administration"]:
+        assert w in texte, w
+    assert "Derniers traitements" in texte and "Aucun traitement pour l'instant" in texte and "Bucket S3" in texte
+    assert 'action="/lots"' not in r.text
     assert '<script src="/static/vendor/htmx.min.js"' in r.text
+    t = html.unescape(client.get("/traiter").text)
+    assert 'action="/lots"' in t and "Règles chargées" in t and "aucune erreur bloquante" in t
+    assert "Derniers traitements" not in t
 
 
 def test_statiques(client):

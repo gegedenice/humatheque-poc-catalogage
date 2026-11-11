@@ -599,8 +599,16 @@ défaut sur la version générée.
 
 ### 9.3 Écrans
 
-- **`/` Nouveau traitement** : le formulaire du §3, la liste des dossiers du
-  bucket MinIO avec leur dernier statut et sélection multiple (ING-F-005),
+- **Gabarit commun** (décision du 11/11) : bandeau supérieur « Humathèque POC
+  catalogage » et rail latéral (badge H, Accueil, Traiter, Lots, Historique,
+  Admin).
+- **`/` Accueil** (décision du 11/11) : un widget par page (Lots traités —
+  lots, documents, à reprendre ; Historique ; Chargement manuel ;
+  Administration — état des règles), les derniers traitements et le
+  raccourci « Balayer le bucket » (liste des dossiers du bucket MinIO avec
+  leur dernier statut et sélection multiple, ING-F-005) ; bannière des lots
+  automatiques créés depuis la dernière visite.
+- **`/traiter` Nouveau traitement (chargement manuel)** : le formulaire du §3,
   l'état de la spec chargée et les avertissements du vérificateur. Si le
   fournisseur VLM est un endpoint Hugging Face dédié : indicateur d'état et
   bouton de réveil de l'endpoint (repris du POC).
