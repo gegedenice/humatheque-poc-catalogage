@@ -125,6 +125,38 @@ docker compose up -d      # application : http://localhost:8000
 - Derrière un proxy qui re-chiffre TLS, fournir son certificat au build :
   `docker build --secret id=ca,src=/chemin/ca.crt .`
 
+### Sur un VPS, dans une stack Traefik
+
+`deploy/vps/` contient un service prêt à ajouter à une stack existante
+(Traefik + Let's Encrypt, réseau Docker `web`, services humathèque, MinIO et
+VLM llama.cpp dans le même compose) :
+
+- `compose.catalogage.yml` : le service `catalogage` (build depuis le clone,
+  labels Traefik, volumes `data/`, `regles/`, `config/prompts/`) ; domaine
+  à adapter ;
+- `catalogage.env.example` : variables de l'application avec les **adresses
+  internes** du réseau `web` (`http://sudoc-checker:8000`,
+  `http://minio:9000`, `http://llama-server-qwen:8080/v1/chat/completions`…) :
+  les appels ne repassent ni par Traefik ni par Internet. Fichier distinct
+  du `.env` de la stack ; valeurs factices, à renseigner.
+
+```bash
+# dans le dossier du compose de la stack
+git clone -b <branche> <url-du-depot> humatheque-poc-catalogage
+cp humatheque-poc-catalogage/deploy/vps/catalogage.env.example .catalogage.env   # puis renseigner
+# coller le service de deploy/vps/compose.catalogage.yml dans compose.yml, ou :
+docker compose -f compose.yml -f humatheque-poc-catalogage/deploy/vps/compose.catalogage.yml up -d --build catalogage
+```
+
+- Exposée sur Internet : renseigner `MOT_DE_PASSE` (sinon l'application est ouverte).
+- Mise à jour : `git pull` dans le clone puis `up -d --build catalogage` ;
+  la base et les dossiers (`data/`) sont conservés. Les règles et prompts
+  modifiés depuis l'administration sont dans le clone : les commiter avant
+  un `git pull`.
+- Évènements MinIO (déclencheur « évènements ») : webhook vers
+  `http://catalogage:8000/minio/evenements?jeton=…` (adresse interne ; jeton
+  affiché dans /admin).
+
 ## Organisation du code
 
 ```
