@@ -241,6 +241,13 @@ def dewey(request: Request, dossier_id: str, exception: Annotated[int, Form()], 
     return _rediriger(f"/dossiers/{dossier_id}", auteur)
 
 
+@routeur.post("/dossiers/{dossier_id}/notice-existante")
+def notice_existante(request: Request, dossier_id: str, auteur: Annotated[str, Form()],
+                     commentaire: Annotated[str, Form()] = ""):
+    _app(request).confirmer_notice_existante(dossier_id, commentaire, _auteur(auteur))
+    return _rediriger(f"/dossiers/{dossier_id}", auteur)
+
+
 @routeur.post("/dossiers/{dossier_id}/hors-outil")
 def hors_outil(request: Request, dossier_id: str, auteur: Annotated[str, Form()],
                commentaire: Annotated[str, Form()] = ""):

@@ -23,7 +23,7 @@
   </label>
 {%- endmacro %}
 
-<form class="flex flex-wrap gap-6 items-start" method="post" action="/admin/reglages">
+<form class="flex flex-wrap gap-6 items-start" method="post" action="/admin/reglages" data-suivi-modifs>
   <section class="carte flex-[1_1_420px] min-w-0 flex flex-col gap-4">
     <div>
       <h2 class="mb-1">Lots automatiques</h2>
@@ -88,7 +88,9 @@
     <p class="text-[13px] text-sourdine">Un seul lot automatique à la fois : les dossiers arrivés pendant un lot attendent le déclenchement suivant. Un dossier déjà traité dont les images changent est signalé, jamais retraité d'office.</p>
   </section>
 
-  <div class="basis-full flex flex-wrap items-center justify-end gap-3">
+  {# Barre d'enregistrement toujours visible (retour du 11/11 : bouton trop bas, oublié). #}
+  <div class="basis-full sticky bottom-3 z-30 flex flex-wrap items-center justify-end gap-3 bg-carte rounded-full shadow-lg border border-filet px-5 py-3">
+    <span data-indicateur-modifs hidden class="mr-auto text-sm font-medium text-decision-fonce">● Modifications non enregistrées</span>
     <label class="text-sm text-sourdine flex items-center gap-2.5">Catalogueur <input class="champ champ-sm w-44 rounded-full" name="auteur" value="{{ auteur }}" required></label>
     <button class="btn-principal btn-grand">Enregistrer les réglages</button>
   </div>

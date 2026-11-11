@@ -1,26 +1,31 @@
 {% from "_composants.html" import badge, vide, en_cours, lien_ppn, json %}
+{% from "_macros_services.html" import ligne_provenance %}
 {% set d = vue.dossier %}
 {% set editeur = notice is defined and notice and notice.version %}
 <div id="panneau-dossier" class="flex-[1_1_560px] min-w-0 flex flex-col gap-6"
      {% if vue.etat != "termine" %}hx-get="/dossiers/{{ d.id }}/fragment" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
 
+  {# ---------------------------------------------------------------- bilan #}
+  {% include "_dossier_bilan.html" %}
+
   {# ---------------------------------------------------------------- onglets #}
-  {# Reprise (résolutions, SPEC §9.3) : onglet discret, présent seulement s'il y a quelque chose à reprendre. #}
-  {% set a_reprendre = vue.etat == "termine" and ((d.exceptions | rejectattr("resolue") | list) or (d.routage not in (none, "terminé") and not d.cloture)) %}
-  {% set onglets = [("notice", "Notice"), ("metadonnees", "Métadonnées"), ("services", "Services"),
-                    ("reponses", "Réponses brutes"), ("journal", "Journal (" ~ (d.journal | length) ~ ")")] %}
-  {% if a_reprendre %}{% set onglets = onglets + [("reprise", "Reprise" ~ (" (" ~ vue.exceptions_ouvertes ~ ")" if vue.exceptions_ouvertes else ""))] %}{% endif %}
+  {# Notice seulement s'il y en a une ; ouvert par défaut : Notice, sinon Services (décision du 11/11). #}
+  {% set a_notice = d.notice or d.notice_convertie or editeur %}
+  {% set onglets = ([("notice", "Notice")] if a_notice else []) + [("extraction", "Extraction"), ("services", "Services"),
+                    ("journal", "Journal (" ~ (d.journal | length) ~ ")")] %}
+  {% set defaut = "notice" if a_notice else ("services" if vue.etat == "termine" else "extraction") %}
   <section class="bg-carte rounded-carte shadow-carte overflow-hidden" id="onglets-dossier" data-onglets>
     <div role="tablist" aria-label="Sections du dossier" class="onglets px-4">
       {% for cle, libelle in onglets %}
       <button type="button" role="tab" class="onglet" id="onglet-{{ cle }}" aria-controls="volet-{{ cle }}"
-              {% if cle == "services" %}title="Alma · Sudoc · IdRef · Dewey"{% endif %}
-              aria-selected="{{ 'true' if loop.first else 'false' }}">{{ libelle }}</button>
+              {% if cle == "services" %}title="Alma · provenance · Sudoc · IdRef · Dewey, dans l'ordre d'exécution"{% endif %}
+              aria-selected="{{ 'true' if cle == defaut else 'false' }}">{{ libelle }}</button>
       {% endfor %}
     </div>
 
     {# ------------------------------------------------------------ notice #}
-    <div role="tabpanel" id="volet-notice" aria-labelledby="onglet-notice" class="p-5 flex flex-col gap-4">
+    {% if a_notice %}
+    <div role="tabpanel" id="volet-notice" aria-labelledby="onglet-notice" class="p-5 flex flex-col gap-4" {% if defaut != "notice" %}hidden{% endif %}>
       {% if vue.alertes %}
       {% with groupes = vue.alertes %}{% include "_alertes.html" %}{% endwith %}
       {% endif %}
@@ -77,14 +82,15 @@
       </div>
       {% endif %}
 
-      {% if not d.notice and not d.notice_convertie and not editeur %}
-        {% if vue.etat != "termine" %}<div class="vide">{{ en_cours("La notice apparaîtra à la fin du traitement.") }}</div>
-        {% else %}{{ vide("Pas de notice : " ~ (d.motif_arret or "aucune notice produite") ~ ".") }}{% endif %}
-      {% endif %}
     </div>
+    {% endif %}
 
-    {# ------------------------------------------------------------ métadonnées #}
-    <div role="tabpanel" id="volet-metadonnees" aria-labelledby="onglet-metadonnees" class="p-5 flex flex-col gap-4" hidden>
+    {# ------------------------------------------------------------ extraction #}
+    <div role="tabpanel" id="volet-extraction" aria-labelledby="onglet-extraction" class="p-5 flex flex-col gap-4" {% if defaut != "extraction" %}hidden{% endif %}>
+      {% if d.extraction %}
+      <details class="sous-carte"><summary class="cursor-pointer text-sm font-semibold">Sortie brute du modèle <span class="font-normal text-xs text-sourdine">· {{ d.fournisseur_vlm or "—" }} · prompt {{ d.extraction.prompt.nom }}</span></summary>
+        {% for b in d.extraction.bruts %}<pre class="code mt-2 max-h-96 bg-white">{{ b }}</pre>{% endfor %}</details>
+      {% endif %}
       {% if vue.champs %}
       <div class="defilant"><table class="tableau">
         <thead><tr><th>Champ</th><th>Extrait (brut)</th><th>Contexte (normalisé)</th></tr></thead>
@@ -106,26 +112,10 @@
         </tbody>
       </table></div>
       {% elif vue.etat != "termine" %}<div class="vide">{{ en_cours("Extraction en cours…") }}</div>
-      {% else %}{{ vide("Pas de métadonnées.") }}{% endif %}
+      {% else %}{{ vide("Pas de métadonnées extraites.") }}{% endif %}
 
-      {% if d.provenance or d.decision %}
-      <div class="sous-carte flex flex-col gap-2">
-        <h3>Provenance et pipeline</h3>
-        {% if d.provenance %}
-        <p class="text-sm">Provenance <span class="font-semibold">{{ d.provenance.valeur }}</span>
-          <span class="text-xs text-sourdine">— règle {{ d.provenance.regle }}, forme comparée « {{ d.provenance.forme_comparee }} »{% if d.provenance.forme_reconnue %}, forme reconnue « {{ d.provenance.forme_reconnue }} »{% endif %}</span></p>
-        {% endif %}
-        {% if vue.parcours %}
-        <p class="etiquette mb-0">Parcours du pipeline</p>
-        {% with etapes = vue.parcours %}{% include "_parcours.html" %}{% endwith %}
-        {% endif %}
-        {% if d.decision %}<p class="text-sm">{{ d.decision.motif }} {{ badge(d.decision.routage) }}</p>{% endif %}
-      </div>
-      {% endif %}
-
-      {% if d.extraction %}
-      <details><summary class="cursor-pointer text-sm text-sourdine">Sortie brute du modèle</summary>
-        {% for b in d.extraction.bruts %}<pre class="code mt-2 max-h-72">{{ b }}</pre>{% endfor %}</details>
+      {% if d.provenance %}
+      <div class="sous-carte"><p class="etiquette mb-1">Provenance (déduite de l'établissement de soutenance)</p>{{ ligne_provenance(d.provenance, d.metadonnees) }}</div>
       {% endif %}
       {% if d.contexte %}
       <details><summary class="cursor-pointer text-sm text-sourdine">Transformations du module NOR ({{ d.contexte.transformations | length }})</summary>
@@ -142,37 +132,17 @@
     </div>
 
     {# ------------------------------------------------------------ services #}
-    <div role="tabpanel" id="volet-services" aria-labelledby="onglet-services" class="p-5 flex flex-col gap-4" hidden>
-      {% include "_dossier_candidats.html" %}
-      {% if not (d.alma or d.sudoc or d.idref_personnes or d.idref_organisations or d.dewey) %}
-        {% if vue.etat != "termine" %}<div class="vide">{{ en_cours("Services en cours d'interrogation…") }}</div>
-        {% else %}{{ vide("Aucun service interrogé.") }}{% endif %}
-      {% endif %}
+    <div role="tabpanel" id="volet-services" aria-labelledby="onglet-services" class="p-5 flex flex-col gap-4" {% if defaut != "services" %}hidden{% endif %}>
+      {% if vue.etat != "termine" and not (d.alma or d.sudoc) %}<div class="vide">{{ en_cours("Services en cours d'interrogation…") }}</div>{% endif %}
+      {% include "_dossier_services.html" %}
     </div>
-
-    {# ------------------------------------------------------------ réponses brutes #}
-    <div role="tabpanel" id="volet-reponses" aria-labelledby="onglet-reponses" class="p-5 flex flex-col gap-2" hidden>
-      {% set avec_appels = d.etapes.values() | selectattr("appels") | list %}
-      {% for e in avec_appels %}
-      <details class="sous-carte"><summary class="cursor-pointer text-sm font-medium">{{ e.nom }} <span class="text-xs font-normal text-sourdine">· {{ e.appels | length }} appel(s)</span></summary>
-        {% for a in e.appels %}
-        <p class="text-xs font-mono mt-3 break-all">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "—" }} · {{ a.duree }} s{% if a.erreur %} · <span class="text-sortie">{{ a.erreur }}</span>{% endif %}</p>
-        <details class="mt-1"><summary class="cursor-pointer text-xs text-sourdine">requête</summary>{{ json(a.requete) }}</details>
-        <details><summary class="cursor-pointer text-xs text-sourdine">réponse</summary>{{ json(a.reponse) }}</details>
-        {% endfor %}
-      </details>
-      {% else %}{{ vide("Aucun appel pour l'instant.") }}{% endfor %}
-    </div>
-
-    {% if a_reprendre %}
-    {# ------------------------------------------------------------ reprise #}
-    <div role="tabpanel" id="volet-reprise" aria-labelledby="onglet-reprise" class="p-5" hidden>
-      {% include "_dossier_resolutions.html" %}
-    </div>
-    {% endif %}
 
     {# ------------------------------------------------------------ journal #}
-    <div role="tabpanel" id="volet-journal" aria-labelledby="onglet-journal" class="p-5" hidden>
+    <div role="tabpanel" id="volet-journal" aria-labelledby="onglet-journal" class="p-5 flex flex-col gap-3" hidden>
+      {% if vue.parcours %}
+      <details open class="sous-carte"><summary class="cursor-pointer text-sm font-semibold">Parcours du pipeline</summary>
+        <div class="mt-2">{% with etapes = vue.parcours %}{% include "_parcours.html" %}{% endwith %}</div></details>
+      {% endif %}
       {% for e in d.journal %}
         <div class="ligne-journal"><span class="text-encre">{{ e.horodatage | date("%H:%M:%S") }}</span>
           <span><span class="text-encre">{{ e.etape }} · {{ e.type }}</span>{% if e.auteur != "système" %} · {{ e.auteur }}{% endif %} — {{ e.detail if e.detail is string else (e.detail | tojson) }}</span></div>

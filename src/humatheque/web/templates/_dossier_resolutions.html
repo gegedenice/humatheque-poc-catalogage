@@ -1,4 +1,4 @@
-{# Résolution d'exception (SPEC §9.3), contenu de l'onglet « Reprise » du dossier ;
+{# Actions de reprise (SPEC §9.3), dans la carte « Bilan » du dossier ;
    chaque action est journalisée (qui / quand / quoi). #}
 {% set d = vue.dossier %}
 {% macro champ_auteur() -%}
@@ -17,7 +17,7 @@
   {% if provenance_a_choisir %}
   <form method="post" action="/dossiers/{{ d.id }}/provenance" class="sous-carte space-y-2">
     <p class="text-sm font-semibold">Établissement de soutenance absent ou ambigu</p>
-    <p class="text-xs text-sourdine">Extrait : « {{ (d.metadonnees or {}).get("granting_institution") or "—" }} ». Choisir reprend le traitement (Alma, Sudoc…).</p>
+    <p class="text-xs text-sourdine">Choisir reprend le traitement à la provenance (puis Sudoc…).</p>
     <div class="flex flex-wrap items-center gap-3">
       <label class="text-sm"><input type="radio" class="accent-primaire" name="valeur" value="EPHE" required> EPHE</label>
       <label class="text-sm"><input type="radio" class="accent-primaire" name="valeur" value="hors EPHE"> hors EPHE</label>
@@ -68,33 +68,32 @@
   </form>
   {% endif %}
 
-  {% if faux_alma %}
-  <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">
-    <p class="text-sm font-semibold">Candidat Alma à vérifier{% if d.alma and d.alma.ppn %} (PPN {{ d.alma.ppn }}){% endif %}</p>
-    <p class="text-xs text-sourdine">Si la notice ne correspond pas, « ignorer » poursuit comme si Alma avait répondu <span class="font-mono">no_academic_record_found</span>.</p>
-    <input type="hidden" name="service" value="alma">
-    <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Ignorer ce résultat (faux positif) et poursuivre</button></div>
-  </form>
-  {% elif faux_sudoc %}
-  <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte space-y-2">
-    <p class="text-sm font-semibold">Résultat Sudoc à vérifier</p>
-    {% if d.sudoc %}<ul class="text-[13px] bg-white rounded-xl p-3 flex flex-col gap-1">
-      {% for c in d.sudoc.candidats if c.retenu %}<li><span class="font-mono">{% if c.lien %}<a href="{{ c.lien }}" target="_blank" rel="noopener">{{ c.ppn }}</a>{% else %}{{ c.ppn }}{% endif %}</span> {{ c.titre or "" }} <span class="text-sourdine">score {{ c.score }} · <span class="font-mono">{{ c.thesis_state }}</span></span></li>{% endfor %}
-    </ul>{% endif %}
-    <p class="text-xs text-sourdine">Si aucun candidat ne correspond, « ignorer » poursuit comme si le Sudoc avait répondu <span class="font-mono">no_print_duplicate_found</span>.</p>
-    <input type="hidden" name="service" value="sudoc">
-    <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Ignorer ce résultat (faux positif) et poursuivre</button></div>
-  </form>
+  {% if faux_alma or faux_sudoc %}{% set service = "alma" if faux_alma else "sudoc" %}
+  <div class="grid gap-3 sm:grid-cols-2">
+    <form method="post" action="/dossiers/{{ d.id }}/faux-positif" class="sous-carte flex flex-col gap-2">
+      <p class="text-sm font-semibold">Aucune ne correspond : poursuivre</p>
+      <p class="text-xs text-sourdine">Faux positif : le traitement reprend comme si {{ "Alma" if faux_alma else "le Sudoc" }} avait répondu <span class="font-mono">{{ "no_academic_record_found" if faux_alma else "no_print_duplicate_found" }}</span>.</p>
+      <input type="hidden" name="service" value="{{ service }}">
+      <input class="champ champ-sm" name="commentaire" placeholder="motif (obligatoire)" required>
+      <div class="flex flex-wrap items-center gap-2">{{ champ_auteur() }}<button class="btn-principal btn-sm">Faux positif : poursuivre</button></div>
+    </form>
+    <form method="post" action="/dossiers/{{ d.id }}/notice-existante" class="sous-carte flex flex-col gap-2">
+      <p class="text-sm font-semibold">La notice existe déjà : terminer</p>
+      <p class="text-xs text-sourdine">Le dossier passe à « terminé », sans notice produite.</p>
+      <input class="champ champ-sm" name="commentaire" placeholder="PPN ou remarque (facultatif)">
+      <div class="flex flex-wrap items-center gap-2">{{ champ_auteur() }}<button class="btn-succes btn-sm">Confirmer : notice déjà présente</button></div>
+    </form>
+  </div>
   {% endif %}
 
   {% if a_decider %}
-  <form method="post" action="/dossiers/{{ d.id }}/hors-outil" class="sous-carte space-y-2">
-    <p class="text-sm font-semibold">Traité hors outil</p>
-    <input class="champ champ-sm" name="commentaire" placeholder="ce qui a été fait (obligatoire)" required>
-    <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-discret btn-sm">Marquer comme traité</button></div>
-  </form>
+  <details class="text-sm">
+    <summary class="cursor-pointer text-xs text-sourdine">Autre issue : traité hors outil</summary>
+    <form method="post" action="/dossiers/{{ d.id }}/hors-outil" class="sous-carte space-y-2 mt-2">
+      <input class="champ champ-sm" name="commentaire" placeholder="ce qui a été fait (obligatoire)" required>
+      <div class="flex items-center gap-2">{{ champ_auteur() }}<button class="btn-discret btn-sm">Marquer comme traité</button></div>
+    </form>
+  </details>
   {% endif %}
 </div>
 {% endif %}

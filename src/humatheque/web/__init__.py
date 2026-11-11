@@ -93,7 +93,8 @@ def _version_statique(chemin: str) -> str:
 
 
 gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=_libelle_routage,
-                            v_css=_version_statique("css/app.css"), v_js=_version_statique("js/editeur-regles.js"))
+                            v_css=_version_statique("css/app.css"), v_js=_version_statique("js/editeur-regles.js"),
+                            v_app=_version_statique("js/app.js"))
 gabarits.env.filters["date"] = lambda d, f="%d/%m %H:%M": d.astimezone().strftime(f) if d else ""
 
 

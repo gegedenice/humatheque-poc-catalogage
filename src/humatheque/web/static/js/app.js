@@ -47,10 +47,14 @@
     var onglet = e.target.closest('[data-onglets] [role="tab"]');
     if (onglet) activer(onglet);
     // lien vers un onglet (ex. pastille « exceptions à reprendre » de l'en-tête du dossier)
-    var lien = e.target.closest("[data-ouvrir-onglet]");
+    // data-cible : élément vers lequel défiler ensuite (ex. carte d'une étape, bilan du dossier)
+    var lien = e.target.closest("[data-ouvrir-onglet], [data-cible]");
     var cible = lien && document.getElementById(lien.getAttribute("data-ouvrir-onglet"));
-    if (cible) {
-      activer(cible);
+    var element = lien && document.getElementById(lien.getAttribute("data-cible"));
+    if (cible) activer(cible);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (cible) {
       cible.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
       cible.focus({ preventScroll: true });
     }
@@ -99,5 +103,21 @@
     if (!c.matches || !c.matches('input[type="range"]')) return;
     var sortie = c.closest("label") && c.closest("label").querySelector("[data-curseur-valeur]");
     if (sortie) sortie.textContent = Number(c.value).toFixed(2);
+  });
+
+  // Formulaires [data-suivi-modifs] : indicateur « modifications non enregistrées »
+  // et confirmation avant de quitter la page sans enregistrer.
+  var modifie = null;
+  function suivre(e) {
+    var f = e.target.form || e.target.closest && e.target.closest("form");
+    if (!f || !f.hasAttribute("data-suivi-modifs") || e.target.name === "auteur") return;
+    modifie = f;
+    f.querySelectorAll("[data-indicateur-modifs]").forEach(function (i) { i.hidden = false; });
+  }
+  document.addEventListener("input", suivre);
+  document.addEventListener("change", suivre);
+  document.addEventListener("submit", function (e) { if (e.target === modifie) modifie = null; });
+  window.addEventListener("beforeunload", function (e) {
+    if (modifie && document.body.contains(modifie)) { e.preventDefault(); e.returnValue = ""; }
   });
 })();

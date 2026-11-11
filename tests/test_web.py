@@ -110,12 +110,14 @@ def test_mode2_lot_file_filtres_et_exports(client):
 
 @respx.mock
 def test_notice_alma_certaine_sans_a_trancher(client):
-    """Notice au-dessus de match_threshold : arrêt en vert, pas de bloc « À trancher » (05/11)."""
+    """Notice au-dessus de match_threshold : arrêt terminé, sans action proposée (05/11) ;
+    Bilan : étape, motif du pipeline, PPN (11/11) ; pas d'onglet Notice sans notice."""
     simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
     page = client.get(_televerser(client).headers["location"])
     texte = html.unescape(page.text)
-    assert "Arrêt sans intervention" in texte and "229969437" in texte
-    assert "À trancher" not in texte and "faux positif" not in texte and "Traité hors outil" not in texte
+    assert 'id="bilan"' in texte and "Alma — notice déjà dans Alma" in texte and "229969437" in texte
+    assert "Faux positif" not in texte and "traité hors outil" not in texte and "Pas de notice" not in texte
+    assert 'id="onglet-notice"' not in texte and 'id="onglet-extraction"' in texte
 
 
 @respx.mock
@@ -123,9 +125,14 @@ def test_resolution_par_formulaire(client, app):
     simuler(alma=sim.alma("off_profile_match_only", ppn="111111111"))
     dossier = _televerser(client).headers["location"]
     page = html.unescape(client.get(dossier).text)
-    assert "Candidat Alma à vérifier" in page and "Ignorer ce résultat (faux positif)" in page \
-        and "Traité hors outil" in page
-    assert "Parcours du pipeline" in page and "ambiguous_academic_candidate OU off_profile_match_only" in page
+    # Bilan (11/11) : étape et motif du pipeline, notice(s) candidate(s), actions sur place
+    bilan = page[page.index('id="bilan"'):page.index('id="onglets-dossier"')]
+    assert "Alma — candidat Alma à vérifier" in bilan and "Notice(s) Alma candidate(s)" in bilan
+    assert "Faux positif : poursuivre" in bilan and "Confirmer : notice déjà présente" in bilan \
+        and "traité hors outil" in bilan
+    assert 'id="service-alma"' in page and "Parcours du pipeline" in page \
+        and "ambiguous_academic_candidate OU off_profile_match_only" in page
+    assert 'aria-selected="true">Services' in page.replace("\n", "")
     simuler()
     r = client.post(f"{dossier}/faux-positif", data={"service": "alma", "commentaire": "autre ouvrage",
                                                      "auteur": "Camille"})
@@ -339,3 +346,19 @@ def test_admin_modeles_par_fournisseur(client, app):
     assert r.status_code == 303 and app.reglages_admin().modeles == {"hf": "Qwen/Qwen2.5-VL-7B-Instruct"}
     assert app.fournisseur_effectif("hf") == ("hf", "Qwen/Qwen2.5-VL-7B-Instruct")
     assert app.fournisseur_effectif("albert")[1] == app.reglages.albert_model
+
+
+@respx.mock
+def test_confirmer_notice_existante(client, app):
+    """Arrêt Alma à reprendre, notice existant par ailleurs : le dossier passe à « terminé » (11/11)."""
+    simuler(alma=sim.alma("off_profile_match_only", ppn="111111111"))
+    dossier = _televerser(client).headers["location"]
+    r = client.post(f"{dossier}/notice-existante", data={"commentaire": "PPN 111111111", "auteur": "Camille"})
+    assert r.status_code == 303
+    d = app.vue_dossier(dossier.rsplit("/", 1)[1]).dossier
+    assert d.routage == "terminé" and "notice déjà présente" in d.motif_arret
+    assert any(e.type == "resolution" and e.auteur == "Camille" for e in d.journal)
+    page = html.unescape(client.get(dossier).text)
+    assert "Confirmer : notice déjà présente" not in page
+    r = client.post(f"{dossier}/notice-existante", data={"auteur": "Camille"})
+    assert r.status_code == 422  # déjà terminé

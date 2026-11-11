@@ -1,0 +1,77 @@
+{# Onglet « Services » : une carte par étape, dans l'ordre d'exécution ; résultat dans le
+   pipeline, pièces renvoyées, puis requêtes et réponses brutes de l'étape (accordéon). #}
+{% from "_composants.html" import vide, lien_ppn, statut_etape %}
+{% from "_macros_services.html" import table_alma, table_sudoc, ligne_provenance, appels %}
+{% set d = vue.dossier %}
+{% set couleurs = {"stop": "bg-auto-clair text-auto-fonce", "stop à reprendre": "bg-decision-clair text-decision-fonce",
+                   "conversion": "bg-conversion-clair text-conversion-fonce", "poursuite": "bg-primaire-clair text-primaire-fonce",
+                   "poursuite avec alerte": "bg-primaire-clair text-primaire-fonce", "poursuite à reprendre": "bg-decision-clair text-decision-fonce",
+                   "création": "bg-auto-clair text-auto-fonce"} %}
+{% set titres = {"alma": "Alma", "provenance": "Provenance", "sudoc": "Sudoc", "idref": "IdRef", "dewey": "Dewey"} %}
+{% set sous_etapes = {"idref": ["idref_personnes", "idref_organisations"]} %}
+{% set cartes = [] %}
+{% for e in vue.etapes %}{% set c = "idref" if e.nom.startswith("idref") else e.nom %}
+  {% if c in titres and c not in cartes %}{% set _ = cartes.append(c) %}{% endif %}{% endfor %}
+
+{% for c in cartes %}
+{% set etapes_c = sous_etapes.get(c, [c]) %}
+{% set executees = [] %}{% for n in etapes_c %}{% if d.etapes[n].statut != "a_faire" %}{% set _ = executees.append(d.etapes[n]) %}{% endif %}{% endfor %}
+{% set ignorees = executees | selectattr("statut", "equalto", "ignoree") | list %}
+{% set resultats = vue.parcours | selectattr("etape", "equalto", c) | list %}
+{% set arret = vue.bilan and vue.bilan.etape == c and vue.bilan.cas in ("arret", "arret_a_reprendre", "incident") %}
+<section id="service-{{ c }}" class="sous-carte flex flex-col gap-2 scroll-mt-4 {% if arret %}ring-2 ring-decision{% endif %} {% if not executees or ignorees|length == executees|length %}opacity-60{% endif %}">
+  <div class="flex flex-wrap items-center gap-2">
+    {% if executees %}{{ statut_etape(executees[0].statut) }}{% endif %}
+    <h3 class="flex-1">{{ titres[c] }}</h3>
+    {% for r in resultats %}
+    <span class="puce {{ couleurs.get(r.resultat, 'bg-rail') }}" title="{{ r.chemin | join(' › ') }}">{% if r.objet %}{{ r.objet }} : {% endif %}{{ r.resultat }}{% if r.notice %} · {{ r.notice }}{% endif %}</span>
+    {% endfor %}
+  </div>
+  {% for r in resultats if r.motif %}<p class="text-xs text-sourdine">{% if r.objet %}{{ r.objet }} — {% endif %}{{ r.motif }}</p>{% endfor %}
+
+  {% if not executees %}
+    <p class="text-sm text-sourdine">Non exécutée{% if d.etape_arret %} : arrêt à l'étape {{ vue.bilan.etape_libelle if vue.bilan else d.etape_arret }}{% endif %}.</p>
+  {% elif ignorees|length == executees|length %}
+    <p class="text-sm text-sourdine">Ignorée : {{ ignorees[0].motif or "étape non applicable" }}.</p>
+  {% elif c == "alma" and d.alma %}
+    <p class="text-xs text-sourdine">code <span class="font-mono">{{ d.alma.statut }}</span>{% if d.etat_alma and d.etat_alma != d.alma.statut %} · retenu <span class="font-mono">{{ d.etat_alma }}</span>{% endif %}{% if d.alma.ppn %} · PPN {{ lien_ppn(d.alma.ppn) }}{% endif %}{% if d.alma.motif %} · {{ d.alma.motif }}{% endif %}</p>
+    {{ table_alma(d.alma) }}
+  {% elif c == "provenance" %}
+    {{ ligne_provenance(d.provenance, d.metadonnees) }}
+  {% elif c == "sudoc" and d.sudoc %}
+    <p class="text-xs text-sourdine">code <span class="font-mono">{{ d.sudoc.statut_service }}</span> · état agrégé <span class="font-mono">{{ d.etat_sudoc or "—" }}</span> · seuil {{ d.sudoc.seuil }} — {{ d.sudoc.justification }}</p>
+    {{ table_sudoc(d.sudoc) }}
+  {% elif c == "idref" and (d.idref_personnes or d.idref_organisations) %}
+  <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>Personne / organisme</th><th>Code</th><th>PPN retenu</th><th>Meilleurs candidats</th></tr></thead><tbody>
+  {% for champ, alignements in d.idref_personnes.items() %}{% for a in alignements %}{% if a %}
+    <tr><td class="text-xs">{{ champ }}[{{ loop.index }}] {{ (d.metadonnees[champ] if d.metadonnees[champ] is string else d.metadonnees[champ][loop.index0]) }}</td>
+      <td class="font-mono text-xs">{{ a.statut }}</td><td>{{ lien_ppn(a.ppn, "https://www.idref.fr/") }}</td>
+      <td class="text-xs">{% for c2 in a.candidats[:3] %}{{ lien_ppn(c2.ppn, "https://www.idref.fr/") }} {{ c2.libelle or "" }} <span class="text-sourdine">({{ c2.score }})</span>{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+  {% endif %}{% endfor %}{% endfor %}
+  {% if d.idref_organisations %}{% set o = d.idref_organisations %}
+    {% for libelle, a in [("établissement", o.granting_institution), ("école doctorale", o.doctoral_school)] %}{% if a %}
+    <tr><td class="text-xs">{{ libelle }}</td><td class="font-mono text-xs">{{ a.statut }}</td><td>{{ lien_ppn(a.ppn, "https://www.idref.fr/") }} {{ a.libelle or "" }}</td>
+      <td class="text-xs">{% for c2 in a.candidats[:3] %}{{ lien_ppn(c2.ppn, "https://www.idref.fr/") }} {{ c2.libelle or "" }} <span class="text-sourdine">({{ c2.score }})</span>{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+    {% endif %}{% endfor %}
+    {% for a in o.co_tutelle_institutions %}
+    <tr><td class="text-xs">cotutelle {{ loop.index }}</td><td class="font-mono text-xs">{{ a.statut }}</td><td>{{ lien_ppn(a.ppn, "https://www.idref.fr/") }} {{ a.libelle or "" }}</td>
+      <td class="text-xs">{% for c2 in a.candidats[:3] %}{{ lien_ppn(c2.ppn, "https://www.idref.fr/") }} {{ c2.libelle or "" }} <span class="text-sourdine">({{ c2.score }})</span>{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+    {% endfor %}
+  {% endif %}
+  </tbody></table></div>
+  {% elif c == "dewey" and d.dewey %}
+    <p class="text-xs text-sourdine">code <span class="font-mono">{{ d.dewey.statut }}</span>{% if d.dewey.code %} · retenu <span class="font-mono">{{ d.dewey.code }}</span> {{ d.dewey.libelle }}{% endif %}</p>
+    <ul class="text-xs space-y-0.5">{% for k in d.dewey.classes %}<li><span class="font-mono">{{ k.code }}</span> {{ k.libelle }} <span class="text-sourdine">({{ k.score }})</span></li>{% endfor %}</ul>
+  {% endif %}
+
+  {% set liste = [] %}{% for e in executees %}{% for a in e.appels %}{% set _ = liste.append(a) %}{% endfor %}{% endfor %}
+  {% if liste %}
+  <details><summary class="cursor-pointer text-xs text-sourdine">Requêtes et réponses brutes ({{ liste | length }})</summary>{{ appels(liste) }}</details>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% set autres = [] %}{% for n in ["conversion", "generation"] %}{% for a in d.etapes[n].appels %}{% set _ = autres.append(a) %}{% endfor %}{% endfor %}
+{% if autres %}
+<details class="sous-carte"><summary class="cursor-pointer text-sm font-medium">Autres appels (conversion, génération) <span class="text-xs font-normal text-sourdine">· {{ autres | length }}</span></summary>{{ appels(autres) }}</details>
+{% endif %}
