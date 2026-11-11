@@ -11,7 +11,7 @@
   <title>{% block titre %}Catalogage assisté par IA{% endblock %} · Humathèque POC catalogage</title>
   <link rel="stylesheet" href="/static/css/app.css?v={{ v_css }}">
   <script src="/static/vendor/htmx.min.js" defer></script>
-  <script src="/static/js/app.js" defer></script>
+  <script src="/static/js/app.js?v={{ v_app }}" defer></script>
   {# Îlots chargés sur toutes les pages : la navigation hx-boost ne remplace que le body
      et n'exécute pas les scripts du head de la page cible. Monaco (editor.main) est
      chargé à la demande par son chargeur AMD, seulement si un éditeur est présent. #}

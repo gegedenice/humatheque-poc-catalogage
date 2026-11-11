@@ -1,0 +1,66 @@
+{# Carte « Bilan » (décision du 11/11), au-dessus des onglets : où en est le document,
+   pourquoi, sur quelles pièces, quoi faire. Les actions de reprise sont ici. #}
+{% from "_composants.html" import badge, en_cours, lien_ppn %}
+{% from "_macros_services.html" import table_alma, table_sudoc, ligne_provenance %}
+{% set d = vue.dossier %}
+{% set b = vue.bilan %}
+{% set bord = {"terminé": "border-auto", "à reprendre": "border-decision", "incident": "border-sortie"}.get(b.issue, "border-primaire") %}
+<section id="bilan" aria-label="Bilan du dossier" class="bg-carte rounded-carte shadow-carte p-5 flex flex-col gap-3 border-l-4 {{ bord }} scroll-mt-4">
+  {% if b.cas == "en_cours" %}
+    <p class="text-sm">{{ en_cours("Traitement en cours…") }}</p>
+  {% else %}
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+    {{ badge(b.issue) }}
+    <h2 class="text-base font-semibold flex-1 min-w-[12rem]">
+      {% if b.cas == "conversion" %}Notice convertie depuis le Sudoc
+      {% elif b.cas == "notice" %}Notice produite
+      {% elif b.cas == "notice_a_valider" %}Notice produite — {{ b.points }} point(s) à valider
+      {% elif b.cas == "cloture" %}Traité hors outil
+      {% elif b.cas == "incident" %}Incident{% if b.etape_libelle %} · {{ b.etape_libelle }}{% endif %}
+      {% elif b.etape_libelle %}{{ b.etape_libelle }}{% if b.motif %} — {{ b.motif }}{% endif %}
+      {% else %}{{ b.motif or "Aucune notice produite" }}{% endif %}
+    </h2>
+    {% if b.chemin %}<span class="text-xs text-sourdine font-mono" title="Branche suivie dans le pipeline">{{ b.chemin }}</span>{% endif %}
+  </div>
+
+  {# ---------------------------------------------------------- pièces #}
+  {% if b.cas == "cloture" %}
+    <p class="text-sm">Par {{ d.cloture.par }} le {{ d.cloture.le | date }} : {{ d.cloture.commentaire }}</p>
+  {% elif b.cas == "incident" %}
+    {% set e = d.etapes.get(b.etape) %}
+    <p class="text-sm">{{ b.motif }}</p>
+    {% if e %}
+      {% if e.appels %}{% set a = e.appels[-1] %}<p class="text-xs font-mono break-all text-sourdine">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "—" }}{% if a.erreur %} · {{ a.erreur }}{% endif %}</p>{% endif %}
+      <p class="text-xs text-sourdine">{{ e.tentatives }} tentative(s){% if e.erreur %} · {{ e.erreur }}{% endif %}</p>
+      <form method="post" action="/dossiers/{{ d.id }}/relancer" class="flex justify-end">
+        <input type="hidden" name="depuis" value="{{ b.etape }}">
+        <button class="btn-principal btn-sm">Relancer depuis cette étape</button></form>
+    {% endif %}
+  {% elif b.cas in ("arret", "arret_a_reprendre") %}
+    {% if b.etape == "alma" and d.alma %}
+      {% if b.cas == "arret" and d.alma.ppn %}<p class="text-sm">Notice Alma : PPN {{ lien_ppn(d.alma.ppn) }}</p>{% endif %}
+      {% if b.cas == "arret_a_reprendre" or not d.alma.ppn %}
+      <p class="etiquette mb-0">Notice(s) Alma candidate(s)</p>{{ table_alma(d.alma) }}{% endif %}
+    {% elif b.etape == "sudoc" and d.sudoc %}
+      <p class="etiquette mb-0">Candidat(s) Sudoc retenu(s) <span class="font-normal normal-case">— {{ d.sudoc.justification }}</span></p>{{ table_sudoc(d.sudoc, retenus=True) }}
+    {% elif b.etape == "provenance" %}
+      {{ ligne_provenance(d.provenance, d.metadonnees) }}
+    {% endif %}
+  {% elif b.cas == "conversion" %}
+    <p class="text-sm">Notice Sudoc {{ lien_ppn(d.ppn_source) }} convertie vers la notice cible <span class="font-mono">{{ d.notice_convertie.profil_cible }}</span>{% if b.motif %} ({{ b.motif }}){% endif %}.</p>
+  {% elif b.cas in ("notice", "notice_a_valider") %}
+    <p class="text-sm">Profil <span class="font-mono">{{ d.notice.profil }}</span>{% if b.nb_alertes %} · {{ b.nb_alertes }} type(s) d'alerte sur la notice{% endif %}.</p>
+  {% endif %}
+
+  {% if d.notice or d.notice_convertie %}
+  <p class="text-sm"><button type="button" class="text-primaire font-medium hover:underline" data-ouvrir-onglet="onglet-notice">Voir la notice{% if b.nb_alertes %} et ses alertes{% endif %} ›</button></p>
+  {% endif %}
+
+  {# ---------------------------------------------------------- actions #}
+  {% include "_dossier_resolutions.html" %}
+
+  {% if b.etape in ("alma", "provenance", "sudoc", "idref", "dewey") %}
+  <p class="text-xs text-sourdine"><button type="button" class="text-primaire font-medium hover:underline" data-ouvrir-onglet="onglet-services" data-cible="service-{{ b.etape }}">Détail de l'étape {{ b.etape_libelle }} (onglet Services) ›</button></p>
+  {% endif %}
+  {% endif %}
+</section>

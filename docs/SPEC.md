@@ -235,7 +235,7 @@ dans le dossier :
    `ambigu` → STOP – à reprendre (décision du 09/11). Depuis le 11/11, la
    provenance est calculée **après Alma** (ordre de `regles/pipeline.yaml`) :
    Alma n'utilise pas `ephe` ; l'arrêt intervient donc avant Sudoc ; le catalogueur choisit EPHE ou
-   hors EPHE dans l'onglet « Reprise » et le traitement reprend. La règle appliquée et la forme comparée sont
+   hors EPHE dans la carte « Bilan » du dossier et le traitement reprend. La règle appliquée et la forme comparée sont
    journalisées. **Modèle de décision** (optionnel, désactivé par défaut,
    `PROVENANCE_CONFIRMATION_LLM=false`) : un appel LLM texte peut confirmer la
    déduction ; en cas de désaccord avec la règle, le document part en décision.
@@ -408,11 +408,12 @@ vérification ni de distinction action / issue.
 - **Traçabilité** : à chaque étape, le dossier journalise les valeurs lues,
   le chemin suivi dans l'arbre et le résultat ; l'onglet du dossier affiche le
   **parcours du pipeline**.
-- **Reprise** (document à reprendre) : actions fixes de l'onglet « Reprise » —
+- **Reprise** (document à reprendre) : actions fixes de la carte « Bilan » du dossier —
   choisir EPHE / hors EPHE (provenance) ; **ignorer le résultat (faux positif)
   et poursuivre** (ALM-SUD-006 : Alma → `no_academic_record_found`, Sudoc →
-  `no_print_duplicate_found`, sans rappeler le service) ; choisir le PPN IdRef ;
-  « traité hors outil ».
+  `no_print_duplicate_found`, sans rappeler le service) ; **confirmer que la
+  notice existe déjà** (arrêt Alma ou Sudoc : le dossier passe à « terminé »,
+  décision du 11/11) ; choisir le PPN IdRef ; « traité hors outil ».
 
 ## 8. Règles et générateur
 
@@ -699,6 +700,28 @@ défaut sur la version générée.
     l'éditeur (§9.2) ;
   - pour une conversion : images à gauche, notice Sudoc avant transformation en
     haut à droite, notice produite par la conversion en bas à droite, éditable.
+
+  **Organisation du panneau droit** (décision du 11/11, après les premiers
+  essais) — l'information utile d'abord, le reste à titre informatif :
+  - **carte « Bilan »**, toujours en haut : issue, étape et motif écrit dans le
+    pipeline, branche suivie ; puis les pièces selon le cas (arrêt Alma : les
+    notices candidates — PPN, MMS id, titre, auteurs, année, type, score ;
+    arrêt Sudoc : les candidats retenus avec `thesis_state` ; provenance :
+    établissement lu et règle ; conversion : PPN source et notice cible ;
+    notice produite : profil, alertes, **points à valider** ; incident :
+    service, appel, erreur, « Relancer depuis cette étape ») ; puis **les
+    actions de reprise** (il n'y a plus d'onglet « Reprise ») : faux positif,
+    notice déjà présente, choix de provenance, choix IdRef groupés avec un
+    seul bouton de validation, classe Dewey, « traité hors outil » ;
+  - **onglets** : **Notice** (seulement s'il y a une notice ; ouvert par
+    défaut), **Extraction** (sortie brute du modèle en tête, puis champs
+    extraits et normalisés, provenance, transformations), **Services** (une
+    carte par étape dans l'ordre d'exécution : résultat dans le pipeline,
+    pièces, requêtes et réponses brutes ; étapes non exécutées grisées ;
+    ouvert par défaut sans notice), **Journal** (parcours du pipeline, puis
+    journal) ;
+  - la frise des étapes est cliquable : elle mène à la carte de l'étape dans
+    « Services » (l'étape d'arrêt est entourée).
 
   Contenu :
   - une frise des étapes avec statut et durée ;

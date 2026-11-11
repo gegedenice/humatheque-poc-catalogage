@@ -1,0 +1,42 @@
+{# Pièces renvoyées par les services, réutilisées par la carte « Bilan » et l'onglet « Services ». #}
+{% from "_composants.html" import vide, lien_ppn, json %}
+
+{% macro table_alma(alma) -%}
+  {% if alma.candidats %}
+  <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>PPN</th><th>MMS id</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Type</th><th>Score</th></tr></thead><tbody>
+  {% for c in alma.candidats[:10] %}
+    <tr><td>{{ lien_ppn(c.ppn) }}</td><td class="font-mono text-xs">{{ c.mms_id or "" }}</td><td class="text-xs">{{ c.titre }}</td><td class="text-xs">{{ c.auteurs | join(", ") }}</td>
+      <td class="text-xs">{{ c.annee or "" }}</td><td class="text-xs">{{ c.type or "" }}{% if c.dans_le_profil == false %} <span class="text-sourdine">(hors profil)</span>{% endif %}</td>
+      <td class="font-mono text-xs">{{ c.score }}</td></tr>
+  {% endfor %}</tbody></table></div>
+  {% else %}{{ vide("Aucun candidat Alma.") }}{% endif %}
+{%- endmacro %}
+
+{% macro table_sudoc(sudoc, retenus=False) -%}
+  {% set lignes = (sudoc.candidats | selectattr("retenu") | list) if retenus else sudoc.candidats %}
+  {% if lignes %}
+  <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>PPN</th><th>Titre</th><th>Auteur</th><th>Année</th><th>Score</th><th>Support</th><th>thesis_state</th>{% if not retenus %}<th>Retenu</th>{% endif %}</tr></thead><tbody>
+  {% for c in lignes %}
+    <tr class="{% if not c.retenu %}text-sourdine{% endif %}"><td>{{ lien_ppn(c.ppn) }}</td><td class="text-xs">{{ c.titre }}</td>
+      <td class="text-xs">{{ c.auteurs | join(", ") }}</td><td class="text-xs">{{ c.annee or "" }}</td>
+      <td class="font-mono text-xs">{{ c.score }}</td><td class="text-xs">{{ c.carrier }}</td>
+      <td class="font-mono text-xs">{{ c.thesis_state }}</td>{% if not retenus %}<td class="text-xs">{{ "oui" if c.retenu else "non" }}</td>{% endif %}</tr>
+  {% endfor %}</tbody></table></div>
+  {% else %}{{ vide("Aucun candidat Sudoc" ~ (" retenu" if retenus else "") ~ ".") }}{% endif %}
+{%- endmacro %}
+
+{% macro ligne_provenance(p, m) -%}
+  <p class="text-sm">Établissement lu : « {{ (m or {}).get("granting_institution") or "—" }} »
+    → <span class="font-semibold">{{ p.valeur if p else "—" }}</span>
+    {% if p %}<span class="text-xs text-sourdine">— règle {{ p.regle }}{% if p.forme_comparee %}, forme comparée « {{ p.forme_comparee }} »{% endif %}{% if p.forme_reconnue %}, forme reconnue « {{ p.forme_reconnue }} »{% endif %}</span>{% endif %}</p>
+{%- endmacro %}
+
+{% macro appels(liste) -%}
+  {% for a in liste %}
+  <details class="mt-1 bg-white rounded-xl px-3 py-2">
+    <summary class="cursor-pointer text-xs font-mono break-all">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "—" }} · {{ a.duree }} s{% if a.erreur %} · <span class="text-sortie">{{ a.erreur }}</span>{% endif %}</summary>
+    <p class="etiquette mt-2 mb-0">Requête</p>{{ json(a.requete) }}
+    <p class="etiquette mt-2 mb-0">Réponse</p>{{ json(a.reponse) }}
+  </details>
+  {% endfor %}
+{%- endmacro %}

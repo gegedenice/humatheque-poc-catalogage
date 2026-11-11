@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 
+from humatheque import issues
 from humatheque.config import charger_yaml
 from humatheque.services.idref import AlignementIdref, AlignementOrganisations
 from humatheque.workflow.modeles import Cloture, Dossier, Etape
@@ -123,6 +124,22 @@ def choisir_dewey(d: Dossier, index: int, code: str, auteur: str) -> Dossier:
     e.resolue = True
     d.noter("dewey", "resolution", {"code": classe.code, "libelle": classe.libelle}, auteur)
     _regenerer(d)
+    return d
+
+
+def confirmer_notice_existante(d: Dossier, commentaire: str, auteur: str) -> Dossier:
+    """Arrêt Alma ou Sudoc « à reprendre » : le catalogueur confirme que la notice existe
+    déjà (décision du 11/11) ; le dossier passe à « terminé », sans autre traitement."""
+    etape = d.decision.etape if d.decision else None
+    if d.routage != issues.A_REPRENDRE or etape not in ("alma", "sudoc"):
+        raise ResolutionImpossible("seul un arrêt Alma ou Sudoc à reprendre se confirme")
+    for e in d.exceptions:
+        e.resolue = True
+    if etape in d.etapes:
+        d.etapes[etape].routage = issues.TERMINE
+    d.routage = issues.TERMINE
+    d.motif_arret = f"{d.motif_arret or etape} — notice déjà présente (confirmé par {auteur})"
+    d.noter(etape, "resolution", {"notice_existante": True, "commentaire": commentaire}, auteur)
     return d
 
 

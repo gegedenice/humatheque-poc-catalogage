@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from humatheque.application.vues import (
-    Accueil, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
+    Accueil, Bilan, ChampVue, DossierBucket, EntreeLot, EtapeVue, EtatSpec, Historique, ImageVue, Indicateurs,
     LigneException, LigneJournal, Reglable, ResumeLot, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
 )
 from humatheque import issues
@@ -438,7 +438,38 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
         return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=titre,
                           etapes=etapes, images=images, champs=champs,
                           exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel,
-                          parcours=parcours(d), alertes=regrouper(d.alertes, self.regles.alertes))
+                          parcours=parcours(d), alertes=(alertes := regrouper(d.alertes, self.regles.alertes)),
+                          bilan=self._bilan(d, ligne.etat, len(alertes)))
+
+    def _bilan(self, d: Dossier, etat: str, nb_alertes: int) -> Bilan:
+        """Carte « Bilan » : le cas du dossier, l'étape concernée et le motif du pipeline."""
+        ouvertes = sum(1 for e in d.exceptions if not e.resolue)
+        routage = d.routage or issues.TERMINE
+        etape = d.decision.etape if d.decision and d.decision.etape else d.etape_arret
+        motif = d.motif_arret
+        for p in reversed(parcours(d)):  # motif tel qu'écrit dans le pipeline
+            if p.get("etape") == etape and p.get("motif"):
+                motif = p["motif"]
+                break
+        if etat != "termine":
+            cas = "en_cours"
+        elif d.cloture:
+            cas = "cloture"
+        elif routage == issues.INCIDENT:
+            cas, etape, motif = "incident", d.etape_arret, d.motif_arret
+        elif d.notice_convertie:
+            cas = "conversion"
+        elif d.notice:
+            cas = "notice_a_valider" if ouvertes else "notice"
+        elif d.motif_arret:
+            cas = "arret_a_reprendre" if routage == issues.A_REPRENDRE else "arret"
+            if etape in ("alma", "sudoc") and "notice déjà présente" in (d.motif_arret or ""):
+                motif = d.motif_arret
+        else:
+            cas = "sans_notice"
+        libelle = self.regles.etapes[etape].libelle if etape in self.regles.etapes else LIBELLES_ETAPES.get(etape or "", etape)
+        return Bilan(cas=cas, issue=routage, etape=etape, etape_libelle=libelle, motif=motif,
+                     chemin=d.decision.situation if d.decision else None, points=ouvertes, nb_alertes=nb_alertes)
 
     def vue_apercu(self, dossier_id: str) -> VueApercu:
         """Images et notice finale, sans édition : version courante (validée, éditée ou
@@ -544,6 +575,10 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
 
     def choisir_dewey(self, dossier_id: str, index: int, code: str, auteur: str) -> VueDossier:
         return self._resolution(dossier_id, lambda d: res.choisir_dewey(d, index, code, auteur), True)
+
+    def confirmer_notice_existante(self, dossier_id: str, commentaire: str, auteur: str) -> VueDossier:
+        """Arrêt Alma ou Sudoc à reprendre : notice déjà présente, le dossier passe à « terminé »."""
+        return self._resolution(dossier_id, lambda d: res.confirmer_notice_existante(d, commentaire, auteur), False)
 
     def traiter_hors_outil(self, dossier_id: str, commentaire: str, auteur: str) -> VueDossier:
         return self._resolution(dossier_id, lambda d: res.traiter_hors_outil(d, commentaire, auteur), False)

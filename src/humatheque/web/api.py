@@ -101,7 +101,7 @@ def resoudre_ppns(request: Request, dossier_id: str, r: ChoixPpn) -> VueDossier:
 
 @routeur.post("/dossiers/{dossier_id}/resolutions/{type_}", response_model=VueDossier)
 def resoudre(request: Request, dossier_id: str, type_: Literal["provenance", "faux-positif", "ppn", "dewey",
-                                                              "hors-outil"], r: Resolution) -> VueDossier:
+                                                              "hors-outil", "notice-existante"], r: Resolution) -> VueDossier:
     a = _app(request)
     if type_ == "provenance":
         return a.choisir_provenance(dossier_id, r.provenance or "", r.auteur, r.commentaire)
@@ -111,6 +111,8 @@ def resoudre(request: Request, dossier_id: str, type_: Literal["provenance", "fa
         return a.choisir_ppn(dossier_id, r.exception if r.exception is not None else -1, r.ppn, r.auteur)
     if type_ == "dewey":
         return a.choisir_dewey(dossier_id, r.exception if r.exception is not None else -1, r.code or "", r.auteur)
+    if type_ == "notice-existante":
+        return a.confirmer_notice_existante(dossier_id, r.commentaire, r.auteur)
     return a.traiter_hors_outil(dossier_id, r.commentaire, r.auteur)
 
 

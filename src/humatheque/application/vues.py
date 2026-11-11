@@ -135,6 +135,20 @@ class ImageVue(BaseModel):
     nom: str
 
 
+class Bilan(BaseModel):
+    """Carte « Bilan » du dossier (décision du 11/11) : où en est le document, pourquoi,
+    sur quelles pièces, quoi faire. `cas` choisit le contenu affiché."""
+    cas: str = Field(description="en_cours | incident | cloture | arret | arret_a_reprendre | conversion | "
+                                 "notice | notice_a_valider | sans_notice")
+    issue: str
+    etape: str | None = Field(None, description="étape du workflow concernée (alma, sudoc, provenance…)")
+    etape_libelle: str | None = None
+    motif: str | None = Field(None, description="motif écrit dans le pipeline (ou motif d'arrêt)")
+    chemin: str | None = Field(None, description="branche suivie dans le pipeline")
+    points: int = Field(0, description="points à valider (exceptions ouvertes)")
+    nb_alertes: int = 0
+
+
 class VueDossier(BaseModel):
     dossier: Dossier
     lot_id: str
@@ -147,6 +161,7 @@ class VueDossier(BaseModel):
     telechargements: dict[str, str] = Field(default_factory=dict, description="libellé → nom de fichier")
     parcours: list[dict] = Field(default_factory=list, description="étapes du pipeline : valeurs, chemin, résultat")
     alertes: list[Any] = Field(default_factory=list, description="groupes d'alertes à afficher (GroupeAlertes)")
+    bilan: Bilan | None = None
 
 
 class VueLots(BaseModel):
