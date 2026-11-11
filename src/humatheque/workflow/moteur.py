@@ -34,7 +34,7 @@ from humatheque.services.dewey import classer
 from humatheque.services.idref import aligner_organisations, aligner_personne
 from humatheque.services.sudoc import lien_notice, lire_notice, verifier_sudoc
 from humatheque.regles.modeles import Regles
-from humatheque.workflow.modeles import ETAPES, Dossier, Etape, ExceptionDossier, maintenant
+from humatheque.workflow.modeles import ETAPES, Dossier, Etape, ExceptionDossier, maintenant, ordre_etapes
 
 SERVICE_IDREF_PERSONNE = "idref_personne"   # clés de config/services.yaml
 SERVICE_IDREF_ORGS = "idref_organisations"
@@ -109,6 +109,7 @@ class Workflow:
 
     # ================================================================ exécution
     def executer(self, dossier: Dossier, depuis: str | None = None) -> Dossier:
+        ordre = dossier.ordre = ordre_etapes(list(self.services.regles.etapes))
         if depuis:
             dossier.reinitialiser_depuis(depuis)
             dossier.noter(depuis, "relance", f"relance demandée depuis {depuis}")
@@ -116,9 +117,9 @@ class Workflow:
         dossier.fournisseur_vlm = f"{self.services.vlm.nom}:{self.services.vlm.modele}"
         dossier.routage = dossier.motif_arret = dossier.etape_arret = None
 
-        for nom in ETAPES:
+        for nom in ordre:
             etape = dossier.etapes[nom]
-            if (ETAPES.index(nom) > ETAPES.index("conversion") and dossier.decision
+            if (ordre.index(nom) > ordre.index("conversion") and dossier.decision
                     and dossier.decision.suite != "creer"):
                 # Conversion faite : arrêt (SPEC §7), même lors d'une relance.
                 conv = dossier.etapes["conversion"]

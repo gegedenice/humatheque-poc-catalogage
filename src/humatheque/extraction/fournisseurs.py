@@ -78,15 +78,14 @@ SEPARATEUR_MODELE = "#"  # « hf#Qwen/Qwen2.5-VL-7B-Instruct » : fournisseur et
 def table_fournisseurs(r: Reglages) -> dict[str, tuple[str, str, str]]:
     """Fournisseur → (URL, modèle de .env, clé) ; la clé n'est jamais affichée."""
     return {
-        "vlm": (r.vlm_api_url, r.vlm_model, ""),
-        "openai": (r.openai_api_url, r.openai_model, r.openai_api_key.get_secret_value()),
-        "hf": (r.hf_api_url, r.hf_model, r.hf_token.get_secret_value()),
         "albert": (r.albert_api_url, r.albert_model, r.albert_api_key.get_secret_value()),
+        "vlm": (r.vlm_api_url, r.vlm_model, ""),
+        "hf": (r.hf_api_url, r.hf_model, r.hf_token.get_secret_value()),
     }
 
 
 def fournisseur(nom: str, r: Reglages, client: httpx.Client | None = None) -> FournisseurOpenAICompatible:
-    """Fournisseur par nom : vlm (endpoint on-premise), openai, hf, albert ; « nom#modèle »
+    """Fournisseur par nom : albert (défaut), vlm (endpoint on-premise), hf ; « nom#modèle »
     remplace le modèle de .env (choix de l'administration)."""
     nom, _, modele_choisi = (nom or r.vlm_fournisseur).partition(SEPARATEUR_MODELE)
     nom = nom.strip().lower()

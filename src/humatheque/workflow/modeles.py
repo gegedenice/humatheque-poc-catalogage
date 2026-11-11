@@ -26,11 +26,29 @@ from humatheque.services.idref import AlignementIdref, AlignementOrganisations
 
 SCHEMA_VERSION = 1
 
-# Ordre des étapes (cf. mindmap, SPEC §6). Alma avant Sudoc (ALM-SUD-F-001).
+# Étapes du workflow (cf. mindmap, SPEC §6), ordre par défaut ; l'ordre réel suit
+# regles/pipeline.yaml (ordre_etapes). Alma avant Sudoc (ALM-SUD-F-001).
 ETAPES = [
     "extraction", "provenance", "alma", "sudoc", "situation", "conversion",
     "idref_personnes", "idref_organisations", "dewey", "generation",
 ]
+# Étape du pipeline → étapes du workflow
+_ETAPES_WORKFLOW = {"idref": ["idref_personnes", "idref_organisations"]}
+
+
+def ordre_etapes(pipeline: list[str] | None = None) -> list[str]:
+    """Ordre d'exécution : celui de regles/pipeline.yaml à l'intérieur de chaque groupe
+    (GROUPES_ETAPES : vérifications, puis enrichissements), ETAPES par défaut."""
+    from humatheque.regles.modeles import GROUPES_ETAPES
+
+    p = list(pipeline or [])
+
+    def groupe(g: list[str]) -> list[str]:
+        noms = [e for e in p if e in g] + [e for e in g if e not in p]
+        return [w for e in noms for w in _ETAPES_WORKFLOW.get(e, [e])]
+
+    verifs, enrichissements, _ = GROUPES_ETAPES
+    return ["extraction", *groupe(verifs), "situation", "conversion", *groupe(enrichissements), "generation"]
 
 # Statuts d'étape : a_faire, ok, ignoree, arret (décision du moteur ou exception
 # à trancher), et les statuts d'incident du §6.
@@ -107,6 +125,7 @@ class Dossier(BaseModel):
     schema_version: int = SCHEMA_VERSION
     id: str
     document: Document
+    ordre: list[str] | None = None  # ordre d'exécution des étapes (pipeline.yaml), noté à l'exécution
     fournisseur_vlm: str | None = None
     version_spec: str | None = None
     cree_le: datetime = Field(default_factory=maintenant)
@@ -155,9 +174,10 @@ class Dossier(BaseModel):
 
     def reinitialiser_depuis(self, etape: str) -> None:
         """Remet à faire l'étape et les suivantes."""
-        for n in ETAPES[ETAPES.index(etape):]:
+        ordre = self.ordre or ETAPES
+        for n in ordre[ordre.index(etape):]:
             self.etapes[n] = Etape(nom=n)
-        self.exceptions = [e for e in self.exceptions if ETAPES.index(e.etape) < ETAPES.index(etape)]
+        self.exceptions = [e for e in self.exceptions if ordre.index(e.etape) < ordre.index(etape)]
         self.routage = self.motif_arret = self.etape_arret = None
-        if ETAPES.index(etape) <= ETAPES.index("sudoc"):  # la décision sera reprise par le pipeline
+        if ordre.index(etape) < ordre.index("situation"):  # la décision sera reprise par le pipeline
             self.decision = None

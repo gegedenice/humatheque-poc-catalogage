@@ -22,7 +22,7 @@
       <a class="btn-tonal btn-sm" href="/dossiers/{{ d.id }}/apercu" title="Image et notice finale, sans édition">Aperçu</a>
       <form method="post" action="/dossiers/{{ d.id }}/relancer" onsubmit="return confirm('Relancer tout le pipeline (extraction comprise) ? Les choix de reprise déjà faits sont conservés.')">
         <input type="hidden" name="depuis" value="extraction">
-        <button class="btn btn-sm" title="Relance tout le pipeline : extraction, provenance, Alma, Sudoc, IdRef, Dewey, notice">Relancer</button></form>
+        <button class="btn btn-sm" title="Relance tout le pipeline : extraction, Alma, provenance, Sudoc, IdRef, Dewey, notice">Relancer</button></form>
       {% endif %}
       {% if vue.telechargements %}
       <details class="relative">

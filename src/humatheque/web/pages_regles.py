@@ -111,6 +111,21 @@ def operation_noeud(request: Request, etape: Annotated[str, Form()], chemin: Ann
     return _apres_enregistrement(f"/admin/regles?onglet=pipeline&enregistre={quote(r.archive)}#etape-{etape}", auteur)
 
 
+@routeur.post("/admin/regles/etape/operation")
+def operation_etape(request: Request, etape: Annotated[str, Form()], operation: Annotated[str, Form()],
+                    auteur: Annotated[str, Form()] = ""):
+    """Déplacement d'un bloc (étape) du pipeline : change l'ordre d'exécution."""
+    a = _app(request)
+    auteur = _auteur(auteur)
+    try:
+        r = a.deplacer_etape(etape, operation, auteur)
+    except ReglesRefusees as e:
+        reponse = _page(request, "pipeline", refus=e.rapport)
+        reponse.status_code = 422
+        return reponse
+    return _apres_enregistrement(f"/admin/regles?onglet=pipeline&enregistre={quote(r.archive)}#etape-{etape}", auteur)
+
+
 @routeur.post("/admin/regles/alertes")
 async def enregistrer_alertes(request: Request):
     a = _app(request)

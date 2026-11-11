@@ -28,7 +28,7 @@ def _resoudre(d: Dossier, etape: str) -> None:
 
 def choisir_provenance(d: Dossier, valeur: str, auteur: str, commentaire: str = "") -> Dossier:
     """Provenance absente ou ambiguë : le catalogueur choisit EPHE ou hors EPHE ;
-    le pipeline reprend à l'étape 3 (alma)."""
+    le pipeline reprend à la provenance (Alma n'est rappelé que s'il la suit)."""
     cfg = charger_yaml("provenance")["valeurs"]
     if valeur not in (cfg["ephe"], cfg["hors_ephe"]):
         raise ResolutionImpossible(f"provenance « {valeur} » : choisir {cfg['ephe']} ou {cfg['hors_ephe']}")

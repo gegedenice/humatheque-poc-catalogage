@@ -27,6 +27,11 @@ def test_provenance(regles, valeur, attendu):
     assert _r(regles, "provenance", type="these", ephe=valeur)[0] == attendu
 
 
+def test_provenance_memoire_poursuit(regles):
+    """Règle du studio (11/11) : la provenance n'arrête que les thèses."""
+    assert _r(regles, "provenance", type="memoire", ephe="absent")[0] == "poursuite"
+
+
 # ---------------------------------------------------------------- Alma
 @pytest.mark.parametrize("status, attendu", [
     ("academic_record_found", "stop"),

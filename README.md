@@ -39,9 +39,10 @@ uv run humatheque serve   # http://127.0.0.1:8000
 
 `.env.example` liste toutes les variables (valeurs factices). L'essentiel :
 
-- **VLM** : `VLM_FOURNISSEUR` (`vlm`, `openai`, `hf`, `albert`) et l'URL, le
-  modèle et la clé du fournisseur choisi (`HF_API_URL`, `HF_MODEL`,
-  `HF_TOKEN`… ; `VLM_MODEL` pour le point d'accès `vlm`) ;
+- **VLM** : `VLM_FOURNISSEUR` (`albert` par défaut, `vlm`, `hf` : modèles
+  ouverts uniquement) et l'URL, le modèle et la clé du fournisseur choisi
+  (`ALBERT_API_URL`, `ALBERT_MODEL`, `ALBERT_API_KEY`… ; `VLM_MODEL` pour le
+  point d'accès `vlm`) ;
   `VLM_STRATEGIE` (`requete_unique` ou `par_image`).
 - **Services** : `ALMA_CHECKER_API_URL`, `SUDOC_CHECKER_API_URL`,
   `IDREF_QUALINKA_API_URL`, `DEWEY_CLASSIFICATION_API_URL` (clés facultatives) ;
@@ -67,7 +68,7 @@ uv run humatheque serve   # http://127.0.0.1:8000
 | `regles/notice/socle.yaml` | zones communes de la notice : sous-zones configurables (constante, donnée, composition, autorité ; repli ou vérification si absente), rendu des autorités |
 | `regles/notice/variantes/*.yaml` | thèse originale, thèse de reproduction, mémoire : zones ajoutées, remplacées, retirées |
 | `regles/alertes.yaml` | alertes affichées au-dessus de la notice : libellé et affichage par famille |
-| `regles/pipeline.yaml` | pipeline : provenance → Alma → Sudoc → IdRef → Dewey → création ; pour chaque étape, arbre de décision sur les codes renvoyés par l'API (`status`, `thesis_state`), résultats `stop`, `stop à reprendre`, `conversion`, `poursuite` (avec alerte, à reprendre), `création` |
+| `regles/pipeline.yaml` | pipeline : Alma → provenance → Sudoc → IdRef → Dewey → création (l'ordre du fichier est l'ordre d'exécution, réglable dans le studio à l'intérieur de chaque groupe) ; pour chaque étape, arbre de décision sur les codes renvoyés par l'API (`status`, `thesis_state`), résultats `stop`, `stop à reprendre`, `conversion`, `poursuite` (avec alerte, à reprendre), `création` |
 
 Format détaillé : `docs/SPEC.md` §8 ; référence : `reference/moteur-regles/`.
 `humatheque check-spec` les vérifie (erreurs, avertissements, cas qui tombent dans « sinon »).

@@ -292,3 +292,21 @@ def test_mot_de_passe_active(tmp_path):
     assert c.get("/admin").status_code == 200
     c.get("/logout")
     assert c.get("/admin").status_code == 303
+
+
+def test_fournisseurs_ouverts_albert_par_defaut(tmp_path):
+    """Décision du 11/11 (VLM-T-006) : OpenAI retiré, Albert par défaut avec le modèle de .env."""
+    from humatheque.application import FOURNISSEURS
+    from humatheque.config import Reglages
+    from humatheque.extraction.fournisseurs import fournisseur, table_fournisseurs
+
+    assert FOURNISSEURS[0] == "albert" and "openai" not in FOURNISSEURS
+    r = Reglages(_env_file=None, albert_model="modele-du-env")
+    assert r.vlm_fournisseur == "albert" and "openai" not in table_fournisseurs(r)
+    assert fournisseur("", r).modele == "modele-du-env"
+    a = _app(tmp_path, albert_model="modele-du-env")
+    assert a.fournisseur_effectif(None) == ("albert", "modele-du-env")
+    # ancien réglage d'administration « openai » : retour au défaut
+    a.store.ecrire_reglage_admin("lots_automatiques", {**a.reglages_admin().model_dump(mode="json", exclude={"maj_le", "auteur"}),
+                                              "fournisseur": "openai"}, "C")
+    assert a.reglages_admin().fournisseur == "albert"
