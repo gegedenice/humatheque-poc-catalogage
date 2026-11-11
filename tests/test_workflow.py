@@ -125,7 +125,7 @@ def test_provenance_ambigue_arret_puis_reprise(workflow):
     d = workflow.executer(dossier())
     # Provenance ambiguë : STOP – à reprendre avant Alma
     assert (d.routage, d.etape_arret) == ("à reprendre", "provenance")
-    assert d.decision.situation == "Provenance › ephe = absent OU ambigu" and not routes["alma"].called
+    assert d.decision.situation == "Provenance › type = these ET ephe = absent OU ambigu" and not routes["alma"].called
 
     choisir_provenance(d, "EPHE", auteur="catalogueur", commentaire="EPHE, section IV")
     workflow.executer(d)

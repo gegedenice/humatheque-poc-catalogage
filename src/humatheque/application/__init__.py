@@ -44,7 +44,7 @@ LIBELLES_ETAPES = {
     "dewey": "Classification Dewey", "generation": "Générateur UNIMARC",
 }
 FILTRES = {"tous": None, "a_reprendre": issues.A_REPRENDRE, "incidents": issues.INCIDENT}
-FOURNISSEURS = ["vlm", "openai", "hf", "albert"]
+FOURNISSEURS = ["albert", "vlm", "hf"]  # modèles ouverts ; Albert par défaut
 
 
 class Introuvable(Exception):

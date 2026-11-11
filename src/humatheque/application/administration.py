@@ -81,7 +81,11 @@ class Administration:
     def reglages_admin(self: "Application") -> ReglagesAdmin:
         enregistre = self.store.reglage_admin(CLE_REGLAGES)
         if enregistre:
+            from humatheque.application import FOURNISSEURS
+
             valeur, maj_le, auteur = enregistre
+            if valeur.get("fournisseur") not in FOURNISSEURS:  # ex. « openai », retiré
+                valeur = {**valeur, "fournisseur": self.reglages.vlm_fournisseur}
             return ReglagesAdmin(**valeur, maj_le=maj_le, auteur=auteur)
         r = self.reglages
         return ReglagesAdmin(

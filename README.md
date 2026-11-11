@@ -39,9 +39,10 @@ uv run humatheque serve   # http://127.0.0.1:8000
 
 `.env.example` liste toutes les variables (valeurs factices). L'essentiel :
 
-- **VLM** : `VLM_FOURNISSEUR` (`vlm`, `openai`, `hf`, `albert`) et l'URL, le
-  modèle et la clé du fournisseur choisi (`HF_API_URL`, `HF_MODEL`,
-  `HF_TOKEN`… ; `VLM_MODEL` pour le point d'accès `vlm`) ;
+- **VLM** : `VLM_FOURNISSEUR` (`albert` par défaut, `vlm`, `hf` : modèles
+  ouverts uniquement) et l'URL, le modèle et la clé du fournisseur choisi
+  (`ALBERT_API_URL`, `ALBERT_MODEL`, `ALBERT_API_KEY`… ; `VLM_MODEL` pour le
+  point d'accès `vlm`) ;
   `VLM_STRATEGIE` (`requete_unique` ou `par_image`).
 - **Services** : `ALMA_CHECKER_API_URL`, `SUDOC_CHECKER_API_URL`,
   `IDREF_QUALINKA_API_URL`, `DEWEY_CLASSIFICATION_API_URL` (clés facultatives) ;

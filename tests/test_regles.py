@@ -148,8 +148,8 @@ def test_cas_sinon_comble(regles_fabriquees):
 
 
 def test_verifier_un_brouillon_sans_ecrire(regles_fabriquees):
-    texte = regles_fabriquees.texte("pipeline.yaml").replace("si: {status: academic_record_found}",
-                                                             "si: {status: academic_record_foundd}")
+    texte = regles_fabriquees.texte("pipeline.yaml").replace("status: academic_record_found",
+                                                             "status: academic_record_foundd")
     r = verifier_textes({"pipeline.yaml": texte}, regles_fabriquees.reglages)
     assert r.bloquant and "valeur_inconnue" in _codes(r)
     assert regles_fabriquees.texte("pipeline.yaml") != texte  # rien n'est écrit

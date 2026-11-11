@@ -55,13 +55,11 @@ class Reglages(BaseSettings):
     # vide = seuil non fixé (Statuts_services : « Seuil à fixer »)
     dewey_seuil: float | None = None
 
-    # VLM : fournisseurs OpenAI-compatibles (repris du POC)
-    vlm_fournisseur: str = "hf"
+    # VLM : fournisseurs de modèles ouverts, API OpenAI-compatibles (repris du POC) ;
+    # Albert par défaut (décision du 11/11), OpenAI retiré
+    vlm_fournisseur: str = "albert"
     vlm_image_max_size: int = 768
     vlm_image_jpeg_quality: int = 85
-    openai_api_url: str = "https://api.openai.com/v1/chat/completions"
-    openai_model: str = "gpt-4o"
-    openai_api_key: SecretStr = SecretStr("")
     hf_api_url: str = "https://router.huggingface.co/v1/chat/completions"
     hf_model: str = "google/gemma-4-26B-A4B-it"
     hf_token: SecretStr = SecretStr("")

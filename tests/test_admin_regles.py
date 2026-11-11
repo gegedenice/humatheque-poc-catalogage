@@ -154,7 +154,7 @@ def test_enregistrer_archive_journalise_recharge(client, app):
 
 def test_enregistrer_refuse_un_brouillon_en_erreur(client, app):
     ancien = app.texte_regles("pipeline.yaml")
-    texte = ancien.replace("si: {status: academic_record_found}", "si: {status: academic_record_foundd}")
+    texte = ancien.replace("status: academic_record_found", "status: academic_record_foundd")
     r = client.post("/admin/regles/enregistrer", data={"fichier": "pipeline.yaml", "texte": texte, "auteur": "C"})
     assert r.status_code == 422 and "Modification refusée" in html.unescape(r.text)
     assert "academic_record_foundd" in html.unescape(r.text)  # le brouillon est conservé dans le formulaire

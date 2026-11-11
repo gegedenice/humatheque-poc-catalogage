@@ -159,6 +159,10 @@ Restent en Python, fonctions pures, listes dans `config/texte_unimarc.yaml` :
     le fournisseur se changent par configuration, sans toucher à la logique
     métier (VLM-T-006) : une interface `FournisseurVLM` unique, une classe par
     fournisseur OpenAI-compatible (reprises du POC).
+  - **Fournisseurs** (décision du 11/11) : modèles ouverts uniquement —
+    `albert` (**par défaut**, modèle `ALBERT_MODEL` de `.env`), `vlm` (point
+    d'accès on-premise, ex. llama.cpp) et `hf`. OpenAI est retiré ; un réglage
+    d'administration qui le désignait revient au fournisseur par défaut.
   - **Multi-images** (VLM-T-001, ING-T-001) : toutes les images du document sont
     envoyées. La stratégie est un paramètre (`VLM_STRATEGIE`) :
     `requete_unique` (toutes les images dans une requête, valeur par défaut en
