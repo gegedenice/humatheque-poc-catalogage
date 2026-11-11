@@ -1,21 +1,11 @@
-"""Accès paresseux au dictionnaire reaccentue et à `config/texte_unimarc.yaml`."""
+"""Accès à `config/texte_unimarc.yaml` (civilités, particules, articles)."""
 
 from __future__ import annotations
 
 from functools import lru_cache
 from typing import Any
 
-from humatheque.config import charger_yaml, reglages
-from humatheque.texte_unimarc._vendor.reaccentue.dictionnaire import Dictionnaire, charger
-
-NOM_CACHE = "reaccentue-cache.pz"
-
-
-@lru_cache
-def dictionnaire() -> Dictionnaire:
-    """Dictionnaire de reaccentue ; cache dans `data/` (construit au premier appel)."""
-    r = reglages()
-    return charger(r.reaccentue_cache or r.dossier_data / NOM_CACHE)
+from humatheque.config import charger_yaml
 
 
 @lru_cache

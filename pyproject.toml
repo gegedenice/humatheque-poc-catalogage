@@ -15,7 +15,6 @@ dependencies = [
     "pymarc>=5.4.0",
     "python-multipart>=0.0.33",
     "pyyaml>=6.0",
-    "unidecode>=1.4.0",
     "uvicorn>=0.54.0",
 ]
 

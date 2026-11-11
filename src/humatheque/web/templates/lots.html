@@ -22,6 +22,9 @@
   <section aria-label="Synthèse" class="grid gap-4 grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
     <div class="kpi"><span class="kpi-libelle">Lots affichés</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | length }}</span>
       <span class="text-[13px] text-sourdine">sur {{ vue.total }} au total</span></div>
+    {% set docs = vue.lots | map(attribute="indicateurs.documents") | sum %}{% set en_traitement = vue.lots | map(attribute="indicateurs.en_cours") | sum %}
+    <div class="kpi"><span class="kpi-libelle">Documents traités</span><span class="text-4xl font-semibold leading-none">{{ docs - en_traitement }}</span>
+      <span class="text-[13px] text-sourdine">sur {{ docs }} document(s) dans les lots affichés{% if en_traitement %} · {{ en_traitement }} en cours{% endif %}</span></div>
     <div class="kpi"><span class="kpi-libelle">En cours</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | selectattr("en_cours") | list | length }}</span>
       <span class="text-[13px] text-sourdine">traitement en tâche de fond</span></div>
     <div class="kpi"><span class="kpi-libelle">Documents à reprendre</span><span class="text-4xl font-semibold leading-none">{{ vue.lots | map(attribute="indicateurs.en_attente") | sum }}</span>

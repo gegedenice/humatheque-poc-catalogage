@@ -10,6 +10,7 @@
 {% include "_admin_onglets.html" %}
 {% set onglets = [("pipeline", "Pipeline", "Étapes et décisions : arrêter, convertir, poursuivre"),
                   ("notice", "Notice UNIMARC", "Zones, sous-zones, replis"),
+                  ("alertes", "Alertes", "Alertes affichées au-dessus de la notice"),
                   ("essai", "Banc d'essai", "Parcours, données et notice sur un document"),
                   ("modifier", "Fichiers", "YAML, pour experts")] %}
 
@@ -42,6 +43,26 @@
     {% include "_pipeline.html" %}
   {% elif onglet == "notice" %}
     {% include "_notice_liste.html" %}
+  {% elif onglet == "alertes" %}
+    <p class="text-sm text-sourdine mb-4">Alertes affichées au-dessus de la notice (dossier, aperçu), par famille. Une famille masquée reste dans le journal du dossier et le rapport CSV. Le texte des alertes du pipeline se règle dans l'onglet <a href="/admin/regles?onglet=pipeline">Pipeline</a>.</p>
+    <form method="post" action="/admin/regles/alertes" hx-boost="false" class="flex flex-col gap-4">
+      <div class="defilant"><table class="tableau">
+        <thead><tr><th>Afficher</th><th>Libellé affiché</th><th>Exemple</th></tr></thead>
+        <tbody>
+        {% for f in vue_alertes %}
+          <tr>
+            <td><input type="checkbox" class="accent-primaire w-4 h-4" name="afficher.{{ f.code }}" value="1" {% if f.afficher %}checked{% endif %} aria-label="afficher {{ f.code }}"></td>
+            <td><input class="champ champ-sm" name="libelle.{{ f.code }}" value="{{ f.libelle }}" aria-label="libellé {{ f.code }}"><span class="font-mono text-xs text-sourdine">{{ f.code }}</span></td>
+            <td class="text-[13px] text-sourdine">{{ f.exemple }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      <div class="flex items-center gap-2 justify-end">
+        <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+        <button class="btn-principal btn-sm">Enregistrer</button>
+      </div>
+    </form>
   {% elif onglet == "essai" %}
     {% include "_banc_essai.html" %}
   {% else %}

@@ -2,6 +2,7 @@
 {% block titre %}{{ vue.dossier.document.id }}{% endblock %}
 {% block fil %}<a class="text-sourdine" href="/lots/{{ vue.lot_id }}">Lot <span class="font-mono">{{ vue.lot_id }}</span></a> › <span class="font-mono">{{ vue.dossier.document.id }}</span>{% endblock %}
 {% block contenu %}
+{% with retour_lot = vue.lot_id %}{% include "_retour.html" %}{% endwith %}
 {% with oob = False %}{% include "_dossier_entete.html" %}{% endwith %}
 <div class="flex flex-wrap gap-6 items-start">
   {# Îlot JavaScript : jamais dans un fragment rafraîchi (SPEC §9.1). #}

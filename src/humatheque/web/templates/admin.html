@@ -29,10 +29,32 @@
       <h2 class="mb-1">Lots automatiques</h2>
       <p class="text-[13px] text-sourdine">Appliqués aux lots créés par un déclencheur ; proposés aussi par défaut dans « Nouveau traitement ».</p>
     </div>
-    <label class="block"><span class="etiquette">Fournisseur VLM</span>
+    <label class="block"><span class="etiquette">Fournisseur VLM par défaut</span>
       <select class="champ" name="fournisseur">
         {% for f in fournisseurs %}<option value="{{ f }}" {% if f == reglages.fournisseur %}selected{% endif %}>{{ f }}</option>{% endfor %}
       </select></label>
+    <div class="sous-carte">
+      <p class="text-sm font-semibold mb-1">Modèles par fournisseur</p>
+      <p class="text-xs text-sourdine mb-3">Lus dans <span class="font-mono">.env</span> ; la liste déroulante interroge l'API du fournisseur (<span class="font-mono">/models</span>) pour proposer un autre modèle. Le choix s'applique à tous les lots qui utilisent ce fournisseur.</p>
+      <ul class="flex flex-col gap-2">
+        {% for v in vlm %}
+        <li class="bg-white rounded-xl p-3 flex flex-col gap-2">
+          <div class="flex flex-wrap items-baseline gap-2">
+            <span class="font-mono font-semibold">{{ v.nom }}</span>
+            {% if v.nom == reglages.fournisseur %}<span class="puce bg-primaire-clair text-primaire-fonce">défaut</span>{% endif %}
+            {% if v.cle %}<span class="puce bg-auto-clair text-auto-fonce">clé configurée</span>{% elif v.nom != "vlm" %}<span class="puce bg-decision-clair text-decision-fonce">clé absente</span>{% endif %}
+            <span class="font-mono text-xs text-sourdine truncate min-w-0 flex-1" title="{{ v.url }}">{{ v.url or "URL non configurée" }}</span>
+          </div>
+          <label class="flex flex-wrap items-center gap-2"><span class="text-xs text-sourdine w-28">Modèle utilisé</span>
+            <select class="champ champ-sm font-mono text-xs flex-1 min-w-[12rem]" name="modele.{{ v.nom }}" aria-label="modèle pour {{ v.nom }}"
+                    hx-get="/admin/modeles?fournisseur={{ v.nom }}" hx-trigger="focus once" hx-swap="beforeend" hx-target="this">
+              <option value="" {% if v.modele == v.modele_env %}selected{% endif %}>{{ v.modele_env }} (.env)</option>
+              {% if v.modele != v.modele_env %}<option value="{{ v.modele }}" selected>{{ v.modele }}</option>{% endif %}
+            </select></label>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
     <div class="sous-carte">
       <p class="text-sm font-semibold mb-3">Paramètres avancés <span class="font-normal text-sourdine">· défauts de <span class="font-mono">config/services.yaml</span></span></p>
       {{ champs_reglables(reglables) }}

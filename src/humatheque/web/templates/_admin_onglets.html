@@ -1,6 +1,6 @@
-{# Deux pages d'administration (SPEC §9.3) : services et déclencheurs, règles. #}
+{# Pages d'administration (SPEC §9.3) : services et déclencheurs, prompts, règles. #}
 <nav aria-label="Pages d'administration" class="flex flex-wrap gap-2 mb-6">
-  {% for href, libelle in [("/admin", "Services et déclencheurs"), ("/admin/regles", "Règles de catalogage")] %}
+  {% for href, libelle in [("/admin", "Services et déclencheurs"), ("/admin/prompts", "Prompts"), ("/admin/regles", "Règles de catalogage")] %}
   {% set actif = (request.url.path == href) %}
   <a href="{{ href }}" class="filtre {% if actif %}filtre-actif{% endif %}" {% if actif %}aria-current="page"{% endif %}>{% if actif %}✓ {% endif %}{{ libelle }}</a>
   {% endfor %}

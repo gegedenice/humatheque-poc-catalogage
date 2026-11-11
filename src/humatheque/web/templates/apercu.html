@@ -4,6 +4,7 @@
 {% block titre %}{{ vue.document_id }} · aperçu{% endblock %}
 {% block fil %}<a class="text-sourdine" href="/lots/{{ vue.lot_id }}">Lot <span class="font-mono">{{ vue.lot_id }}</span></a> › <span class="font-mono">{{ vue.document_id }}</span> › aperçu{% endblock %}
 {% block entete %}
+{% with retour_lot = vue.lot_id %}{% include "_retour.html" %}{% endwith %}
 <div class="flex flex-wrap items-center gap-3">
   <h1 class="break-words">{{ vue.titre or vue.document_id }}</h1>{{ badge(vue.routage) }}
 </div>
@@ -47,7 +48,7 @@
     <pre class="font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-words rounded-2xl border border-filet bg-[#fbfbfe] p-4 overflow-x-auto">{{ vue.notice | colorer_notice }}</pre>
     {% else %}{{ vide("Pas de notice produite pour ce document : le traitement s'est arrêté avant la génération.") }}{% endif %}
     {% if vue.alertes %}
-    <ul class="flex flex-wrap gap-1.5" aria-label="Alertes">{% for a in vue.alertes %}<li class="puce bg-decision-clair text-decision-fonce font-medium">{{ a }}</li>{% endfor %}</ul>
+    {% with groupes = vue.alertes %}{% include "_alertes.html" %}{% endwith %}
     {% endif %}
   </section>
 </div>

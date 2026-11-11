@@ -183,3 +183,70 @@ def test_api_regles(client):
     assert "701 #1$3026594803$4003" in a["texte"]
 
 
+
+
+# ---------------------------------------------------------------- prompts (Administration › Prompts)
+def test_page_prompts_et_correspondances(client):
+    page = _txt(client.get("/admin/prompts"))
+    assert "extraction_these.txt" in page and "transform it into sentence case with French accents" in page
+    assert "Du prompt à la notice" in page and "titre_classement" in page and "@ devant le premier mot" in page
+    assert "granting_institution" in page and "etablissement" in page
+    memoire = _txt(client.get("/admin/prompts", params={"nom": "extraction_memoire.txt"}))
+    assert "Mémoire de master recherche 2e année" in memoire
+    assert client.get("/admin/prompts", params={"nom": "../.env"}).status_code == 404
+
+
+def test_modifier_un_prompt(client, app, tmp_path):
+    import shutil
+    from conftest import RACINE
+    shutil.copytree(RACINE / "config", tmp_path / "config")  # ne pas écrire dans le dépôt
+    p = app.prompt("extraction_these.txt")
+    texte = p.texte.replace("Return ONLY valid JSON.", "Return ONLY valid JSON, nothing else.")
+    r = client.post("/admin/prompts", data={"nom": p.nom, "texte": texte, **AUTEUR})
+    assert r.status_code == 303 and "enregistre=1" in r.headers["location"]
+    assert app.prompt(p.nom).texte == texte and app.prompt(p.nom).empreinte != p.empreinte
+    assert app.journal_prompts()[0]["auteur"] == "Camille"
+    r = client.post("/admin/prompts", data={"nom": p.nom, "texte": "pas de schéma", **AUTEUR})
+    assert r.status_code == 422 and "aucun schéma JSON" in _txt(r) and "pas de schéma" in _txt(r)
+    assert (tmp_path / "config" / "prompts" / "archives").is_dir()
+
+
+# ---------------------------------------------------------------- alertes affichées
+ALERTES_ANCIENNES = [
+    "granting_institution:accent_ambigu:PARIS", "title:mot_inconnu:MULTIRESOLUTIONS", "numero_nnt:bouchon",
+    "jury_president[1] Monsieur Ivar EKELAND : proto-notice d'autorité à créer",
+    "jury_president[1] Ivar Ekeland : non trouvé dans IdRef",
+    "pipeline:idref:non trouvé dans IdRef|reviewers[2] Jean-Michel Morel",
+    "zone 029 obligatoire non produite (029 (these-originale-imprimee))", "conversion_non_implementee",
+]
+
+
+def test_alertes_regroupees_et_anciennes_masquees(regles):
+    from humatheque.application.alertes import regrouper
+    groupes = {g.libelle: g.elements for g in regrouper(ALERTES_ANCIENNES, regles.alertes)}
+    assert groupes == {
+        "Non trouvé dans IdRef": ["Ivar Ekeland (président du jury)", "Jean-Michel Morel (rapporteur)"],
+        "Zone obligatoire non produite": ["029"],
+        "Conversion non implémentée (copie de la notice source)": [],
+    }
+
+
+def test_onglet_alertes(client, app):
+    page = _txt(client.get("/admin/regles?onglet=alertes"))
+    assert "Anciennes alertes" in page and "proto-notice" in page and 'name="afficher.zone_obligatoire"' in page
+    donnees = {f"libelle.{c}": f.libelle for c, f in app.regles.alertes.items()}
+    donnees |= {f"afficher.{c}": "1" for c, f in app.regles.alertes.items() if f.afficher and c != "zone_obligatoire"}
+    donnees["libelle.pipeline"] = "Pipeline"
+    r = client.post("/admin/regles/alertes", data={**donnees, **AUTEUR})
+    assert r.status_code == 303
+    assert not app.regles.alertes["zone_obligatoire"].afficher and app.regles.alertes["pipeline"].libelle == "Pipeline"
+    assert "# Alertes affichées" in app.texte_regles("alertes.yaml")
+
+
+@respx.mock
+def test_alerte_idref_dans_le_dossier(client, app):
+    simuler(idref_statut="not_found")
+    dossier = _televerser(client).headers["location"]
+    page = _txt(client.get(dossier))
+    assert "Non trouvé dans IdRef</span> : Jean-Daniel Dubois (auteur)" in page
+    assert "pipeline:idref" not in page.split("volet-journal")[0]  # code brut : seulement au journal

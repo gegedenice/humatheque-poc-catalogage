@@ -28,20 +28,21 @@ def reponse_vlm(contenu) -> dict:
     return {"choices": [{"message": {"content": texte}}]}
 
 
+# Réponse attendue du VLM avec le prompt de l'atelier (casse et accents par le modèle)
 EXTRACTION = {
-    "title": "CONTRIBUTION A L'ETUDE DE LA DEMOCRATIE EN AFRIQUE",
-    "subtitle": "LE CAS DU SENEGAL",
-    "author": "Jean-Daniel DUBOIS",
+    "title": "Contribution à l'étude de la démocratie en Afrique",
+    "subtitle": "Le cas du Sénégal",
+    "author": "Jean-Daniel Dubois",
     "degree_type": "Thèse de doctorat",
-    "discipline": "SCIENCE POLITIQUE",
+    "discipline": "Science politique",
     "volume": None,
-    "granting_institution": "ECOLE PRATIQUE DES HAUTES ETUDES",
+    "granting_institution": "École pratique des hautes études",
     "co_tutelle_institutions": [],
     "doctoral_school": None,
     "defense_year": 1998,
-    "advisor": ["Pr Marie-France de LA ROCHE"],
+    "advisor": ["Marie-France de La Roche"],
     "jury_president": None,
-    "reviewers": "Luc PETIT | Claire DURAND",
+    "reviewers": "Luc Petit | Claire Durand",
     "committee_members": [],
     "language": "fre",
     "abstract": None,
@@ -57,9 +58,9 @@ def fournisseur():
 def test_prompt_externalise():  # VLM-T-005
     p = charger_prompt("these")
     assert p.nom == "extraction_these.txt" and len(p.empreinte) == 12
-    assert "Transcribe every value exactly as printed" in p.texte
-    assert "sentence case" not in p.texte and "civility" not in p.texte.replace("civilities", "")
-    assert '"abstract"' in p.texte  # VLM-T-002
+    # Prompt de l'atelier (décision du 11/11) : normalisation lexicale par le VLM
+    assert "transform it into sentence case with French accents" in p.texte
+    assert "remove all civility and title prefixes" in p.texte
     assert "Mémoire de DEA" in charger_prompt("memoire").texte
 
 
@@ -128,7 +129,7 @@ def test_image_inaccessible():
 # --- Contexte
 def test_normaliser_metadonnees():
     m = normaliser_metadonnees(EXTRACTION)
-    assert m["reviewers"] == ["Luc PETIT", "Claire DURAND"]
+    assert m["reviewers"] == ["Luc Petit", "Claire Durand"]
     assert m["defense_year"] == "1998" and m["abstract"] is None
     assert not document_vide(m)
     assert document_vide(normaliser_metadonnees({"confidence": 0.1}))
@@ -178,12 +179,16 @@ def test_contexte_alertes_et_journal():
     c = construire(m, "these")
     assert c.valeurs["volumaison"] == "? volumes"
     assert c.valeurs["defense_year"] is None
-    assert {"defense_year:annee_invalide:vers 1998", "dollar_dans_valeur:title",
-            "advisor[1]:particule_a_verifier"} <= set(c.alertes)
-    t = next(t for t in c.transformations if t.champ == "discipline")
-    assert (t.avant, t.apres, t.fonction) == ("SCIENCE POLITIQUE", "Science politique", "casse_phrase")
+    assert {"defense_year:annee_invalide:vers 1998", "dollar_dans_valeur:title"} <= set(c.alertes)
+    assert not any("particule" in a or "accent" in a or "mot_inconnu" in a for a in c.alertes)
+    t = next(t for t in c.transformations if t.champ == "subtitle")
+    assert (t.avant, t.apres, t.fonction) == ("Le cas du Sénégal", "le cas du Sénégal", "minuscule_initiale")
 
 
-def test_noms_propres_du_document_preserves():
-    m = normaliser_metadonnees(EXTRACTION | {"title": "LA PENSEE DE ROUSSEAU", "committee_members": ["Paul ROUSSEAU"]})
-    assert construire(m, "these").valeurs["title"] == "La pensée de Rousseau"
+def test_ecriture_du_vlm_conservee():
+    """Plus de réaccentuation en Python : « Université Paris IX Dauphine » reste tel quel."""
+    m = normaliser_metadonnees(EXTRACTION | {"granting_institution": "Université Paris IX Dauphine",
+                                             "title": "La pensée de Rousseau"})
+    c = construire(m, "these").valeurs
+    assert c["granting_institution"]["forme"] == "Université Paris IX Dauphine"
+    assert c["titre_classement"] == "La @pensée de Rousseau"

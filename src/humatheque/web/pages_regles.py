@@ -16,7 +16,7 @@ from humatheque.regles.modeles import Noeud, Partie, SousZoneRegle, ZoneRegle
 from humatheque.web.pages import COOKIE_AUTEUR, _app, _auteur, _rendre
 
 routeur = APIRouter(include_in_schema=False)
-ONGLETS = ("pipeline", "notice", "essai", "modifier")
+ONGLETS = ("pipeline", "notice", "alertes", "essai", "modifier")
 
 
 def _page(request: Request, onglet: str = "pipeline", **contexte):
@@ -27,6 +27,8 @@ def _page(request: Request, onglet: str = "pipeline", **contexte):
         contexte["texte"] = a.texte_regles(contexte["fichier"])
     if onglet == "notice":
         contexte["notice"] = a.vue_notice_modele(contexte.get("variante") or "socle")
+    if onglet == "alertes":
+        contexte["vue_alertes"] = a.vue_alertes()
     return _rendre(request, "admin_regles.html", vue=a.vue_regles(), onglet=onglet,
                    dossiers=a.dossiers_pour_essai(), **contexte)
 
@@ -107,6 +109,22 @@ def operation_noeud(request: Request, etape: Annotated[str, Form()], chemin: Ann
         reponse.status_code = 422
         return reponse
     return _apres_enregistrement(f"/admin/regles?onglet=pipeline&enregistre={quote(r.archive)}#etape-{etape}", auteur)
+
+
+@routeur.post("/admin/regles/alertes")
+async def enregistrer_alertes(request: Request):
+    a = _app(request)
+    f = await request.form()
+    auteur = _auteur(str(f.get("auteur") or ""))
+    familles = {code: {"libelle": str(f.get(f"libelle.{code}") or ""), "afficher": f.get(f"afficher.{code}") == "1"}
+                for code in a.regles.alertes}
+    try:
+        r = a.enregistrer_alertes(familles, auteur)
+    except ReglesRefusees as e:
+        reponse = _page(request, "alertes", refus=e.rapport)
+        reponse.status_code = 422
+        return reponse
+    return _apres_enregistrement(f"/admin/regles?onglet=alertes&enregistre={quote(r.archive)}", auteur)
 
 
 @routeur.post("/admin/regles/essai")

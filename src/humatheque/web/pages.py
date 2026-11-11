@@ -6,7 +6,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from markupsafe import escape
 
 from humatheque.application import ActionImpossible, Application, Introuvable, documents_depuis_liste
 from humatheque.application.vues import EntreeLot
@@ -318,9 +319,44 @@ def evenements_s3(request: Request, jeton: str = ""):
 def administration(request: Request):
     a = _app(request)
     return _rendre(request, "admin.html", reglages=a.reglages_admin(), reglables=a.reglables(),
-                   fournisseurs=a.accueil().fournisseurs, etat=request.app.state.planificateur.etat(),
+                   fournisseurs=a.accueil().fournisseurs, vlm=a.fournisseurs_vlm(), etat=request.app.state.planificateur.etat(),
                    s3=a.depot is not None, base=str(request.base_url).rstrip("/"),
                    mot_de_passe=bool(a.reglages.mot_de_passe.get_secret_value()))
+
+
+@routeur.get("/admin/prompts")
+def page_prompts(request: Request, nom: str = "extraction_these.txt", enregistre: str = ""):
+    a = _app(request)
+    return _rendre(request, "admin_prompts.html", prompts=a.prompts(), prompt=a.prompt(nom),
+                   correspondances=a.correspondances(), journal=a.journal_prompts(), enregistre=enregistre)
+
+
+@routeur.post("/admin/prompts")
+def enregistrer_prompt(request: Request, nom: Annotated[str, Form()], texte: Annotated[str, Form()],
+                       auteur: Annotated[str, Form()] = ""):
+    a = _app(request)
+    try:
+        a.enregistrer_prompt(nom, texte, _auteur(auteur))
+    except ActionImpossible as e:  # brouillon conservé, motif affiché
+        r = _rendre(request, "admin_prompts.html", prompts=a.prompts(), prompt=a.prompt(nom), texte=texte,
+                    refus=str(e), correspondances=a.correspondances(), journal=a.journal_prompts(), enregistre="")
+        r.status_code = 422
+        return r
+    return _rediriger(f"/admin/prompts?nom={nom}&enregistre=1", auteur)
+
+
+@routeur.get("/admin/modeles")
+def modeles(request: Request, fournisseur: str):
+    """Options de la liste des modèles d'un fournisseur (chargées à l'ouverture de la liste)."""
+    a = _app(request)
+    vue = next((v for v in a.fournisseurs_vlm() if v.nom == fournisseur), None)
+    if vue is None:
+        raise Introuvable(f"fournisseur {fournisseur}")
+    deja = {vue.modele_env, vue.modele}
+    noms = [m for m in a.modeles_accessibles(fournisseur) if m not in deja]
+    if not noms:
+        return HTMLResponse('<option disabled>(aucun autre modèle obtenu de l\'API)</option>')
+    return HTMLResponse("".join(f'<option value="{escape(m)}">{escape(m)}</option>' for m in noms))
 
 
 @routeur.get("/admin/sante")
@@ -347,6 +383,8 @@ async def reglages_admin(request: Request):
     try:
         nouveaux = ReglagesAdmin(
             fournisseur=str(f.get("fournisseur") or actuel.fournisseur),
+            modeles={k.removeprefix("modele."): str(v).strip() for k, v in f.items()
+                     if k.startswith("modele.") and str(v).strip()},
             reglages_services=await _reglages_formulaire(request),
             declencheurs=Declencheurs(
                 balayage=Balayage(actif=f.get("balayage_actif") == "on",

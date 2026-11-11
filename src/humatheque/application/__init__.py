@@ -24,6 +24,7 @@ from humatheque.application.vues import (
     LigneException, LigneJournal, Reglable, ResumeLot, VueApercu, VueBucket, VueDossier, VueLot, VueLots, VueNotice, resume_version,
 )
 from humatheque import issues
+from humatheque.application.alertes import regrouper
 from humatheque.conversion import depuis_iso, vers_iso
 from humatheque.config import charger_yaml
 from humatheque import ingestion
@@ -92,6 +93,7 @@ def documents_depuis_liste(texte: str) -> list[list[str]]:
 
 from humatheque.application.administration import Administration  # noqa: E402
 from humatheque.application.regles_admin import AdministrationRegles, ReglesRefusees  # noqa: E402,F401
+from humatheque.application.prompts import Prompts  # noqa: E402
 from humatheque.application.studio import Studio  # noqa: E402
 
 
@@ -111,7 +113,7 @@ def parcours(d) -> list[dict]:
             if e.type == "decision" and isinstance(e.detail, dict) and "chemin" in e.detail and "etape" in e.detail]
 
 
-class Application(Administration, AdministrationRegles, Studio):
+class Application(Administration, AdministrationRegles, Studio, Prompts):
     def __init__(self, store: Store | None = None, reglages: Reglages | None = None,
                  fabrique: FabriqueServices | None = None, executeur: Executor | None = None,
                  regles: Regles | None = None, depot: "ingestion.Depot | None | bool" = True) -> None:
@@ -217,7 +219,8 @@ class Application(Administration, AdministrationRegles, Studio):
         lot = Lot(id=_identifiant("L"), cree_le=datetime.now(UTC), mode=1 if len(docs) == 1 else 2,
                   declencheur=entree.declencheur, nb_documents=len(docs),
                   parametres={"type_document": entree.type_document,
-                              "fournisseur": entree.fournisseur or self.reglages.vlm_fournisseur,
+                              "fournisseur": (f_m := self.fournisseur_effectif(entree.fournisseur))[0],
+                              "modele": f_m[1],
                               "source": entree.source, "services": reglages_lot})
         self.store.creer_lot(lot)
         dossiers = []
@@ -251,7 +254,11 @@ class Application(Administration, AdministrationRegles, Studio):
         lot = self.store.lot(ligne.lot_id)
         self.store.changer_etat(dossier_id, "en_cours")
         try:
-            services = self.fabrique(self.regles, (lot.parametres if lot else {}).get("fournisseur"))
+            parametres = lot.parametres if lot else {}
+            vlm = parametres.get("fournisseur")
+            if vlm and parametres.get("modele"):
+                vlm = f"{vlm}#{parametres['modele']}"  # modèle choisi en administration (extraction/fournisseurs.py)
+            services = self.fabrique(self.regles, vlm)
             # Le dépôt qui a constitué les documents est celui qui lit leurs images.
             if self.depot is not None:
                 services.depot = self.depot
@@ -421,7 +428,7 @@ class Application(Administration, AdministrationRegles, Studio):
         return VueDossier(dossier=d, lot_id=ligne.lot_id, etat=ligne.etat, titre=titre,
                           etapes=etapes, images=images, champs=champs,
                           exceptions_ouvertes=sum(1 for e in d.exceptions if not e.resolue), telechargements=tel,
-                          parcours=parcours(d))
+                          parcours=parcours(d), alertes=regrouper(d.alertes, self.regles.alertes))
 
     def vue_apercu(self, dossier_id: str) -> VueApercu:
         """Images et notice finale, sans édition : version courante (validée, éditée ou
@@ -441,7 +448,7 @@ class Application(Administration, AdministrationRegles, Studio):
         return VueApercu(dossier_id=d.id, lot_id=v.lot_id, document_id=d.document.id,
                          type_document=d.document.type_document, titre=v.titre, routage=d.routage or issues.TERMINE,
                          situation=d.decision.situation if d.decision else None, motif_arret=d.motif_arret,
-                         images=v.images, notice=notice, origine=origine, profil=profil, alertes=d.alertes,
+                         images=v.images, notice=notice, origine=origine, profil=profil, alertes=regrouper(d.alertes, self.regles.alertes),
                          telechargements=v.telechargements)
 
     def url_image(self, image: str) -> str:

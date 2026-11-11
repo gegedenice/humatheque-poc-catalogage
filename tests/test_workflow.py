@@ -55,8 +55,8 @@ def test_s08_produit_une_notice(workflow):
     assert d.routage == "terminé" and d.etape_arret is None
     assert all(e.statut in ("ok", "ignoree") for e in d.etapes.values())
     lignes = d.notice_texte.splitlines()
-    assert "200 1#$aContribution à l'étude de la démocratie en Afrique$fJean-Daniel DUBOIS" \
-           "$gsous la direction de Pr Marie-France de LA ROCHE" not in lignes  # civilité retirée de la forme
+    assert "200 1#$aContribution à l'étude de la démocratie en Afrique$fJean-Daniel Dubois" \
+           "$gsous la direction de Marie-France de La Roche" in lignes
     assert "700 #1$3026940345$4070" in lignes
     assert "701 #1$3026940345$4958$4555" in lignes
     assert "711 02$3026375478$4295" in lignes

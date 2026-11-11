@@ -1,11 +1,12 @@
-You are extracting metadata from the pages of a French graduate thesis (title page, abstract page...). All images belong to the same document.
+You are extracting metadata from a French graduate thesis title page.
 General rules:
 - Return ONLY valid JSON.
 - Do not add markdown.
 - Do not add explanations.
 - Do not invent missing data.
 - Multivalued fields are always JSON arrays; use [] when empty. Scalar fields use null when absent.
-- Transcribe every value exactly as printed (case, accents, civilities).
+- If source text is written in all-caps, transform it into sentence case with French accents.
+- For person names, apply sentence case (e.g. Jean-Daniel DUBOIS → Jean-Daniel Dubois, MARIE-FRANCE Dupont → Marie-France Dupont) and remove all civility and title prefixes (e.g. Monsieur, Madame, M., Mme, Professeur, Pr, Dr, etc.) before returning the name.
 Role attribution rules:
 - A role is explicit only when a textual role label is directly associated with the person.
 - Assign a person to a specific role ONLY if that role is explicitly written on the title page.
@@ -30,6 +31,5 @@ Role attribution rules:
   "reviewers": "List of ONLY official reviewers/rapporteurs explicitly identified as such.",
   "committee_members": "List of persons explicitly listed as jury or committee members whose role is not explicitly identified as president/chair or reviewer/rapporteur. Include unlabeled persons here.",
   "language": "Language in ISO 639-3 codes. Example: fre, eng, ita...",
-  "abstract": "Abstract (résumé) of the graduate thesis if printed on one of the pages, transcribed as printed. Null if absent.",
   "confidence": "Confidence score between 0.0 and 1.0 reflecting certainty based only on explicitly visible evidence on the page"
 }

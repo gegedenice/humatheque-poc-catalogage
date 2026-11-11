@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_composants.html" import vide %}
+{% block titre %}Prompts{% endblock %}
+{% block fil %}Administration · prompts d'extraction (SPEC §5, VLM-T-005){% endblock %}
+{% block entete %}<h1>Prompts d'extraction</h1>{% endblock %}
+{% block entete_droite %}
+<span class="text-[13px] text-sourdine">Empreinte <span class="font-mono">{{ prompt.empreinte }}</span> · enregistrée dans chaque dossier</span>
+{% endblock %}
+{% block contenu %}
+{% include "_admin_onglets.html" %}
+<nav class="flex flex-wrap gap-2 mb-4" aria-label="Prompts">
+  {% for p in prompts %}
+  <a class="filtre {% if p.nom == prompt.nom %}filtre-actif{% endif %}" href="/admin/prompts?nom={{ p.nom }}">{{ {"these": "Thèse", "memoire": "Mémoire"}.get(p.type_document, p.type_document) }}</a>
+  {% endfor %}
+</nav>
+{% if enregistre %}<p class="avis bg-auto-clair text-auto-fonce mb-4">✓ Prompt enregistré (nouvelle empreinte <span class="font-mono">{{ prompt.empreinte }}</span>) ; il s'applique aux documents traités à partir de maintenant.</p>{% endif %}
+{% if refus is defined and refus %}<p class="avis bg-sortie-clair text-sortie-fonce mb-4">Modification refusée : {{ refus }}. Le brouillon est conservé ci-dessous.</p>{% endif %}
+{% if prompt.erreur %}<p class="avis bg-sortie-clair text-sortie-fonce mb-4">Schéma JSON illisible : {{ prompt.erreur }}</p>{% endif %}
+
+<div class="flex flex-wrap gap-6 items-start">
+  <section class="carte flex-[1_1_560px] min-w-0 flex flex-col gap-3">
+    <h2 class="mb-0">{{ prompt.nom }}</h2>
+    <p class="text-[13px] text-sourdine">Envoyé tel quel au VLM avec les images du document. Le schéma JSON (entre accolades) fixe les champs extraits ; la casse, les accents et les civilités sont pris en charge par le VLM.</p>
+    <form method="post" action="/admin/prompts" hx-boost="false" class="flex flex-col gap-3" id="formulaire-regles">
+      <input type="hidden" name="nom" value="{{ prompt.nom }}">
+      <label class="sr-only" for="regles-texte">Texte du prompt</label>
+      <textarea class="champ font-mono text-xs h-[65vh]" id="regles-texte" name="texte" spellcheck="false">{{ texte if texte is defined and texte else prompt.texte }}</textarea>
+      <div id="editeur-regles" data-cible="regles-texte" class="h-[65vh] border border-filet rounded-2xl overflow-hidden" hidden></div>
+      <div class="flex flex-wrap items-center gap-3 justify-end">
+        <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-44 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+        <button class="btn-principal">Enregistrer</button>
+      </div>
+      <p class="text-xs text-sourdine">L'enregistrement vérifie que le schéma JSON reste lisible, archive la version précédente dans <span class="font-mono">config/prompts/archives/</span> et journalise la modification.</p>
+    </form>
+    {% if journal %}
+    <h3 class="mt-2 mb-1">Dernières modifications</h3>
+    <ul class="flex flex-col gap-1 text-[13px]">
+      {% for j in journal %}<li><span class="font-mono text-xs text-sourdine">{{ j.le[:16] | replace("T", " ") }}</span> · {{ j.auteur }} · <span class="font-mono">{{ j.fichier }}</span></li>{% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="carte flex-[1_1_480px] min-w-0 flex flex-col gap-3 lg:sticky lg:top-3">
+    <h2 class="mb-0">Du prompt à la notice</h2>
+    <p class="text-[13px] text-sourdine">À gauche, les champs demandés au VLM ; à droite, les variables qu'en tire le démonstrateur et que l'on retrouve dans le <a href="/admin/regles?onglet=notice">studio › Notice UNIMARC</a>.</p>
+    <div class="defilant"><table class="tableau">
+      <thead><tr><th>Champ du prompt</th><th></th><th>Variable de la notice</th><th>Transformation</th></tr></thead>
+      <tbody>
+      {% for c in correspondances if c.champ %}
+        <tr class="{% if not c.disponible %}text-sourdine{% endif %}">
+          <td><span class="font-mono font-semibold" title="{{ c.consigne }}">{{ c.champ }}</span></td>
+          <td class="text-contour">→</td>
+          <td>{% if c.variable %}<span class="font-mono font-semibold">{{ c.variable }}</span>{% if not c.disponible %} <span class="puce bg-rail text-sourdine">indisponible</span>{% endif %}{% else %}<span class="text-contour">—</span>{% endif %}</td>
+          <td class="text-[13px]">{{ c.transformation }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <h3 class="mb-0">Variables calculées ou fournies par un service</h3>
+    <div class="defilant"><table class="tableau">
+      <thead><tr><th>Variable</th><th>Source</th><th>Calcul</th></tr></thead>
+      <tbody>
+      {% for c in correspondances if not c.champ %}
+        <tr class="{% if not c.disponible %}text-sourdine{% endif %}">
+          <td class="font-mono font-semibold">{{ c.variable }}{% if not c.disponible %} <span class="puce bg-rail text-sourdine font-sans">indisponible</span>{% endif %}</td>
+          <td class="font-mono text-xs">{{ c.consigne }}</td>
+          <td class="text-[13px]">{{ c.transformation }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

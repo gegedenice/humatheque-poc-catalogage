@@ -70,10 +70,12 @@ def dewey() -> dict:
 # ---------------------------------------------------------------- scénario complet
 VLM = "https://vlm.test/v1/chat/completions"
 
+# Réponse du VLM avec le prompt de l'atelier (décision du 11/11) : capitales passées
+# en casse de phrase avec accents, noms de personnes en casse de phrase, sans civilité.
 EXTRACTION = {
-    "title": "CONTRIBUTION A L'ETUDE DE LA DEMOCRATIE EN AFRIQUE",
+    "title": "Contribution à l'étude de la démocratie en Afrique",
     "subtitle": None,
-    "author": "Jean-Daniel DUBOIS",
+    "author": "Jean-Daniel Dubois",
     "degree_type": "Thèse de doctorat",
     "discipline": "Science politique",
     "volume": None,
@@ -81,12 +83,11 @@ EXTRACTION = {
     "co_tutelle_institutions": [],
     "doctoral_school": None,
     "defense_year": "1998",
-    "advisor": ["Pr Marie-France de LA ROCHE"],
+    "advisor": ["Marie-France de La Roche"],
     "jury_president": None,
-    "reviewers": ["Luc PETIT"],
+    "reviewers": ["Luc Petit"],
     "committee_members": [],
     "language": "fre",
-    "abstract": None,
     "confidence": 0.9,
 }
 

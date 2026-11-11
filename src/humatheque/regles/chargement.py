@@ -16,10 +16,11 @@ import yaml
 from pydantic import ValidationError
 
 from humatheque.config import Reglages, reglages as reglages_par_defaut
-from humatheque.regles.modeles import EtapePipeline, Regles, Socle, Variable, Variante, ZoneRegle
+from humatheque.regles.modeles import EtapePipeline, FamilleAlerte, Regles, Socle, Variable, Variante, ZoneRegle
 
 FICHIER_VARIABLES = "variables.yaml"
 FICHIER_PIPELINE = "pipeline.yaml"
+FICHIER_ALERTES = "alertes.yaml"
 FICHIER_SOCLE = "notice/socle.yaml"
 DOSSIER_VARIANTES = "notice/variantes"
 
@@ -37,7 +38,7 @@ class ReglesInvalides(Exception):
 def fichiers_regles(dossier: Path) -> list[str]:
     """Chemins relatifs des fichiers de règles, dans l'ordre de lecture."""
     variantes = sorted(p.relative_to(dossier).as_posix() for p in (dossier / DOSSIER_VARIANTES).glob("*.yaml"))
-    return [FICHIER_VARIABLES, FICHIER_PIPELINE, FICHIER_SOCLE, *variantes]
+    return [FICHIER_VARIABLES, FICHIER_PIPELINE, FICHIER_ALERTES, FICHIER_SOCLE, *variantes]
 
 
 def lire_textes(dossier: Path) -> dict[str, str]:
@@ -114,6 +115,17 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
             except ValidationError as err:
                 problemes += _erreurs_pydantic(FICHIER_PIPELINE, f"étape {nom}", err)
 
+    # --- alertes.yaml
+    brut = _yaml(FICHIER_ALERTES, textes.get(FICHIER_ALERTES, "")) or {}
+    alertes: dict[str, FamilleAlerte] = {}
+    if _attendu(FICHIER_ALERTES, isinstance(brut, dict) and isinstance(brut.get("familles") or {}, dict),
+                "clé familles attendue", problemes):
+        for code, v in (brut.get("familles") or {}).items():
+            try:
+                alertes[str(code)] = FamilleAlerte.model_validate(v or {"libelle": str(code)})
+            except ValidationError as err:
+                problemes += _erreurs_pydantic(FICHIER_ALERTES, str(code), err)
+
     # --- notice/socle.yaml
     brut = _yaml(FICHIER_SOCLE, textes.get(FICHIER_SOCLE, ""))
     socle = Socle(zones=[], fichier=FICHIER_SOCLE)
@@ -144,6 +156,7 @@ def construire(textes: dict[str, str], *, emplacement: str) -> Regles:
     if problemes:
         raise ReglesInvalides(problemes)
     return Regles(variables=variables, communes=communes, etapes=etapes, socle=socle, variantes=variantes,
+                  alertes=alertes,
                   emplacement=emplacement, horodatage=datetime.now(UTC), empreinte=_empreinte(textes),
                   textes=dict(textes))
 

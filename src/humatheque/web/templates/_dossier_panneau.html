@@ -21,8 +21,8 @@
 
     {# ------------------------------------------------------------ notice #}
     <div role="tabpanel" id="volet-notice" aria-labelledby="onglet-notice" class="p-5 flex flex-col gap-4">
-      {% if d.alertes %}
-      <ul class="flex flex-wrap gap-1.5" aria-label="Alertes">{% for a in d.alertes %}<li class="puce bg-decision-clair text-decision-fonce font-medium">{{ a }}</li>{% endfor %}</ul>
+      {% if vue.alertes %}
+      {% with groupes = vue.alertes %}{% include "_alertes.html" %}{% endwith %}
       {% endif %}
 
       {% if editeur %}

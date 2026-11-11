@@ -297,3 +297,37 @@ def test_fragment_dossier_termine_recharge_la_page(client):
     dossier = _televerser(client).headers["location"]
     r = client.get(f"{dossier}/fragment", headers={"HX-Request": "true"})
     assert r.headers.get("HX-Refresh") == "true"
+
+
+@respx.mock
+def test_retours_et_documents_traites(client):
+    simuler()
+    dossier = _televerser(client).headers["location"]
+    page = html.unescape(client.get(dossier).text)
+    lot = page.split('href="/lots/')[1].split('"')[0]
+    assert "← Retour au lot" in page and "← Tous les lots" in page
+    assert "← Tous les lots" in html.unescape(client.get(f"/lots/{lot}").text)
+    lots = html.unescape(client.get("/lots").text)
+    assert "Documents traités" in lots and "dans les lots affichés" in lots
+
+
+def test_modele_choisi_remplace_celui_de_env():
+    from humatheque.extraction.fournisseurs import fournisseur
+    r = Reglages(_env_file=None)
+    assert fournisseur("hf", r).modele == r.hf_model
+    assert fournisseur("hf#Qwen/Qwen2.5-VL-7B-Instruct", r).modele == "Qwen/Qwen2.5-VL-7B-Instruct"
+
+
+@respx.mock
+def test_admin_modeles_par_fournisseur(client, app):
+    page = html.unescape(client.get("/admin").text)
+    assert "Modèles par fournisseur" in page and app.reglages.hf_model in page and "(.env)" in page
+    base = app.reglages.hf_api_url.rsplit("/chat/completions", 1)[0]
+    respx.get(f"{base}/models").respond(json={"data": [{"id": "Qwen/Qwen2.5-VL-7B-Instruct"}, {"id": app.reglages.hf_model}]})
+    options = client.get("/admin/modeles", params={"fournisseur": "hf"}).text
+    assert 'value="Qwen/Qwen2.5-VL-7B-Instruct"' in options and app.reglages.hf_model not in options  # déjà proposé
+    r = client.post("/admin/reglages", data={"fournisseur": "hf", "modele.hf": "Qwen/Qwen2.5-VL-7B-Instruct",
+                                            "auteur": "Camille"})
+    assert r.status_code == 303 and app.reglages_admin().modeles == {"hf": "Qwen/Qwen2.5-VL-7B-Instruct"}
+    assert app.fournisseur_effectif("hf") == ("hf", "Qwen/Qwen2.5-VL-7B-Instruct")
+    assert app.fournisseur_effectif("albert")[1] == app.reglages.albert_model

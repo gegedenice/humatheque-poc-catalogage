@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from humatheque.config import charger_yaml, reglages
 from humatheque.services.idref import AlignementIdref, AlignementOrganisations
-from humatheque.texte_unimarc import casse_complement_titre, casse_phrase, personne, titre_classement
+from humatheque.texte_unimarc import minuscule_initiale, personne, titre_classement
 
 
 @lru_cache
@@ -108,17 +108,12 @@ def construire(metadonnees: dict[str, Any], type_document: str,
             alertes.append(f"{champ}:{a}")
         return getattr(r, "valeur", r)
 
-    # Noms propres connus du document (personnes et organismes extraits)
-    noms_connus = [n for c in cfg["personnes"] + cfg["organismes"] for n in _liste(m.get(c))]
-
     # --- Personnes : listes de {forme, nom, prenom, ppn, statut_idref}
     for champ in cfg["personnes"]:
         alignements = res.personnes.get(champ, [])
         elements = []
         for i, brut in enumerate(_liste(m.get(champ))):
             p = personne(brut)
-            for a in p.alertes:
-                alertes.append(f"{champ}[{i + 1}]:{a}")
             journal.append(Transformation(champ=f"{champ}[{i + 1}]", fonction="personne", avant=brut,
                                           apres={"nom": p.nom, "prenom": p.prenom}, alertes=p.alertes,
                                           trace=p.trace))
@@ -131,9 +126,8 @@ def construire(metadonnees: dict[str, Any], type_document: str,
     orgs = res.organisations or AlignementOrganisations()
 
     def organisme(champ: str, brut: str, alignement: AlignementIdref | None) -> dict[str, Any]:
-        forme = noter(champ, "casse_phrase", brut, casse_phrase(brut, noms_connus))
         ppn, statut = _ppn(alignement)
-        return {"forme": forme, "ppn": ppn, "statut_idref": statut}
+        return {"forme": brut, "ppn": ppn, "statut_idref": statut}
 
     g = m.get("granting_institution")
     ctx["granting_institution"] = organisme("granting_institution", g, orgs.granting_institution) if g else None
@@ -145,14 +139,12 @@ def construire(metadonnees: dict[str, Any], type_document: str,
         for i, c in enumerate(_liste(m.get("co_tutelle_institutions")))]
 
     # --- Champs simples
-    titre = m.get("title")
-    ctx["title"] = noter("title", "casse_phrase", titre, casse_phrase(titre, noms_connus)) if titre else None
+    # Casse et accents : par le VLM (prompt) ; seuls le @ du titre et la minuscule
+    # initiale du sous-titre sont faits ici (décision du 11/11).
+    ctx["title"] = m.get("title")
     st = m.get("subtitle")
-    ctx["subtitle"] = [noter("subtitle", "casse_complement_titre", s, casse_complement_titre(s, noms_connus))
-                       for s in _liste(st)] if st else []
-    disc = m.get("discipline")
-    ctx["discipline"] = noter("discipline", "casse_phrase", disc, casse_phrase(disc, noms_connus)) if disc else None
-    for champ in ("degree_type", "language", "abstract", "volume"):
+    ctx["subtitle"] = [noter("subtitle", "minuscule_initiale", s, minuscule_initiale(s)) for s in _liste(st)] if st else []
+    for champ in ("discipline", "degree_type", "language", "abstract", "volume"):
         ctx[champ] = m.get(champ)
     annee = m.get("defense_year")
     if annee and not re.fullmatch(r"\d{4}", str(annee)):

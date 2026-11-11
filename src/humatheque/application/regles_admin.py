@@ -248,6 +248,24 @@ class AdministrationRegles:
                 raise ActionImpossible(f"opération « {operation} » inconnue")
         return self._ecrire_pipeline(etapes, auteur)
 
+    # -------------------------------------------------------------- alertes affichées
+    def vue_alertes(self: "Application") -> list[dict[str, Any]]:
+        from humatheque.application.alertes import EXEMPLES
+
+        return [{"code": c, "libelle": f.libelle, "afficher": f.afficher, "exemple": EXEMPLES.get(c, "")}
+                for c, f in self.regles.alertes.items()]
+
+    def enregistrer_alertes(self: "Application", familles: dict[str, dict[str, Any]], auteur: str
+                            ) -> EnregistrementRegles:
+        from humatheque.regles.chargement import FICHIER_ALERTES
+
+        texte = self.texte_regles(FICHIER_ALERTES)
+        entete = "".join(l + "\n" for l in texte.splitlines() if l.startswith("#"))
+        donnees = {"familles": {c: {"libelle": (v.get("libelle") or c).strip(), "afficher": bool(v.get("afficher"))}
+                                for c, v in familles.items()}}
+        return self.enregistrer_regles(FICHIER_ALERTES, entete + yaml.safe_dump(donnees, allow_unicode=True,
+                                                                                 sort_keys=False), auteur)
+
     def _ecrire_pipeline(self: "Application", etapes: dict[str, EtapePipeline], auteur: str) -> EnregistrementRegles:
         texte = self.texte_regles(FICHIER_PIPELINE)
         entete = "".join(l + "\n" for l in texte.splitlines() if l.startswith("#") or not l.strip()).split("\n\n")[0]

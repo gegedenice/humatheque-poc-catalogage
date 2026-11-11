@@ -34,8 +34,7 @@ humatheque-catalogage/
     config.py               settings pydantic (env), chemins, seuils
     cli.py                  serve | check-spec | run-url | run-batch | scan-minio | css
     ingestion/              lecture du bucket MinIO, constitution des documents (§3)
-    texte_unimarc/          normalisation de chaînes, « module NOR » du wiki (§4)
-      _vendor/reaccentue/   reaccentue vendorisé (+ dico/)
+    texte_unimarc/          titre de classement, sous-titre, nom / prénom (§4)
     extraction/             appel VLM multi-images, fournisseurs interchangeables
   config/prompts/           prompts d'extraction externalisés (VLM-T-005)
     contexte/               adaptateur extraction → Contexte + fonctions de calcul
@@ -134,105 +133,24 @@ mode 1. Les paramètres saisis s'appliquent à tous les documents du lot.
 
 ## 4. Package `texte_unimarc`
 
-Fonctions pures, sans réseau, testées par tables de cas. Chaque fonction
-renvoie `Resultat(valeur, alertes: list[str], trace: list[str])`.
+Décision du 11/11 : la réaccentuation par dictionnaire (reaccentue) et la mise
+en casse en Python étaient trop fragiles (« UNIVERSITE PARIS IX DAUPHINE »
+devenait « Université Paris ix Dauphiné »). La **normalisation lexicale est
+confiée au VLM** par le prompt (§5) : capitales → casse de phrase avec accents,
+noms de personnes en casse de phrase, civilités retirées. Le dictionnaire
+(25 Mo) et la commande `cache-reaccentue` sont retirés.
 
-### 4.1 Réaccentuation : `reaccentuer(texte) -> Resultat`
+Restent en Python, fonctions pures, listes dans `config/texte_unimarc.yaml` :
 
-- **Base** : https://github.com/cquest/reaccentue, à vendoriser dans
-  `_vendor/reaccentue/` (le code n'est pas un paquet pip).
-  - Remplacer les chemins relatifs `dico/...` par des chemins relatifs au module.
-  - Mettre le cache (`cache.pz`) dans `data/`.
-  - Construire le cache au build Docker.
-  - Le dépôt n'a pas de fichier LICENSE : le noter dans `_vendor/README.md`.
-- **Ne pas appeler `reaccentue.reaccentue()`.** Elle remplace les mots par
-  `str.replace` sur toute la chaîne, ce qui corrompt les sous-chaînes
-  (« DEMOCRATIE » devient « deMOCRÀTIE »). Elle ne gère pas l'élision et
-  produit une casse de titre (une majuscule à chaque mot, à la manière des noms
-  de rues), pas une casse de phrase.
-- **N'utiliser que son dictionnaire** `dico`, construit avec les mêmes règles :
-  - clé = forme majuscule sans accent ;
-  - valeur = liste des formes candidates ;
-  - les clés « mot_précédent mot » donnent des fréquences de bigrammes.
-- **Tokeniser soi-même** : mots, apostrophes d'élision (`L'`, `D'`, `QU'`…),
-  traits d'union, ponctuation. Ensuite, pour chaque mot :
-  - **un seul candidat** (une fois les candidats dédoublonnés en minuscules et
-    restreints à l'alphabet latin) : on le prend ;
-  - **plusieurs candidats** : on départage par la fréquence du bigramme avec le
-    mot précédent ;
-  - **égalité ou absence de données** : on garde la forme sans accent et on
-    ajoute l'alerte `accent_ambigu:<MOT>`.
-- **Noms propres** : construire un ensemble à partir des entrées en majuscule
-  initiale du `.dic` hunspell, chargé **avant** la réduction du dictionnaire.
-  - Un mot dont l'entrée n'existe qu'avec une majuscule (« Afrique ») garde sa
-    majuscule.
-  - Un mot dont l'entrée existe avec et sans majuscule (Rousseau / rousseau,
-    Pascal / pascal) passe en minuscule avec l'alerte `nom_propre_possible`,
-    **sauf** s'il figure parmi les noms propres connus du document
-    (personnes et organismes extraits).
-- **Ne s'applique qu'aux segments entièrement en capitales.** Un texte déjà en
-  casse mixte n'est pas modifié.
-
-Cas d'acceptation minimaux (vérifiés avec le dictionnaire de reaccentue) :
-
-| Entrée | Sortie de `casse_phrase` |
-|---|---|
-| `CONTRIBUTION A L'ETUDE DE LA DEMOCRATIE EN AFRIQUE` | `Contribution à l'étude de la démocratie en Afrique` |
-| `ECOLE PRATIQUE DES HAUTES ETUDES` | `École pratique des hautes études` |
-| `ETUDE DE L'ETE 1968` | `Étude de l'été 1968` |
-| `HISTOIRE DES ETATS-UNIS` | `Histoire des États-Unis` |
-| `Les paysans de Normandie` | inchangé |
-
-### 4.2 Casse
-
-- **`casse_phrase(texte)`** : réaccentuation, puis minuscules sauf noms propres,
-  puis majuscule sur le premier mot. S'applique aux zones 200$a, 328$c et 328$e.
-- **`casse_complement_titre(texte)`** : comme `casse_phrase`, mais le premier
-  mot reste en minuscule, sauf s'il s'agit d'un nom propre (règle ABES 200$e).
-  Chaque sous-titre (répétable) est traité séparément.
-
-### 4.3 Personnes : `personne(brut) -> Personne`
-
-`Personne = {forme, nom, prenom, alertes}`. Le VLM rend les noms **tels
-qu'imprimés** : casse d'origine, civilités comprises.
-
-1. Retirer les civilités et titres : Monsieur, Madame, Mademoiselle, M., Mme,
-   Mlle, Professeur, Pr, Pr., Dr, Docteur, Me…
-2. Séparer le nom du prénom **avant toute conversion de casse** :
-   - si une partie seulement des tokens est en capitales, ces tokens forment le nom ;
-   - si tout est en capitales ou tout en casse mixte, le dernier token est le
-     nom, en tenant compte des particules ; ajouter l'alerte `decoupage_heuristique`.
-3. Particules `de`, `d'`, `du`, `des`, `de la`, `van`, `von`… : suivre la
-   forme d'accès française (`$aLa Roche$bMarie-France de`). Ajouter l'alerte
-   `particule_a_verifier` tant que les catalogueurs n'ont pas validé ce traitement.
-4. Casse finale : chaque élément de nom ou de prénom commence par une majuscule,
-   y compris après un trait d'union (`Jean-Daniel`). Accent (décision du
-   05/11) : un mot imprimé en capitales sans accent reçoit l'accent si le
-   dictionnaire ne connaît qu'une forme de ce nom propre, accentuée
-   (`HELENE` → `Hélène`, alerte `accent_restitue`) ; sinon il reste sans
-   accent, avec l'alerte `accent_possible` s'il existe une forme accentuée.
-5. Forme retraitée (décision du 05/11) : `forme` = « Prénom Nom » après ces
-   traitements (`Monsieur le Professeur André GODIN` → `André Godin`) ; c'est
-   elle qu'utilisent 200$f et 200$g. La forme imprimée (civilités retirées)
-   est conservée pour la trace.
-
-| Entrée | `nom` | `prenom` | Alertes |
-|---|---|---|---|
-| `Jean-Daniel DUBOIS` | Dubois | Jean-Daniel | — |
-| `M. Jean-Daniel DUBOIS` | Dubois | Jean-Daniel | — |
-| `JEAN-DANIEL DUBOIS` | Dubois | Jean-Daniel | `decoupage_heuristique` |
-| `Pr Marie-France de LA ROCHE` | La Roche | Marie-France de | `particule_a_verifier` |
-
-### 4.4 Titre de classement : `titre_classement(titre, langue) -> Resultat`
-
-- Insérer `@` devant le premier mot significatif lorsque le titre commence par
-  un article. Le titre est déjà en casse de phrase à ce stade.
-- Une table d'articles par langue est fournie en configuration
-  (`fre, eng, ger, ita, spa` au départ).
-- L'élision ne prend pas d'espace : `L'@évolution des pratiques`.
-- Les autres articles sont suivis d'un espace : `Les @coraux tempérés`.
-- Si aucun article ne précède : pas de `@`.
-- Langue absente de la table : pas de `@`, et l'alerte `langue_sans_table_articles`.
+- **`titre_classement(titre, langue)`** : `@` devant le premier mot significatif
+  (article initial selon la langue ; élision sans espace : `L'@évolution`) ;
+- **`minuscule_initiale(sous_titre)`** : première lettre du sous-titre en
+  minuscule (200 $e), sauf sigle ou nombre romain en capitales ;
+- **`personne(brut)`** : découpage nom / prénom pour les zones d'autorité
+  ($a nom, $b prénom), sans changer l'écriture des mots : un bloc en capitales
+  est le nom, sinon le dernier mot ; particules (`de`, `d'`, `von` rejetées
+  après le prénom, `La`, `Du`… gardées en tête du nom) ; civilités résiduelles
+  retirées.
 
 ## 5. Extraction et contexte
 
@@ -248,24 +166,21 @@ qu'imprimés** : casse d'origine, civilités comprises.
     consolidation champ par champ, la première valeur non nulle dans l'ordre
     des images, les conflits étant signalés par l'alerte `extraction_divergente`).
   - **Prompt externalisé** (VLM-T-005) : `config/prompts/extraction_these.txt` et
-    `extraction_memoire.txt`, versionnés ; le nom et l'empreinte du prompt sont
-    enregistrés dans le dossier.
-  - **`abstract`** (VLM-T-002, ING-T-002) : ajouté au schéma d'extraction
-    (scalaire, null si absent), à `normalize_metadata` et au contexte.
-  - **Séparation extraction / normalisation** (VLM-T-003) : le prompt ne fait
-    que de l'extraction sémantique ; toute normalisation relève de
-    `texte_unimarc` (module NOR).
+    `extraction_memoire.txt`, versionnés et **modifiables dans l'interface**
+    (Administration › Prompts : vérification du schéma JSON, archive, journal) ;
+    le nom et l'empreinte du prompt sont enregistrés dans le dossier.
+  - **Prompts de l'atelier** (décision du 11/11) : retour aux prompts initiaux,
+    qui demandent au VLM la normalisation lexicale (« If source text is
+    written in all-caps, transform it into sentence case with French
+    accents », casse des noms de personnes, retrait des civilités). Le champ
+    `abstract` n'est plus demandé (VLM-T-002 : à rajouter dans le prompt si
+    besoin ; la variable `resume` est indisponible).
+  - **Modèle** : chaque fournisseur a son modèle dans `.env` ; l'administration
+    peut en choisir un autre parmi ceux que l'API du fournisseur déclare
+    (`GET …/models`) ; le choix est enregistré dans les paramètres du lot.
   - **Conservation de la sortie brute** (VLM-T-004) : le JSON renvoyé par le
     modèle est stocké tel quel dans le dossier avant toute normalisation.
 
-  Dans le prompt, **supprimer** :
-  - la règle « all-caps → sentence case » ;
-  - la règle de casse des noms de personnes ;
-  - la règle de retrait des civilités.
-
-  Ajouter à la place : « Transcribe every value exactly as printed (case,
-  accents, civilities). » La normalisation passe par `normalize_metadata`
-  (schéma v2).
 - **Contexte** : `contexte.construire(extraction_v2, saisie, resultats_services)`
   produit les valeurs normalisées du document (clés du schéma d'extraction et
   valeurs calculées) ; les **variables** lues par le générateur portent les
@@ -274,8 +189,11 @@ qu'imprimés** : casse d'origine, civilités comprises.
   (`extraction.defense_year`, `calcul`, `constante`, `service.dewey-classifier`) :
   l'adaptateur s'en sert pour passer des noms du schéma d'extraction aux noms
   des profils (une source non `extraction.*` porte le nom de la variable).
-  - **Champs simples** : on applique la casse du §4 selon le champ (`title` →
-    casse_phrase, `subtitle` → casse_complement_titre).
+  - **Champs simples** : repris tels que le VLM les écrit, sauf `subtitle`
+    (minuscule initiale, §4). Le champ `transformation` de `variables.yaml`
+    décrit, pour chaque variable, ce qui est fait entre le prompt et la notice ;
+    la page Administration › Prompts l'affiche à côté du prompt (« Du prompt à
+    la notice »).
   - **Personnes** (`type: personne`) : `{forme, nom, prenom, ppn, statut_idref}`,
     en liste si `liste: true` (`directeur`, `rapporteur`, `membre_jury`), seul
     sinon (`auteur`, `president`). `ppn` n'est renseigné que si l'alignement est
@@ -690,8 +608,15 @@ défaut sur la version générée.
   - **`/admin` Services et déclencheurs** (décisions du 05/11) : santé des
     services (alma, sudoc, idref, dewey, VLM, stockage S3, règles),
     réglages des lots automatiques (fournisseur, paramètres avancés ; proposés
-    aussi par défaut dans le formulaire), déclencheurs (§3.1), état du
-    planificateur.
+    aussi par défaut dans le formulaire), **modèles par fournisseur** (URL,
+    clé configurée ou non — jamais affichée —, modèle de `.env`, choix d'un
+    autre modèle dans la liste renvoyée par l'API du fournisseur ; décision du
+    11/11), déclencheurs (§3.1), état du planificateur.
+  - **`/admin/prompts` Prompts** (décision du 11/11) : prompt des thèses et des
+    mémoires dans l'éditeur, enregistrement vérifié (schéma JSON lisible),
+    archivé et journalisé ; à côté, « Du prompt à la notice » : champ du
+    schéma → variable de la notice → transformation, puis les variables
+    calculées ou fournies par un service.
   - **`/admin/regles` Studio de catalogage** (décisions du 08/11 et du 09/11) :
     - **Pipeline** : les étapes numérotées, chacune avec ce qu'elle lit et son
       arbre indenté (SI … ET … OU … SAUF … ⟶ résultat → étape suivante ;
@@ -702,6 +627,14 @@ défaut sur la version générée.
       éditeur de zone (sous-zones listées puis paramétrées : sorte de valeur,
       donnée, texte avant / après, plusieurs valeurs, si absente : omettre,
       repli, vérification humaine), aperçu immédiat ; rendu des autorités ;
+    - **Alertes** (décision du 11/11) : pour chaque famille d'alertes
+      (pipeline, zone obligatoire, conversion, année illisible, $ dans une
+      valeur, extraction divergente, document invalide, langue sans articles,
+      anciennes alertes, autres), le libellé affiché et si elle est montrée
+      (`regles/alertes.yaml`). Le dossier affiche les alertes regroupées
+      (« Non trouvé dans IdRef : Ivar Ekeland (président du jury), … ») ; elles
+      restent toutes dans le journal et le rapport CSV. Les anciennes alertes
+      (accents, mots inconnus, bouchon, proto-notice) sont masquées ;
     - **Banc d'essai** : un dossier réel (codes repris) ou l'exemple fictif
       avec des valeurs choisies → parcours du pipeline étape par étape,
       données préparées, notice avec la provenance de chaque zone ;
@@ -725,6 +658,9 @@ défaut sur la version générée.
   - le journal ;
   - l'export : CSV du rapport, et toutes les notices produites en ISO 2709 ou
     en UNIMARC/XML (collection) ;
+  - boutons « ← Retour au lot » et « ← Tous les lots » en tête du dossier, de
+    l'aperçu et du lot ; la page Lots indique aussi le nombre de **documents
+    traités** (lots affichés) ;
   - un seul bouton **« Voir »** par document, qui ouvre le dossier (décision
     du 09/11) ; l'aperçu en lecture seule reste accessible depuis le dossier.
 - **`/dossiers/{id}` Dossier** (mode 1, et cible de « Reprendre »). Mise en
@@ -784,8 +720,7 @@ défaut sur la version générée.
     `PLANIFICATION_CRON=`, `EVENEMENTS_DELAI=60` ;
   - `MOT_DE_PASSE=` (vide : pas d'authentification) ;
 - **Déploiement** :
-  - `Dockerfile` : image `python:3.12-slim` avec `uv` ; le cache reaccentue est
-    construit au build ; l'exécutable autonome Tailwind est téléchargé (version
+  - `Dockerfile` : image `python:3.12-slim` avec `uv` ; l'exécutable autonome Tailwind est téléchargé (version
     figée) et compile la feuille de style au build. En développement :
     `uv run humatheque css --watch` ;
   - `docker-compose.yml` : **un service** `app`, construit depuis le

@@ -1,64 +1,45 @@
-"""Découpage des personnes (SPEC §4.3)."""
+"""Découpage nom / prénom (SPEC §4.3). Décision du 11/11 : la casse, les accents et
+les civilités sont faits par le VLM ; ici, découpage seulement, sans changer
+l'écriture des mots (civilités résiduelles retirées)."""
 
 import pytest
 
 from humatheque.texte_unimarc import personne
 
 
-# Table du §4.3
-@pytest.mark.parametrize("brut, nom, prenom, alertes", [
-    ("Jean-Daniel DUBOIS", "Dubois", "Jean-Daniel", []),
-    ("M. Jean-Daniel DUBOIS", "Dubois", "Jean-Daniel", []),
-    ("JEAN-DANIEL DUBOIS", "Dubois", "Jean-Daniel", ["decoupage_heuristique"]),
-    ("Pr Marie-France de LA ROCHE", "La Roche", "Marie-France de", ["particule_a_verifier"]),
-])
-def test_table_spec(brut, nom, prenom, alertes):
-    p = personne(brut)
-    assert (p.nom, p.prenom, p.alertes) == (nom, prenom, alertes)
-
-
 @pytest.mark.parametrize("brut, nom, prenom", [
-    ("DUBOIS Jean-Daniel", "Dubois", "Jean-Daniel"),          # nom en tête
-    ("Jean D'ORMESSON", "Ormesson", "Jean d'"),               # particule élidée
-    ("JEAN DE LA FONTAINE", "La Fontaine", "Jean de"),        # tout en capitales + particules
-    ("Joachim du BELLAY", "Du Bellay", "Joachim"),            # article conservé en tête du nom
-    ("Madame Marie Curie", "Curie", "Marie"),                 # tout en casse mixte
-    ("J.-D. DUBOIS", "Dubois", "J.-D."),                      # initiales
-    ("Docteur Anne-Marie O'BRIEN", "O'Brien", "Anne-Marie"),
-    # Essai réel du 04/11
-    ("Monsieur le Professeur André GODIN", "Godin", "André"),
-    ("Madame la Professeure Anne LEROY", "Leroy", "Anne"),
-    ("le Professeur Jean MARTIN", "Martin", "Jean"),
-    ("Mr Giovanni Stevanin", "Stevanin", "Giovanni"),
+    # sortie attendue du VLM : casse de phrase, civilités retirées
+    ("Jean-Daniel Dubois", "Dubois", "Jean-Daniel"),
+    ("Marie-France de La Roche", "La Roche", "Marie-France de"),
+    ("Jean de La Fontaine", "La Fontaine", "Jean de"),
+    ("Joachim du Bellay", "du Bellay", "Joachim"),
+    ("Jean d'Ormesson", "Ormesson", "Jean d'"),
+    ("J.-D. Dubois", "Dubois", "J.-D."),
+    ("Anne-Marie O'Brien", "O'Brien", "Anne-Marie"),
+    # capitales laissées par le modèle : le bloc en capitales est le nom, sans recasse
+    ("Jean-Daniel DUBOIS", "DUBOIS", "Jean-Daniel"),
+    ("DUBOIS Jean-Daniel", "DUBOIS", "Jean-Daniel"),
+    # civilités résiduelles
+    ("M. Jean-Daniel Dubois", "Dubois", "Jean-Daniel"),
+    ("Monsieur le Professeur André Godin", "Godin", "André"),
+    ("Madame la Professeure Anne Leroy", "Leroy", "Anne"),
 ])
-def test_decoupages(brut, nom, prenom):
+def test_decoupage(brut, nom, prenom):
     p = personne(brut)
     assert (p.nom, p.prenom) == (nom, prenom)
+    assert p.alertes == []  # plus d'alertes de découpage ni d'accents
 
 
-def test_forme_retraitee_et_forme_imprimee():  # décision du 05/11 : 200$f, 200$g
-    p = personne("M. Jean-Daniel DUBOIS")
-    assert (p.forme, p.forme_imprimee) == ("Jean-Daniel Dubois", "Jean-Daniel DUBOIS")
-    assert personne("Monsieur le Professeur André GODIN").forme == "André Godin"
-    assert personne("Pr Marie-France de LA ROCHE").forme == "Marie-France de La Roche"
-    assert personne("Jean D'ORMESSON").forme == "Jean d'Ormesson"
-    assert personne("DUBOIS").forme == "Dubois"
+def test_forme_sans_civilite_ni_recasse():
+    p = personne("Pr Marie-France de La Roche")
+    assert p.forme == "Marie-France de La Roche"
+    assert personne("Ivar EKELAND").forme == "Ivar EKELAND"  # l'écriture est celle du VLM
 
 
 def test_article_non_civilite_conserve():
-    # « La » n'est retiré que suivi d'une civilité
-    assert personne("LA FONTAINE Jean").nom == "La Fontaine"
-
-
-def test_accent_restitue_si_forme_unique():  # décision du 05/11
-    p = personne("HELENE MARTIN")
-    assert (p.prenom, p.forme) == ("Hélène", "Hélène Martin")
-    assert "accent_restitue:HELENE" in p.alertes
-    # imprimé en casse mixte : rien n'est modifié
-    q = personne("Helene MARTIN")
-    assert q.prenom == "Helene" and not any(a.startswith("accent_") for a in q.alertes)
+    assert personne("Le Goff Jacques").forme == "Le Goff Jacques"
 
 
 def test_personne_vide():
-    assert personne("  ").alertes == ["personne_vide"]
-    assert personne("Monsieur").nom == ""
+    p = personne("Monsieur")
+    assert (p.nom, p.prenom, p.forme) == ("", "", "")
