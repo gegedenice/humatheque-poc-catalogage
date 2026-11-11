@@ -615,8 +615,12 @@ défaut sur la version générée.
   - **`/admin/prompts` Prompts** (décision du 11/11) : prompt des thèses et des
     mémoires dans l'éditeur, enregistrement vérifié (schéma JSON lisible),
     archivé et journalisé ; à côté, « Du prompt à la notice » : champ du
-    schéma → variable de la notice → transformation, puis les variables
-    calculées ou fournies par un service.
+    schéma → variable de la notice → transformation, **modifiable** (nom de
+    la variable, liste, active ; réécrit `regles/variables.yaml` après
+    vérification), puis les variables calculées ou fournies par un service.
+    Un champ ajouté au prompt (ex. `abstract`) est conservé par l'extraction
+    et transmis tel quel au contexte : il suffit de lui donner une variable
+    active pour l'utiliser dans le studio (ex. zone 330 $a).
   - **`/admin/regles` Studio de catalogage** (décisions du 08/11 et du 09/11) :
     - **Pipeline** : les étapes numérotées, chacune avec ce qu'elle lit et son
       arbre indenté (SI … ET … OU … SAUF … ⟶ résultat → étape suivante ;

@@ -36,7 +36,8 @@ def _liste(v: Any) -> list[str]:
 def normaliser_metadonnees(extraction: dict[str, Any]) -> dict[str, Any]:
     """`metadata.normalize_metadata` du POC (schéma v2) + `abstract` : structure seulement."""
     cfg = _cfg()
-    m = {champ: extraction.get(champ) for champ in cfg["champs_extraction"]}
+    # Champs connus, plus tout champ ajouté au prompt (Administration › Prompts)
+    m = {champ: extraction.get(champ) for champ in dict.fromkeys([*cfg["champs_extraction"], *extraction])}
     for champ in cfg["multivalues"]:
         m[champ] = _liste(m.get(champ))
     for champ in cfg["personnes"]:
@@ -151,6 +152,10 @@ def construire(metadonnees: dict[str, Any], type_document: str,
         alertes.append(f"defense_year:annee_invalide:{annee}")
         annee = None
     ctx["defense_year"] = annee
+
+    # --- Champs ajoutés au prompt : transmis tels quels (variable source extraction.<champ>)
+    for champ, v in m.items():
+        ctx.setdefault(champ, v)
 
     # --- Valeurs calculées
     ctx["titre_classement"] = (noter("titre_classement", "titre_classement", ctx["title"],

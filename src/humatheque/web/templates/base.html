@@ -9,7 +9,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titre %}Catalogage assisté{% endblock %} · humatheque</title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ v_css }}">
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/js/app.js" defer></script>
   {# Îlots chargés sur toutes les pages : la navigation hx-boost ne remplace que le body
@@ -19,7 +19,7 @@
   <script src="/static/js/visionneuse.js" defer></script>
   <script src="/static/vendor/monaco/vs/loader.js" defer></script>
   <script src="/static/js/editeur.js" defer></script>
-  <script src="/static/js/editeur-regles.js" defer></script>
+  <script src="/static/js/editeur-regles.js?v={{ v_js }}" defer></script>
   {% block tete %}{% endblock %}
 </head>
 <body hx-boost="true" class="min-h-screen md:flex">

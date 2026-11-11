@@ -40,6 +40,11 @@ class Correspondance(BaseModel):
     variable: str | None = None
     transformation: str = ""
     disponible: bool = True
+    type: str = "texte"
+    liste: bool = False
+    description: str = ""
+    type_fixe: bool = Field(False, description="personne / organisme : traitement prévu dans le code")
+    present: bool = Field(True, description="champ demandé par au moins un prompt")
 
 
 class VuePrompt(BaseModel):
@@ -135,19 +140,77 @@ class Prompts:
                 par_champ.setdefault(v.source[len(prefixe):], []).append((nom, v))
             else:
                 autres.append((nom, v))
+        from humatheque.config import charger_yaml
+
+        ctx = charger_yaml("contexte")
+        fixes = {**{c: "personne" for c in ctx["personnes"]}, **{c: "organisme" for c in ctx["organismes"]}}
         lignes = []
+
+        def ligne(champ: str, consigne: str, nom: str | None, v: Any, present: bool) -> Correspondance:
+            return Correspondance(
+                champ=champ, consigne=consigne, variable=nom, present=present,
+                transformation=(v.transformation if v else "") or ("—" if v is None else "aucune"),
+                disponible=v.disponible if v else False, type=fixes.get(champ, v.type if v else "texte"),
+                liste=v.liste if v else champ in ctx["multivalues"], description=v.description if v else "",
+                type_fixe=champ in fixes)
+
         for champ, consigne in consignes.items():
             for nom, v in par_champ.get(champ) or [(None, None)]:
-                lignes.append(Correspondance(champ=champ, consigne=consigne, variable=nom,
-                                             transformation=(v.transformation if v else "")
-                                             or ("non utilisé dans la notice" if v is None else "aucune"),
-                                             disponible=v.disponible if v else True))
+                lignes.append(ligne(champ, consigne, nom, v, True))
         for champ, liste in par_champ.items():  # variables d'extraction dont le champ n'est plus demandé
             if champ not in consignes:
                 for nom, v in liste:
-                    lignes.append(Correspondance(champ=champ, consigne="(champ absent des prompts)", variable=nom,
-                                                 transformation=v.transformation or "—", disponible=False))
+                    lignes.append(ligne(champ, "(champ absent des prompts)", nom, v, False))
         for nom, v in autres:
             lignes.append(Correspondance(variable=nom, transformation=v.transformation or v.description,
                                          consigne=v.source, disponible=v.disponible))
         return lignes
+
+    def enregistrer_variables(self: "Application", lignes: list[dict[str, Any]], auteur: str):
+        """Variables tirées des champs du prompt (« Du prompt à la notice ») : nom, type, liste,
+        disponible, description ; réécrit regles/variables.yaml (vérifié, archivé, journalisé).
+        Une ligne sans nom de variable retire la variable de ce champ."""
+        import re
+
+        import yaml
+
+        from humatheque.regles.chargement import FICHIER_VARIABLES
+
+        prefixe = "extraction."
+        actuelles = {n: v for n, v in self.regles.variables.items()}
+        nouvelles: dict[str, Any] = {}
+        traites: set[str] = set()
+        for l in lignes:
+            champ, nom = str(l.get("champ") or "").strip(), str(l.get("variable") or "").strip()
+            ancien = str(l.get("ancien") or "").strip()
+            if ancien:
+                traites.add(ancien)
+            if not nom:
+                continue
+            if not re.fullmatch(r"[a-z][a-z0-9_]*", nom):
+                raise ActionImpossible(f"nom de variable « {nom} » : minuscules, chiffres et _ seulement")
+            if nom in nouvelles:
+                raise ActionImpossible(f"variable « {nom} » utilisée pour deux champs")
+            avant = actuelles.get(ancien) or actuelles.get(nom)
+            nouvelles[nom] = {
+                "source": f"{prefixe}{champ}",
+                **({"type": l["type"]} if l.get("type") in ("personne", "organisme") else {}),
+                **({"liste": True} if l.get("liste") else {}),
+                **({} if l.get("disponible") else {"disponible": False}),
+                "transformation": (avant.transformation if avant and avant.transformation else "aucune"),
+                "description": str(l.get("description") or "").strip() or (avant.description if avant else ""),
+            }
+            traites.add(nom)
+        # ordre : celui du fichier pour les variables existantes, nouvelles à la fin
+        sortie: dict[str, Any] = {}
+        for n, v in actuelles.items():
+            if n in nouvelles:
+                sortie[n] = nouvelles.pop(n)
+            elif n not in traites:
+                sortie[n] = v.model_dump(exclude={"nom"}, exclude_defaults=True)
+        sortie.update(nouvelles)
+        texte = self.texte_regles(FICHIER_VARIABLES)
+        entete = "".join(x + "\n" for x in texte.splitlines() if x.startswith("#"))
+        corps = "".join(f"{n}: " + yaml.safe_dump(v, allow_unicode=True, default_flow_style=True, sort_keys=False,
+                                                  width=10_000).strip() + "\n" for n, v in sortie.items())
+        return self.enregistrer_regles(FICHIER_VARIABLES, entete + "\n" + corps, auteur)
