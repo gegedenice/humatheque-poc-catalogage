@@ -25,7 +25,7 @@
       <input type="hidden" name="nom" value="{{ prompt.nom }}">
       <label class="sr-only" for="regles-texte">Texte du prompt</label>
       <textarea class="champ font-mono text-xs h-[65vh]" id="regles-texte" name="texte" spellcheck="false">{{ texte if texte is defined and texte else prompt.texte }}</textarea>
-      <div id="editeur-regles" data-cible="regles-texte" class="h-[65vh] border border-filet rounded-2xl overflow-hidden" hidden></div>
+      <div id="editeur-regles" data-cible="regles-texte" class="border border-filet rounded-2xl overflow-hidden" style="height: 65vh; min-height: 420px" hidden></div>
       <div class="flex flex-wrap items-center gap-3 justify-end">
         <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-44 rounded-full" name="auteur" value="{{ auteur }}" required></label>
         <button class="btn-principal">Enregistrer</button>
@@ -43,19 +43,33 @@
   <section class="carte flex-[1_1_480px] min-w-0 flex flex-col gap-3 lg:sticky lg:top-3">
     <h2 class="mb-0">Du prompt à la notice</h2>
     <p class="text-[13px] text-sourdine">À gauche, les champs demandés au VLM ; à droite, les variables qu'en tire le démonstrateur et que l'on retrouve dans le <a href="/admin/regles?onglet=notice">studio › Notice UNIMARC</a>.</p>
-    <div class="defilant"><table class="tableau">
-      <thead><tr><th>Champ du prompt</th><th></th><th>Variable de la notice</th><th>Transformation</th></tr></thead>
-      <tbody>
-      {% for c in correspondances if c.champ %}
-        <tr class="{% if not c.disponible %}text-sourdine{% endif %}">
-          <td><span class="font-mono font-semibold" title="{{ c.consigne }}">{{ c.champ }}</span></td>
-          <td class="text-contour">→</td>
-          <td>{% if c.variable %}<span class="font-mono font-semibold">{{ c.variable }}</span>{% if not c.disponible %} <span class="puce bg-rail text-sourdine">indisponible</span>{% endif %}{% else %}<span class="text-contour">—</span>{% endif %}</td>
-          <td class="text-[13px]">{{ c.transformation }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table></div>
+    {% if variables_enregistrees %}<p class="avis bg-auto-clair text-auto-fonce">✓ Variables enregistrées : elles sont proposées dans le studio › Notice UNIMARC.</p>{% endif %}
+    {% if refus_variables %}<div class="carte-alerte">{% if refus_variables is string %}{{ refus_variables }}{% else %}<h3 class="mb-2">Modification refusée</h3>{% with rapport = refus_variables %}{% include "_regles_rapport.html" %}{% endwith %}{% endif %}</div>{% endif %}
+    <form method="post" action="/admin/prompts/variables" hx-boost="false" class="flex flex-col gap-3">
+      <input type="hidden" name="nom" value="{{ prompt.nom }}">
+      <div class="defilant"><table class="tableau">
+        <thead><tr><th>Champ du prompt</th><th>Variable de la notice · transformation</th><th title="plusieurs valeurs">Liste</th><th title="utilisable dans la notice">Active</th></tr></thead>
+        <tbody>
+        {% for c in correspondances if c.champ %}{% set i = loop.index0 %}
+          <tr class="{% if not c.disponible %}text-sourdine{% endif %}">
+            <td class="align-top"><span class="font-mono font-semibold" title="{{ c.consigne }}">{{ c.champ }}</span>
+              {% if not c.present %}<span class="block text-xs text-decision-fonce">absent des prompts</span>{% endif %}
+              <input type="hidden" name="l-{{ i }}-champ" value="{{ c.champ }}"><input type="hidden" name="l-{{ i }}-ancien" value="{{ c.variable or '' }}">
+              <input type="hidden" name="l-{{ i }}-type" value="{{ c.type }}"></td>
+            <td class="align-top"><input class="champ champ-sm font-mono w-full min-w-[10rem]" name="l-{{ i }}-variable" value="{{ c.variable or '' }}" placeholder="(aucune)" pattern="[a-z][a-z0-9_]*" aria-label="variable pour {{ c.champ }}">
+              <span class="block text-xs text-sourdine mt-1">{% if c.type != "texte" %}{{ c.type }} · {% endif %}{{ c.transformation }}</span></td>
+            <td class="align-top text-center"><input type="checkbox" class="accent-primaire w-4 h-4 mt-2" name="l-{{ i }}-liste" value="1" {% if c.liste %}checked{% endif %} aria-label="liste {{ c.champ }}"></td>
+            <td class="align-top text-center"><input type="checkbox" class="accent-primaire w-4 h-4 mt-2" name="l-{{ i }}-disponible" value="1" {% if c.disponible %}checked{% endif %} aria-label="active {{ c.champ }}"></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      <p class="text-xs text-sourdine">Pour un champ ajouté au prompt (ex. <span class="font-mono">abstract</span>) : donnez un nom de variable et cochez « Active » ; elle devient utilisable dans le studio (sous-zone « Donnée du document »). Un champ sans variable n'est pas repris dans la notice.</p>
+      <div class="flex items-center gap-2 justify-end">
+        <label class="text-sm text-sourdine flex items-center gap-2">Catalogueur <input class="champ champ-sm w-40 rounded-full" name="auteur" value="{{ auteur }}" required></label>
+        <button class="btn-principal btn-sm">Enregistrer les variables</button>
+      </div>
+    </form>
     <h3 class="mb-0">Variables calculées ou fournies par un service</h3>
     <div class="defilant"><table class="tableau">
       <thead><tr><th>Variable</th><th>Source</th><th>Calcul</th></tr></thead>

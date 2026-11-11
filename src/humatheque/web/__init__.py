@@ -81,7 +81,19 @@ def _libelle_routage(routage: str | None) -> str:
     return LIBELLES_ROUTAGE.get(r or "", r or "—")
 
 
-gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=_libelle_routage)
+def _version_statique(chemin: str) -> str:
+    """Empreinte courte d'un fichier statique : l'URL change quand le fichier change
+    (sinon le navigateur garde l'ancienne feuille de style en cache)."""
+    import hashlib
+
+    try:
+        return hashlib.sha256((ICI / "static" / chemin).read_bytes()).hexdigest()[:10]
+    except OSError:
+        return "0"
+
+
+gabarits.env.globals.update(classe_routage=_classe_routage, libelle_routage=_libelle_routage,
+                            v_css=_version_statique("css/app.css"), v_js=_version_statique("js/editeur-regles.js"))
 gabarits.env.filters["date"] = lambda d, f="%d/%m %H:%M": d.astimezone().strftime(f) if d else ""
 
 

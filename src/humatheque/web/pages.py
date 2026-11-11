@@ -325,10 +325,11 @@ def administration(request: Request):
 
 
 @routeur.get("/admin/prompts")
-def page_prompts(request: Request, nom: str = "extraction_these.txt", enregistre: str = ""):
+def page_prompts(request: Request, nom: str = "extraction_these.txt", enregistre: str = "", variables: str = ""):
     a = _app(request)
     return _rendre(request, "admin_prompts.html", prompts=a.prompts(), prompt=a.prompt(nom),
-                   correspondances=a.correspondances(), journal=a.journal_prompts(), enregistre=enregistre)
+                   correspondances=a.correspondances(), journal=a.journal_prompts(), enregistre=enregistre,
+                   variables_enregistrees=bool(variables))
 
 
 @routeur.post("/admin/prompts")
@@ -343,6 +344,29 @@ def enregistrer_prompt(request: Request, nom: Annotated[str, Form()], texte: Ann
         r.status_code = 422
         return r
     return _rediriger(f"/admin/prompts?nom={nom}&enregistre=1", auteur)
+
+
+@routeur.post("/admin/prompts/variables")
+async def enregistrer_variables(request: Request):
+    from humatheque.application import ReglesRefusees
+
+    a = _app(request)
+    f = await request.form()
+    nom = str(f.get("nom") or "extraction_these.txt")
+    auteur = _auteur(str(f.get("auteur") or ""))
+    indices = sorted({int(k.split("-")[1]) for k in f.keys() if k.startswith("l-") and k.split("-")[1].isdigit()})
+    lignes = [{"champ": f.get(f"l-{i}-champ"), "ancien": f.get(f"l-{i}-ancien"), "variable": f.get(f"l-{i}-variable"),
+               "type": f.get(f"l-{i}-type"), "liste": f.get(f"l-{i}-liste") == "1",
+               "disponible": f.get(f"l-{i}-disponible") == "1"} for i in indices]
+    try:
+        a.enregistrer_variables(lignes, auteur)
+    except (ReglesRefusees, ActionImpossible) as e:
+        r = _rendre(request, "admin_prompts.html", prompts=a.prompts(), prompt=a.prompt(nom),
+                    correspondances=a.correspondances(), journal=a.journal_prompts(), enregistre="",
+                    refus_variables=getattr(e, "rapport", None) or str(e))
+        r.status_code = 422
+        return r
+    return _rediriger(f"/admin/prompts?nom={nom}&variables=1", auteur)
 
 
 @routeur.get("/admin/modeles")

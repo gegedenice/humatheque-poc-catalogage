@@ -250,3 +250,68 @@ def test_alerte_idref_dans_le_dossier(client, app):
     page = _txt(client.get(dossier))
     assert "Non trouvé dans IdRef</span> : Jean-Daniel Dubois (auteur)" in page
     assert "pipeline:idref" not in page.split("volet-journal")[0]  # code brut : seulement au journal
+
+
+def _avec_config(tmp_path):
+    import shutil
+    from conftest import RACINE
+    shutil.copytree(RACINE / "config", tmp_path / "config", dirs_exist_ok=True)
+
+
+@respx.mock
+def test_champ_ajoute_au_prompt_jusqu_a_la_notice(client, app, tmp_path):
+    """abstract ajouté au prompt → variable resume activée → zone 330 → notice (ING-T-002, VLM-T-002)."""
+    _avec_config(tmp_path)
+    p = app.prompt("extraction_these.txt")
+    texte = p.texte.replace('"language":', '"abstract": "Abstract of the thesis, if present",\n  "language":')
+    assert client.post("/admin/prompts", data={"nom": p.nom, "texte": texte, **AUTEUR}).status_code == 303
+    page = _txt(client.get("/admin/prompts"))
+    assert 'name="l-' in page and "abstract" in page
+    lignes = [c for c in app.correspondances() if c.champ]
+    i = next(i for i, c in enumerate(lignes) if c.champ == "abstract")
+    donnees = {"nom": p.nom, **AUTEUR}
+    for k, c in enumerate(lignes):
+        donnees |= {f"l-{k}-champ": c.champ, f"l-{k}-ancien": c.variable or "", f"l-{k}-variable": c.variable or "",
+                    f"l-{k}-type": c.type}
+        if c.liste:
+            donnees[f"l-{k}-liste"] = "1"
+        if c.disponible or k == i:
+            donnees[f"l-{k}-disponible"] = "1"
+    assert client.post("/admin/prompts/variables", data=donnees).status_code == 303
+    assert app.regles.variables["resume"].disponible
+    # zone 330 activée dans le socle, liée à la variable resume
+    from humatheque.regles.modeles import ZoneRegle
+    z = ZoneRegle.model_validate({"id": "330", "zone": "330", "libelle": "Résumé", "indicateurs": "##",
+                                  "sous_zones": [{"code": "a", "variable": "resume"}]})
+    app.enregistrer_zone("socle", "330", z, "socle", "C")
+    import services_simules as sim
+    from humatheque.contexte import construire, normaliser_metadonnees, variables_profil
+    from humatheque.regles.notice import generer
+    m = normaliser_metadonnees(sim.EXTRACTION | {"abstract": "Cette thèse étudie la démocratie."})
+    v = variables_profil(construire(m, "these").valeurs, app.regles)
+    assert "330 ##$aCette thèse étudie la démocratie." in [x.texte() for x in generer(app.regles, "these-originale-imprimee", v).zones]
+
+
+def test_nouvelle_variable_pour_un_champ_nouveau(client, app):
+    lignes = [c for c in app.correspondances() if c.champ]
+    donnees = {"nom": "extraction_these.txt", **AUTEUR}
+    for k, c in enumerate(lignes):
+        donnees |= {f"l-{k}-champ": c.champ, f"l-{k}-ancien": c.variable or "", f"l-{k}-variable": c.variable or "",
+                    f"l-{k}-type": c.type, **({f"l-{k}-disponible": "1"} if c.disponible else {}),
+                    **({f"l-{k}-liste": "1"} if c.liste else {})}
+    k = len(lignes)
+    donnees |= {f"l-{k}-champ": "keywords", f"l-{k}-variable": "mots_cles", f"l-{k}-liste": "1",
+                f"l-{k}-disponible": "1"}
+    assert client.post("/admin/prompts/variables", data=donnees).status_code == 303
+    v = app.regles.variables["mots_cles"]
+    assert (v.source, v.liste, v.disponible) == ("extraction.keywords", True, True)
+    # renommer une variable utilisée dans la notice : refusé par le vérificateur
+    j = next(j for j, c in enumerate(lignes) if c.champ == "subtitle")  # sous_titre : utilisée en 200 $e
+    donnees[f"l-{j}-variable"] = "sous_titre_renomme"
+    r = client.post("/admin/prompts/variables", data=donnees)
+    assert r.status_code == 422 and "variable inconnue" in _txt(r)
+
+
+def test_feuille_de_style_versionnee(client):
+    page = client.get("/admin/prompts").text
+    assert '/static/css/app.css?v=' in page and 'style="height: 65vh' in page
