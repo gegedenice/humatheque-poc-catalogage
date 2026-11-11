@@ -59,6 +59,8 @@ class VueRegles(BaseModel):
     variables: list[dict[str, Any]]
     fichiers: list[str]
     journal: list[EntreeJournalRegles] = Field(default_factory=list)
+    # étape → (peut monter, peut descendre) : blocs déplaçables dans leur groupe
+    mobilite: dict[str, tuple[bool, bool]] = Field(default_factory=dict)
 
 
 class Parcours(BaseModel):
@@ -134,7 +136,7 @@ class AdministrationRegles:
                      for n, v in r.variables.items()]
         return VueRegles(version=r.version, emplacement=r.emplacement, rapport=self._rapport, communes=r.communes,
                          etapes=list(r.etapes.values()), resultats=RESULTATS, profils=profils, variables=variables,
-                         fichiers=list(r.textes), journal=self.journal_regles())
+                         fichiers=list(r.textes), journal=self.journal_regles(), mobilite=_mobilite(list(r.etapes)))
 
     def fichiers_regles(self: "Application") -> dict[str, str]:
         """Textes des fichiers de règles tels que chargés (API GET /api/v1/regles)."""
@@ -265,6 +267,26 @@ class AdministrationRegles:
                                 for c, v in familles.items()}}
         return self.enregistrer_regles(FICHIER_ALERTES, entete + yaml.safe_dump(donnees, allow_unicode=True,
                                                                                  sort_keys=False), auteur)
+
+    def deplacer_etape(self: "Application", etape: str, operation: str, auteur: str) -> EnregistrementRegles:
+        """Monte ou descend une étape (un bloc) du pipeline, à l'intérieur de son groupe
+        (vérifications : provenance, alma, sudoc ; enrichissements : idref, dewey). L'ordre
+        du fichier est l'ordre d'exécution du workflow."""
+        from humatheque.regles.modeles import GROUPES_ETAPES
+
+        noms = list(self.regles.etapes)
+        if etape not in noms:
+            raise Introuvable(f"étape {etape}")
+        if operation not in ("monter", "descendre"):
+            raise ActionImpossible(f"opération « {operation} » inconnue")
+        i = noms.index(etape)
+        j = i + (-1 if operation == "monter" else 1)
+        groupe = next((g for g in GROUPES_ETAPES if etape in g), [etape])
+        if not 0 <= j < len(noms) or noms[j] not in groupe:
+            raise ActionImpossible(f"{self.regles.etapes[etape].libelle} ne peut pas sortir de son groupe "
+                                   f"({', '.join(groupe)})")
+        noms[i], noms[j] = noms[j], noms[i]
+        return self._ecrire_pipeline({n: self.regles.etapes[n] for n in noms}, auteur)
 
     def _ecrire_pipeline(self: "Application", etapes: dict[str, EtapePipeline], auteur: str) -> EnregistrementRegles:
         texte = self.texte_regles(FICHIER_PIPELINE)
@@ -486,3 +508,14 @@ class ReglesRefusees(ActionImpossible):
         super().__init__("modification refusée par le vérificateur : "
                          + "; ".join(f"{c.table} {c.ligne} : {c.message}".replace("  ", " ") for c in rapport.erreurs),
                          details=rapport.erreurs)
+
+
+def _mobilite(noms: list[str]) -> dict[str, tuple[bool, bool]]:
+    """Une étape monte (descend) si sa voisine est dans le même groupe (GROUPES_ETAPES)."""
+    from humatheque.regles.modeles import GROUPES_ETAPES
+
+    def meme(a: str, b: str) -> bool:
+        return any(a in g and b in g for g in GROUPES_ETAPES)
+
+    return {n: (i > 0 and meme(n, noms[i - 1]), i + 1 < len(noms) and meme(n, noms[i + 1]))
+            for i, n in enumerate(noms)}

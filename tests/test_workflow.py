@@ -123,9 +123,11 @@ def test_s06_conversion_copie_puis_arret(workflow):
 def test_provenance_ambigue_arret_puis_reprise(workflow):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     d = workflow.executer(dossier())
-    # Provenance ambiguë : STOP – à reprendre avant Alma
+    # Provenance ambiguë (étape placée après Alma) : STOP – à reprendre avant Sudoc
     assert (d.routage, d.etape_arret) == ("à reprendre", "provenance")
-    assert d.decision.situation == "Provenance › type = these ET ephe = absent OU ambigu" and not routes["alma"].called
+    assert d.decision.situation == "Provenance › type = these ET ephe = absent OU ambigu"
+    assert routes["alma"].call_count == 1 and not routes["sudoc"].called
+    assert d.ordre[:4] == ["extraction", "alma", "provenance", "sudoc"]
 
     choisir_provenance(d, "EPHE", auteur="catalogueur", commentaire="EPHE, section IV")
     workflow.executer(d)

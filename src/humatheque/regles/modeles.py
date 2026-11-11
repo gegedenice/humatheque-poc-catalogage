@@ -28,6 +28,11 @@ class Variable(BaseModel):
 # ------------------------------------------------------------------ pipeline (étapes et arbre de décision)
 Resultat = Literal["stop", "stop à reprendre", "conversion", "poursuite", "poursuite avec alerte",
                    "poursuite à reprendre", "création"]
+# Ordre des étapes du pipeline (décision du 11/11) : l'ordre du fichier fait foi à
+# l'intérieur de chaque groupe ; les groupes se suivent toujours dans cet ordre
+# (vérifications avant la notice à produire, enrichissements après, création à la fin).
+GROUPES_ETAPES: list[list[str]] = [["provenance", "alma", "sudoc"], ["idref", "dewey"], ["creation"]]
+
 RESULTATS: dict[str, str] = {
     "stop": "le traitement s'arrête : rien à faire (terminé)",
     "stop à reprendre": "le traitement s'arrête pour une vérification manuelle (à reprendre)",

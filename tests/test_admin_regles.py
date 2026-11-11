@@ -177,7 +177,7 @@ def test_api_regles(client):
     assert r["rapport"]["nb_erreurs"] == 0
     c = client.post("/api/v1/regles/pipeline", json={"valeurs": {
         "type": "these", "ephe": "oui", "alma.status": "academic_record_found"}}).json()
-    assert [e["etape"] for e in c["etapes"]] == ["provenance", "alma"] and c["etapes"][-1]["resultat"] == "stop"
+    assert [e["etape"] for e in c["etapes"]] == ["alma"] and c["etapes"][-1]["resultat"] == "stop"
     assert c["issue"] == "terminé"
     a = client.post("/api/v1/regles/apercu", json={"profil": "memoire-original-imprime"}).json()
     assert "701 #1$3026594803$4003" in a["texte"]
@@ -315,3 +315,27 @@ def test_nouvelle_variable_pour_un_champ_nouveau(client, app):
 def test_feuille_de_style_versionnee(client):
     page = client.get("/admin/prompts").text
     assert '/static/css/app.css?v=' in page and 'style="height: 65vh' in page
+
+
+# ---------------------------------------------------------------- ordre des étapes (blocs)
+def test_deplacer_un_bloc_change_l_ordre_d_execution(client, app):
+    """Décision du 11/11 : les étapes se déplacent dans leur groupe ; l'ordre du fichier
+    est l'ordre d'exécution du workflow."""
+    from humatheque.workflow.modeles import ordre_etapes
+
+    assert list(app.regles.etapes)[:3] == ["alma", "provenance", "sudoc"]
+    page = _txt(client.get("/admin/regles?onglet=pipeline"))
+    assert "Monter l'étape Provenance" in page
+    r = client.post("/admin/regles/etape/operation", data={"etape": "provenance", "operation": "monter", **AUTEUR})
+    assert r.status_code == 303
+    assert list(app.regles.etapes)[:3] == ["provenance", "alma", "sudoc"]
+    assert ordre_etapes(list(app.regles.etapes))[1:4] == ["provenance", "alma", "sudoc"]
+    # hors de son groupe : refusé
+    with pytest.raises(ActionImpossible, match="groupe"):
+        app.deplacer_etape("sudoc", "descendre", "C")
+    with pytest.raises(ActionImpossible, match="groupe"):
+        app.deplacer_etape("provenance", "monter", "C")
+    app.deplacer_etape("dewey", "monter", "C")
+    assert list(app.regles.etapes)[3:] == ["dewey", "idref", "creation"]
+    assert ordre_etapes(list(app.regles.etapes))[-4:] == ["dewey", "idref_personnes", "idref_organisations",
+                                                           "generation"]

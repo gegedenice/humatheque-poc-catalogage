@@ -1,6 +1,9 @@
 # Pipeline de traitement d'un document : les étapes dans l'ordre, et pour
 # chacune un arbre de décision sur les codes renvoyés par l'API (sans
 # traduction). Fichier écrit par le studio (onglet « Pipeline »).
+# L'ordre des étapes est l'ordre d'exécution ; il se règle à l'intérieur de
+# chaque groupe : vérifications (provenance, alma, sudoc), puis idref et
+# dewey ; creation toujours en dernier.
 #
 # Un nœud : si (ET entre variables, OU entre les valeurs d'une liste),
 # sauf (valeurs exclues), puis des sous-branches ou un résultat.
@@ -27,19 +30,6 @@ communes:
   - absent
   - ambigu
 etapes:
-  provenance:
-    libelle: Provenance
-    source: établissement de soutenance (extraction.granting_institution) comparé aux formes de l'EPHE
-    branches:
-    - si:
-        type: these
-        ephe:
-        - absent
-        - ambigu
-      resultat: stop à reprendre
-      motif: établissement de soutenance absent ou ambigu
-    sinon:
-      resultat: poursuite
   alma:
     libelle: Alma
     source: alma-checker, champ status
@@ -66,6 +56,19 @@ etapes:
     sinon:
       resultat: stop à reprendre
       motif: statut Alma non prévu
+  provenance:
+    libelle: Provenance
+    source: établissement de soutenance (extraction.granting_institution) comparé aux formes de l'EPHE
+    branches:
+    - si:
+        type: these
+        ephe:
+        - absent
+        - ambigu
+      resultat: stop à reprendre
+      motif: établissement de soutenance absent ou ambigu
+    sinon:
+      resultat: poursuite
   sudoc:
     libelle: Sudoc
     source: sudoc-checker, champs status et thesis_state (candidat retenu le plus fort)

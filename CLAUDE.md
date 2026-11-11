@@ -5,7 +5,8 @@ images, téléversées, par URL ou depuis le bucket MinIO) et produit une notice
 UNIMARC, ou s'arrête avec un rapport expliquant pourquoi.
 Les règles de catalogage ne sont PAS dans le code : elles sont dans `regles/`
 (YAML écrits par le studio de catalogage : `variables.yaml` ; `pipeline.yaml`,
-les étapes provenance → Alma → Sudoc → IdRef → Dewey → création, chacune avec
+les étapes Alma → provenance → Sudoc → IdRef → Dewey → création (ordre réglable dans
+chaque groupe, c'est l'ordre d'exécution), chacune avec
 son arbre de décision sur les codes renvoyés par l'API, sans traduction, et des
 résultats simples — stop, stop à reprendre, conversion, poursuite, poursuite
 avec alerte, poursuite à reprendre, création ; `notice/`, socle et variantes

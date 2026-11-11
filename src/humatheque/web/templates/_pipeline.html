@@ -62,11 +62,11 @@
 {%- endmacro %}
 
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <p class="text-sm text-sourdine flex-1 min-w-[280px]">Le pipeline, étape par étape. Chaque étape lit des valeurs — <span class="font-mono">type</span>, <span class="font-mono">ephe</span> et les codes renvoyés par son API — et suit la première branche qui correspond, de haut en bas. Une branche indentée ajoute une condition (<strong>ET</strong>) ; plusieurs valeurs : <strong>OU</strong> ; <strong class="text-sortie">SAUF</strong> : valeurs exclues.</p>
+  <p class="text-sm text-sourdine flex-1 min-w-[280px]">Le pipeline, étape par étape. Chaque étape lit des valeurs — <span class="font-mono">type</span>, <span class="font-mono">ephe</span> et les codes renvoyés par son API — et suit la première branche qui correspond, de haut en bas. Une branche indentée ajoute une condition (<strong>ET</strong>) ; plusieurs valeurs : <strong>OU</strong> ; <strong class="text-sortie">SAUF</strong> : valeurs exclues. Les étapes se déplacent (↑ ↓) dans leur groupe : vérifications (provenance, Alma, Sudoc), puis IdRef et Dewey ; l'ordre affiché est l'ordre d'exécution.</p>
   <details class="text-xs text-sourdine"><summary class="cursor-pointer">Résultats possibles</summary>
     <ul class="mt-2 flex flex-col gap-1">{% for r, d in vue.resultats.items() %}<li><span class="puce {{ couleurs.get(r) }}">{{ r }}</span> {{ d }}</li>{% endfor %}</ul></details>
 </div>
-{% if not auteur %}<p class="avis bg-tonal text-sm mb-4">Pour monter, descendre ou supprimer une branche, indiquez d'abord votre nom dans un formulaire (✎) : il est ensuite retenu.</p>{% endif %}
+{% if not auteur %}<p class="avis bg-tonal text-sm mb-4">Pour déplacer une étape, ou monter, descendre ou supprimer une branche, indiquez d'abord votre nom dans un formulaire (✎) : il est ensuite retenu.</p>{% endif %}
 
 <ol class="flex flex-col gap-4">
 {% for e in etapes %}{% set suivante = etapes[loop.index].libelle if not loop.last else "" %}
@@ -78,6 +78,14 @@
       <span class="flex-1"></span>
       <span class="text-xs text-sourdine">lit :
         {% for k, vals in (vue.communes.items() | list) + (e.variables.items() | list) %}<span class="font-mono" title="{{ vals | join(', ') }}">{{ k }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+      {% set mob = vue.mobilite.get(e.id, (False, False)) %}
+      {% if mob[0] or mob[1] %}
+      <form method="post" action="/admin/regles/etape/operation" hx-boost="false" class="flex self-center">
+        <input type="hidden" name="etape" value="{{ e.id }}"><input type="hidden" name="auteur" value="{{ auteur }}">
+        <button class="btn-icone w-8 h-8" name="operation" value="monter" title="Exécuter cette étape avant la précédente" aria-label="Monter l'étape {{ e.libelle }}" {% if not mob[0] or not auteur %}disabled{% endif %}>↑</button>
+        <button class="btn-icone w-8 h-8" name="operation" value="descendre" title="Exécuter cette étape après la suivante" aria-label="Descendre l'étape {{ e.libelle }}" {% if not mob[1] or not auteur %}disabled{% endif %}>↓</button>
+      </form>
+      {% endif %}
       <button class="btn-discret btn-sm" hx-get="/admin/regles/noeud?etape={{ e.id }}&chemin=&operation=ajouter" hx-target="#form-{{ e.id }}-debut" hx-swap="innerHTML">+ Branche</button>
     </div>
     <div id="form-{{ e.id }}-debut"></div>

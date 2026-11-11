@@ -19,7 +19,7 @@ def test_chargement_regles_reelles(regles):
     assert set(regles.profils) == {"these-originale-imprimee", "these-reproduction-imprimee",
                                    "memoire-original-imprime"}
     assert len(regles.socle.zones) == 34
-    assert list(regles.etapes) == ["provenance", "alma", "sudoc", "idref", "dewey", "creation"]
+    assert list(regles.etapes) == ["alma", "provenance", "sudoc", "idref", "dewey", "creation"]
     assert regles.etapes["alma"].variables["status"][0] == "academic_record_found"
     assert regles.etapes["sudoc"].sinon.resultat == "stop à reprendre"
     assert regles.variables["auteur"].type == "personne" and regles.variables["directeur"].liste
@@ -164,3 +164,22 @@ def test_regles_dir(regles_fabriquees):
     from humatheque.config import Reglages
     r = charger_regles(Reglages(_env_file=None, racine=regles_fabriquees.racine, regles_dir="autres/regles"))
     assert r.emplacement.endswith("autres/regles")
+
+
+def test_ordre_des_etapes_verifie(regles_fabriquees):
+    """Une étape qui teste « ephe » doit suivre la provenance ; les groupes ne se mélangent pas."""
+    texte = regles_fabriquees.texte("pipeline.yaml")
+    # Alma (avant la provenance) qui teste ephe : refusé
+    teste_ephe = texte.replace("    - si:\n        status: academic_record_found\n",
+                               "    - si:\n        status: academic_record_found\n        ephe: oui\n", 1)
+    assert teste_ephe != texte
+    r = verifier_textes({"pipeline.yaml": teste_ephe}, regles_fabriquees.reglages)
+    assert r.bloquant and "ephe_pas_encore_connue" in _codes(r)
+    # Dewey avant Sudoc (édition directe du YAML) : refusé
+    import yaml
+
+    d = yaml.safe_load(texte)
+    d["etapes"] = {k: d["etapes"][k] for k in ["dewey", "alma", "provenance", "sudoc", "idref", "creation"]}
+    r = verifier_textes({"pipeline.yaml": yaml.safe_dump(d, allow_unicode=True, sort_keys=False)},
+                        regles_fabriquees.reglages)
+    assert r.bloquant and "ordre_etapes" in _codes(r)

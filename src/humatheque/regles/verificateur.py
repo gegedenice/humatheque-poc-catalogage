@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from humatheque.regles.chargement import ReglesInvalides, charger_regles
 from humatheque.regles.modeles import Regles
-from humatheque.regles.modeles import Noeud, ZoneRegle
+from humatheque.regles.modeles import GROUPES_ETAPES, Noeud, ZoneRegle
 from humatheque.regles.moteur import conventions, evaluer, valeurs_possibles
 from humatheque.regles.notice import RENDUS
 
@@ -155,6 +155,21 @@ def verifier(regles: Regles) -> Rapport:
         for f in e.branches:
             noeud(nom, f, f"{e.libelle} › {f.condition}", possibles)
         noeud(nom, e.sinon, f"{e.libelle} › sinon", possibles)
+    # --- ordre des étapes (déplaçables dans le studio, à l'intérieur de leur groupe)
+    rang = {e: i for i, g in enumerate(GROUPES_ETAPES) for e in g}
+    noms = list(regles.etapes)
+    for a, b in zip(noms, noms[1:]):
+        if rang.get(a, 0) > rang.get(b, 0):
+            signaler("erreur", "ordre_etapes", "pipeline.yaml", regles.etapes[b].libelle,
+                     f"{regles.etapes[b].libelle} ne peut pas précéder {regles.etapes[a].libelle} "
+                     "(vérifications, puis IdRef et Dewey, puis création)")
+    if "provenance" in noms:
+        for nom in noms[:noms.index("provenance")]:
+            if "ephe" in _variables_lues(regles.etapes[nom]):
+                signaler("erreur", "ephe_pas_encore_connue", "pipeline.yaml", regles.etapes[nom].libelle,
+                         f"{regles.etapes[nom].libelle} teste « ephe », calculée plus tard à l'étape "
+                         f"{regles.etapes['provenance'].libelle} : placer la provenance avant")
+
     for p in sorted(set(regles.variantes) - notices_atteintes):
         signaler("avertissement", "notice_non_atteinte", regles.variantes[p].fichier, "",
                  f"notice {p} atteinte par aucune branche du pipeline")
@@ -170,6 +185,23 @@ def verifier(regles: Regles) -> Rapport:
         signaler("avertissement", "chargement", "", "", a)
 
     return Rapport(emplacement=regles.emplacement, version=regles.version, constats=constats)
+
+
+def _variables_lues(e) -> set[str]:
+    """Variables testées par l'arbre d'une étape (si / sauf, à toutes les profondeurs)."""
+    lues: set[str] = set()
+
+    def parcourir(n: Noeud) -> None:
+        lues.update(n.si, n.sauf)
+        for f in n.branches:
+            parcourir(f)
+        if n.sinon is not None:
+            parcourir(n.sinon)
+
+    for f in e.branches:
+        parcourir(f)
+    parcourir(e.sinon)
+    return lues
 
 
 def cas_sinon(regles: Regles, etape: str) -> list[str]:

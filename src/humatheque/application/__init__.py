@@ -34,6 +34,7 @@ from humatheque.notice import validation as notice_validation
 from humatheque.notice import versions as nv
 from humatheque.regles import Regles, ReglesInvalides, charger_regles, verifier
 from humatheque.store import Lot, Store
+from humatheque.workflow.modeles import ordre_etapes
 from humatheque.workflow import ETAPES, Document, Dossier, Services, Workflow, services_depuis_reglages
 from humatheque.workflow import resolution as res
 
@@ -379,7 +380,7 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
 
     def _avancement(self, dossiers: list[tuple[Any, Dossier]]) -> list[dict[str, Any]]:
         lignes = []
-        for nom in ETAPES:
+        for nom in ordre_etapes(list(self.regles.etapes)):
             faits = sum(1 for _, d in dossiers if d.etapes[nom].statut not in ("a_faire",))
             en_echec = sum(1 for _, d in dossiers if d.etapes[nom].statut not in ("a_faire", "ok", "ignoree"))
             lignes.append({"etape": nom, "libelle": LIBELLES_ETAPES[nom], "faits": faits, "en_echec": en_echec,
@@ -420,7 +421,8 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
         ligne = self.store.ligne_dossier(dossier_id)
         assert ligne is not None
         etapes = [EtapeVue(nom=n, libelle=LIBELLES_ETAPES[n], statut=e.statut, routage=e.routage, motif=e.motif,
-                           duree=e.duree, tentatives=e.tentatives) for n, e in d.etapes.items()]
+                           duree=e.duree, tentatives=e.tentatives)
+                  for n, e in sorted(d.etapes.items(), key=lambda x: (d.ordre or ETAPES).index(x[0]))]
         images = [ImageVue(url=self.url_image(i), nom=Path(i.split("?")[0]).name) for i in d.document.images]
         brut = d.extraction.extraction if d.extraction else {}
         ctx = d.contexte.valeurs if d.contexte else {}

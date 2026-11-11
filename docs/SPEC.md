@@ -231,8 +231,10 @@ dans le dossier :
      « pratique »), ou EPHE présente seulement dans `co_tutelle_institutions`.
 
    La provenance donne la variable `ephe` du pipeline (§7) : `oui` (EPHE),
-   `non` (hors EPHE), `absent`, `ambigu`. `absent` et `ambigu` → STOP – à
-   reprendre avant Alma (décision du 09/11) ; le catalogueur choisit EPHE ou
+   `non` (hors EPHE), `absent`, `ambigu`. Pour une thèse, `absent` et
+   `ambigu` → STOP – à reprendre (décision du 09/11). Depuis le 11/11, la
+   provenance est calculée **après Alma** (ordre de `regles/pipeline.yaml`) :
+   Alma n'utilise pas `ephe` ; l'arrêt intervient donc avant Sudoc ; le catalogueur choisit EPHE ou
    hors EPHE dans l'onglet « Reprise » et le traitement reprend. La règle appliquée et la forme comparée sont
    journalisées. **Modèle de décision** (optionnel, désactivé par défaut,
    `PROVENANCE_CONFIRMATION_LLM=false`) : un appel LLM texte peut confirmer la
@@ -638,7 +640,13 @@ défaut sur la version générée.
       arbre indenté (SI … ET … OU … SAUF … ⟶ résultat → étape suivante ;
       SINON) ; chaque branche se modifie sur place (✎), on ajoute une branche
       après (+) ou une sous-branche (⤷), on monte, descend, supprime ; les
-      valeurs proposées sont les codes de l'API de l'étape ;
+      valeurs proposées sont les codes de l'API de l'étape ; **les étapes
+      elles-mêmes se déplacent** (↑ ↓, décision du 11/11) à l'intérieur de
+      leur groupe — vérifications (provenance, Alma, Sudoc), puis
+      enrichissements (IdRef, Dewey), création toujours à la fin. L'ordre du
+      fichier est l'ordre d'exécution du workflow (noté dans le dossier,
+      champ `ordre`). Le vérificateur refuse une étape qui teste `ephe` avant
+      la provenance, et un mélange des groupes ;
     - **Notice UNIMARC** : socle commun et variantes ; liste des zones ;
       éditeur de zone (sous-zones listées puis paramétrées : sorte de valeur,
       donnée, texte avant / après, plusieurs valeurs, si absente : omettre,

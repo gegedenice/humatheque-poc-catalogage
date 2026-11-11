@@ -125,7 +125,7 @@ def test_mode1_vue_dossier_et_telechargements(app, image):
     (ligne,) = app.store.lignes_du_lot(lot.id)
     v = app.vue_dossier(ligne.id)
     assert v.etat == "termine" and v.titre == "Contribution à l'étude de la démocratie en Afrique"
-    assert [e.nom for e in v.etapes][:3] == ["extraction", "provenance", "alma"]
+    assert [e.nom for e in v.etapes][:3] == ["extraction", "alma", "provenance"]
     assert v.etapes[0].libelle == "Extraction VLM" and v.etapes[0].statut == "ok"
     champ = next(c for c in v.champs if c.champ == "title")
     assert champ.brut == EXTRACTION["title"] and champ.normalise.startswith("Contribution à")
@@ -217,11 +217,13 @@ def test_provenance_puis_relance(app, image):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
-    d = app.vue_dossier(ligne.id).dossier  # provenance ambiguë : STOP – à reprendre avant Alma
-    assert (d.etape_arret, d.routage) == ("provenance", "à reprendre") and not routes["alma"].called
+    d = app.vue_dossier(ligne.id).dossier  # provenance ambiguë (après Alma) : STOP – à reprendre avant Sudoc
+    assert (d.etape_arret, d.routage) == ("provenance", "à reprendre") and routes["alma"].call_count == 1
+    assert not routes["sudoc"].called
     with pytest.raises(ActionImpossible):
         app.choisir_provenance(ligne.id, "peut-être", auteur="cat")
     v = app.choisir_provenance(ligne.id, "hors EPHE", auteur="cat")
+    assert routes["alma"].call_count == 1  # la reprise part de la provenance : Alma n'est pas rappelé
     assert v.dossier.decision.situation == "Création de la notice › type = these ET ephe = non"
     assert v.dossier.notice_texte and v.dossier.decision.profil_cible == "these-reproduction-imprimee"
     app.relancer(ligne.id, depuis="extraction")
