@@ -320,6 +320,14 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
         dossiers = self.store.dossiers_du_lot(lot.id)
         return ResumeLot(lot=lot, indicateurs=self._indicateurs(dossiers), en_cours=lot.termine_le is None)
 
+    def synthese_accueil(self) -> dict[str, int]:
+        """Chiffres des widgets de l'accueil : lots, documents traités, à reprendre, historique."""
+        v = self.vue_lots()
+        return {"lots": v.total,
+                "documents": sum(r.indicateurs.documents - r.indicateurs.en_cours for r in v.lots),
+                "a_reprendre": sum(r.indicateurs.en_attente for r in v.lots),
+                "ingestions": len(self.historique().ingestions)}
+
     def vue_lots(self, etat: str = "", declencheur: str = "", type_document: str = "",
                  limite: int = 200) -> VueLots:
         """Lots les plus récents, filtrés par état (en_cours / termines), déclencheur et type."""

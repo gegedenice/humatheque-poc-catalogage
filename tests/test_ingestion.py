@@ -217,7 +217,7 @@ def test_formulaire_televersement_de_dossiers(client, app):
     assert r.status_code == 303 and r.headers["location"].startswith("/lots/")
     lot_id = r.headers["location"].rsplit("/", 1)[1]
     assert [l.document_id for l in app.store.lignes_du_lot(lot_id)] == ["TH/TH-07", "TH/TH-08"]
-    assert 'webkitdirectory' in client.get("/").text
+    assert 'webkitdirectory' in client.get("/traiter").text
 
 
 def test_api_bucket(client):

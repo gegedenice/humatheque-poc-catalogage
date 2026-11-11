@@ -95,7 +95,7 @@ def test_dewey_albert_scores_reranker():
 @respx.mock
 def test_formulaire_parametres_avances(app, tmp_path):
     client = TestClient(create_app(app), follow_redirects=False)
-    page = client.get("/")
+    page = client.get("/traiter")
     assert "Paramètres avancés" in page.text and 'name="reglage.idref_personne.accept_threshold"' in page.text
     assert 'value="0.5"' in page.text and 'value="albert" checked' in page.text  # choix segmenté
     assert [r["parametre"] for r in client.get("/api/v1/reglables").json()] == [
