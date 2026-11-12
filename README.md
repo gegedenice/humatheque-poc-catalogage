@@ -175,7 +175,7 @@ SUDOC_CHECKER_API_URL=http://sudoc-checker:8000
 IDREF_QUALINKA_API_URL=http://idref-linker:8000
 DEWEY_CLASSIFICATION_API_URL=http://dewey-classifier:8002
 MINIO_ENDPOINT=http://minio:9000
-VLM_API_URL=http://llama-server-qwen:8080/v1/chat/completions   # fournisseur « vlm »
+VLM_API_URL=http://llama-server-qwen:8080/v1/chat/completions   # fournisseur « vlm-local »
 ```
 
 ```bash
