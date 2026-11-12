@@ -7,7 +7,7 @@ __pycache__/
 
 # deployment
 deploy/
-README_private.md
+run.bat
 
 # Données d'exécution
 data/
