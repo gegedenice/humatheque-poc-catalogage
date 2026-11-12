@@ -780,7 +780,12 @@ défaut sur la version générée.
     `FORWARDED_ALLOW_IPS=*`), et `deploy/vps/catalogage.env.example` avec les
     adresses internes des services (`http://sudoc-checker:8000`,
     `http://minio:9000`, VLM llama.cpp…), dans un `.catalogage.env` distinct
-    du `.env` de la stack.
+    du `.env` de la stack ;
+  - sauvegarde des règles modifiées sur le VPS (décision du 12/11) :
+    `scripts/sauvegarde-regles.sh`, lancé chaque nuit par cron sur l'hôte,
+    commite `regles/` et `config/prompts/` et les pousse vers la branche
+    `regles-vps` (fusion dans `main` par PR). L'application n'a ni git ni
+    accès en écriture au dépôt.
 
 ## 11. Tests et ordre de construction
 

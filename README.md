@@ -152,11 +152,34 @@ docker compose -f compose.yml -f humatheque-poc-catalogage/deploy/vps/compose.ca
 - Exposée sur Internet : renseigner `MOT_DE_PASSE` (sinon l'application est ouverte).
 - Mise à jour : `git pull` dans le clone puis `up -d --build catalogage` ;
   la base et les dossiers (`data/`) sont conservés. Les règles et prompts
-  modifiés depuis l'administration sont dans le clone : les commiter avant
-  un `git pull`.
+  modifiés depuis l'administration sont dans le clone : lancer
+  `scripts/sauvegarde-regles.sh` (ci-dessous) avant un `git pull`.
 - Évènements MinIO (déclencheur « évènements ») : webhook vers
   `http://catalogage:8000/minio/evenements?jeton=…` (adresse interne ; jeton
   affiché dans /admin).
+
+#### Sauvegarde nocturne des règles (cron sur l'hôte)
+
+Les règles (`regles/`) et les prompts (`config/prompts/`) modifiés depuis
+l'application sont écrits dans le clone du VPS. `scripts/sauvegarde-regles.sh`
+les commite (rien d'autre : ni `data/`, ni les archives) et les pousse vers la
+branche **`regles-vps`**, à fusionner dans `main` par une PR (fusion classique,
+sans squash, pour que les pushs suivants restent en avance rapide). Sans
+modification, il ne fait rien ; si le push échoue, le commit reste local et
+part au passage suivant.
+
+```bash
+# crontab -e (compte propriétaire du clone, qui a l'accès en écriture au dépôt) : chaque nuit à 2 h 47
+47 2 * * * /chemin/vers/humatheque-poc-catalogage/scripts/sauvegarde-regles.sh >> /chemin/vers/sauvegarde-regles.log 2>&1
+```
+
+- Accès en écriture : une clé de déploiement SSH du dépôt, avec droit
+  d'écriture, configurée pour ce compte (`git remote` en SSH). Aucun secret
+  dans le dépôt ni dans le script.
+- Variables facultatives : `BRANCHE` (défaut `regles-vps`), `DISTANT`
+  (défaut `origin`), `AUTEUR` des commits.
+- Ne pas modifier `regles/` directement dans `main` pendant que le studio du
+  VPS est utilisé : fusionner d'abord `regles-vps`.
 
 ## Organisation du code
 
