@@ -121,7 +121,7 @@ class Studio:
                 alertes += r.verifications
                 if produite:
                     lignes.append(produite.texte())
-        except Exception as e:  # noqa: BLE001 — brouillon incomplet : on l'affiche sans aperçu
+        except Exception as e:  # noqa: BLE001 (brouillon incomplet, affiché sans aperçu)
             alertes.append(f"aperçu impossible : {e}")
         return lignes, alertes
 

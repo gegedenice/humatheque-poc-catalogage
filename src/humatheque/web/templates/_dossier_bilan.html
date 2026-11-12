@@ -14,10 +14,10 @@
     <h2 class="text-base font-semibold flex-1 min-w-[12rem]">
       {% if b.cas == "conversion" %}Notice convertie depuis le Sudoc
       {% elif b.cas == "notice" %}Notice produite
-      {% elif b.cas == "notice_a_valider" %}Notice produite — {{ b.points }} point(s) à valider
+      {% elif b.cas == "notice_a_valider" %}Notice produite : {{ b.points }} point(s) à valider
       {% elif b.cas == "cloture" %}Traité hors outil
       {% elif b.cas == "incident" %}Incident{% if b.etape_libelle %} · {{ b.etape_libelle }}{% endif %}
-      {% elif b.etape_libelle %}{{ b.etape_libelle }}{% if b.motif %} — {{ b.motif }}{% endif %}
+      {% elif b.etape_libelle %}{{ b.etape_libelle }}{% if b.motif %} : {{ b.motif }}{% endif %}
       {% else %}{{ b.motif or "Aucune notice produite" }}{% endif %}
     </h2>
     {% if b.chemin %}<span class="text-xs text-sourdine font-mono" title="Branche suivie dans le pipeline">{{ b.chemin }}</span>{% endif %}
@@ -30,7 +30,7 @@
     {% set e = d.etapes.get(b.etape) %}
     <p class="text-sm">{{ b.motif }}</p>
     {% if e %}
-      {% if e.appels %}{% set a = e.appels[-1] %}<p class="text-xs font-mono break-all text-sourdine">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "—" }}{% if a.erreur %} · {{ a.erreur }}{% endif %}</p>{% endif %}
+      {% if e.appels %}{% set a = e.appels[-1] %}<p class="text-xs font-mono break-all text-sourdine">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "-" }}{% if a.erreur %} · {{ a.erreur }}{% endif %}</p>{% endif %}
       <p class="text-xs text-sourdine">{{ e.tentatives }} tentative(s){% if e.erreur %} · {{ e.erreur }}{% endif %}</p>
       <form method="post" action="/dossiers/{{ d.id }}/relancer" class="flex justify-end">
         <input type="hidden" name="depuis" value="{{ b.etape }}">
@@ -42,7 +42,7 @@
       {% if b.cas == "arret_a_reprendre" or not d.alma.ppn %}
       <p class="etiquette mb-0">Notice(s) Alma candidate(s)</p>{{ table_alma(d.alma) }}{% endif %}
     {% elif b.etape == "sudoc" and d.sudoc %}
-      <p class="etiquette mb-0">Candidat(s) Sudoc retenu(s) <span class="font-normal normal-case">— {{ d.sudoc.justification }}</span></p>{{ table_sudoc(d.sudoc, retenus=True) }}
+      <p class="etiquette mb-0">Candidat(s) Sudoc retenu(s) <span class="font-normal normal-case">({{ d.sudoc.justification }})</span></p>{{ table_sudoc(d.sudoc, retenus=True) }}
     {% elif b.etape == "provenance" %}
       {{ ligne_provenance(d.provenance, d.metadonnees) }}
     {% endif %}

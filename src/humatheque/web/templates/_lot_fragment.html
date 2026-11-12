@@ -22,7 +22,7 @@
         <tr class="{% if l.traite %}text-sourdine{% endif %}">
           <td>{% if l.titre %}<span class="block font-semibold">{{ l.titre | truncate(70) }}</span>{% endif %}
             <span class="font-mono text-xs text-sourdine break-all">{{ l.document_id }}</span></td>
-          <td class="whitespace-nowrap">{{ l.etape_libelle or "—" }}</td>
+          <td class="whitespace-nowrap">{{ l.etape_libelle or "-" }}</td>
           <td><span class="flex flex-col items-start gap-1">{{ badge(l.routage) }}
             {% if l.nb_exceptions %}<span class="text-xs text-decision">{{ l.nb_exceptions }} exception(s)</span>{% endif %}</span></td>
           <td class="text-sourdine">{{ l.motif or "" }}</td>

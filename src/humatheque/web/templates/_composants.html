@@ -19,7 +19,7 @@
 {%- endmacro %}
 
 {% macro statut_etape(statut) -%}
-  {%- set styles = {"ok": ("bg-auto-clair text-auto-fonce", "✓"), "ignoree": ("bg-filet text-sourdine", "–"),
+  {%- set styles = {"ok": ("bg-auto-clair text-auto-fonce", "✓"), "ignoree": ("bg-filet text-sourdine", "-"),
                     "a_faire": ("bg-white border-2 border-filet text-sourdine", ""), "en_cours": ("bg-primaire-clair text-primaire-fonce animate-pulse", "…"),
                     "arret": ("bg-decision-clair text-decision-fonce", "!")} -%}
   {%- set s = styles.get(statut, ("bg-incident-clair text-incident-fonce", "!")) -%}
@@ -40,7 +40,7 @@
 {%- endmacro %}
 
 {% macro lien_ppn(ppn, base="https://www.sudoc.fr/") -%}
-  {%- if ppn %}<a class="font-mono text-xs" href="{{ base }}{{ ppn }}" target="_blank" rel="noopener">{{ ppn }}</a>{% else %}<span class="text-sourdine">—</span>{% endif -%}
+  {%- if ppn %}<a class="font-mono text-xs" href="{{ base }}{{ ppn }}" target="_blank" rel="noopener">{{ ppn }}</a>{% else %}<span class="text-sourdine">-</span>{% endif -%}
 {%- endmacro %}
 
 {% macro json(valeur) -%}

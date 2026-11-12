@@ -248,7 +248,7 @@ class Workflow:
             d.decision = Decision.depuis(r, libelle)
             motif = d.decision.motif + (f" ({objet})" if objet else "")
             if r.etape == "alma" and d.alma and d.alma.ppn:
-                motif += f" — PPN {d.alma.ppn}"
+                motif += f" (PPN {d.alma.ppn})"
             return self._arret(r.issue, motif)
         if r.resultat == "poursuite avec alerte":
             # « pipeline:<étape>:<texte>|<objet> » : regroupé à l'affichage (application/alertes.py)
@@ -335,7 +335,7 @@ class Workflow:
         d.notice_source = iso_vers_winibw(depuis_iso(iso))
         d.notice_convertie = convertir(iso, dec.profil_cible)
         d.alerter(*d.notice_convertie.alertes)
-        motif = f"{dec.motif} — notice source {ppn} ({lien_notice(ppn)}), profil cible {dec.profil_cible}"
+        motif = f"{dec.motif} : notice source {ppn} ({lien_notice(ppn)}), profil cible {dec.profil_cible}"
         d.noter("conversion", "decision", {"ppn_source": ppn, "profil_cible": dec.profil_cible})
         return self._arret(dec.routage, motif, "ok")
 

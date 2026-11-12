@@ -102,8 +102,8 @@ recharge les règles. Les fichiers modifiés sont ceux du dépôt (volume
 ## Administration
 
 La page `/admin` (« Services et déclencheurs ») affiche la santé des services, les réglages des lots
-automatiques (fournisseur VLM, modèle de chaque fournisseur — celui de `.env` ou
-un autre choisi dans la liste renvoyée par l'API —, paramètres avancés) et les trois déclencheurs :
+automatiques (fournisseur VLM, modèle de chaque fournisseur (celui de `.env` ou
+un autre choisi dans la liste proposée), paramètres avancés) et les trois déclencheurs :
 balayage périodique, traitement à heure fixe (cron) et évènements S3. Pour les
 évènements, déclarer dans les notifications du bucket (webhook, évènements
 `s3:ObjectCreated:*`) l'URL affichée, qui porte un jeton. Le planificateur

@@ -1,4 +1,4 @@
-# Spécification — démonstrateur humatheque-catalogage (v1)
+# Spécification du démonstrateur humatheque-catalogage (v1)
 
 ## 1. Objet et périmètre
 
@@ -160,7 +160,7 @@ Restent en Python, fonctions pures, listes dans `config/texte_unimarc.yaml` :
     métier (VLM-T-006) : une interface `FournisseurVLM` unique, une classe par
     fournisseur OpenAI-compatible (reprises du POC).
   - **Fournisseurs** (décisions du 11/11 et du 12/11) : modèles ouverts
-    uniquement — `albert` (**par défaut**, `ALBERT_MODEL`), `vlm-local`
+    uniquement : `albert` (**par défaut**, `ALBERT_MODEL`), `vlm-local`
     (point d'accès on-premise, ex. llama.cpp ; ancien nom `vlm`, accepté comme
     alias), `hf` (Inference Providers) et `custom-hf-endpoint` (endpoint HF
     dédié). OpenAI est retiré. Les modèles proposés dans l'administration
@@ -248,7 +248,7 @@ dans le dossier :
 
    La provenance donne la variable `ephe` du pipeline (§7) : `oui` (EPHE),
    `non` (hors EPHE), `absent`, `ambigu`. Pour une thèse, `absent` et
-   `ambigu` → STOP – à reprendre (décision du 09/11). Depuis le 11/11, la
+   `ambigu` → STOP, à reprendre (décision du 09/11). Depuis le 11/11, la
    provenance est calculée **après Alma** (ordre de `regles/pipeline.yaml`) :
    Alma n'utilise pas `ephe` ; l'arrêt intervient donc avant Sudoc ; le catalogueur choisit EPHE ou
    hors EPHE dans la carte « Bilan » du dossier et le traitement reprend. La règle appliquée et la forme comparée sont
@@ -267,7 +267,7 @@ dans le dossier :
    | `academic_record_found` | `présent` | notice de thèse ou mémoire trouvée |
    | `ambiguous_academic_candidate` | `incertain` | candidat incertain |
    | `off_profile_match_only` | `incertain` | notice proche, pas de type TU |
-   | `no_academic_record_found` | `absent` | — |
+   | `no_academic_record_found` | `absent` | - |
 
    Le PPN de `decision_support` est toujours repris dans le rapport. Un faux
    positif se traite par la reprise manuelle (ALM-SUD-006).
@@ -376,8 +376,8 @@ vérification ni de distinction action / issue.
   | `stop` | arrêt, rien à faire | terminé |
   | `stop à reprendre` | arrêt pour vérification manuelle | à reprendre |
   | `conversion` (notice) | conversion de la notice Sudoc puis arrêt | terminé |
-  | `poursuite` | étape suivante | — |
-  | `poursuite avec alerte` | étape suivante, alerte au dossier | — |
+  | `poursuite` | étape suivante | - |
+  | `poursuite avec alerte` | étape suivante, alerte au dossier | - |
   | `poursuite à reprendre` | étape suivante, exception : document à reprendre à la fin | à reprendre |
   | `création` (notice) | création de la notice | terminé |
 
@@ -424,7 +424,7 @@ vérification ni de distinction action / issue.
 - **Traçabilité** : à chaque étape, le dossier journalise les valeurs lues,
   le chemin suivi dans l'arbre et le résultat ; l'onglet du dossier affiche le
   **parcours du pipeline**.
-- **Reprise** (document à reprendre) : actions fixes de la carte « Bilan » du dossier —
+- **Reprise** (document à reprendre) : actions fixes de la carte « Bilan » du dossier :
   choisir EPHE / hors EPHE (provenance) ; **ignorer le résultat (faux positif)
   et poursuivre** (ALM-SUD-006 : Alma → `no_academic_record_found`, Sudoc →
   `no_print_duplicate_found`, sans rappeler le service) ; **confirmer que la
@@ -625,9 +625,9 @@ défaut sur la version générée.
 - **Gabarit commun** (décision du 11/11) : bandeau supérieur « Humathèque POC
   catalogage » et rail latéral (badge H, Accueil, Traiter, Lots, Historique,
   Admin).
-- **`/` Accueil** (décisions du 11/11 et du 12/11) : une entrée de menu par page, présentée comme un lien (icône, libellé, flèche) et non comme un indicateur (Lots traités —
+- **`/` Accueil** (décisions du 11/11 et du 12/11) : une entrée de menu par page, présentée comme un lien (icône, libellé, flèche) et non comme un indicateur (Lots traités :
   lots, documents, à reprendre ; Historique ; Chargement manuel ;
-  Administration — état des règles), les derniers traitements et le
+  Administration : état des règles), les derniers traitements et le
   raccourci « Balayer le bucket » (liste des dossiers du bucket MinIO avec
   leur dernier statut et sélection multiple, ING-F-005) ; bannière des lots
   automatiques créés depuis la dernière visite.
@@ -640,7 +640,7 @@ défaut sur la version générée.
     services (alma, sudoc, idref, dewey, VLM, stockage S3, règles),
     réglages des lots automatiques (fournisseur, paramètres avancés ; proposés
     aussi par défaut dans le formulaire), **modèles par fournisseur** (URL,
-    clé configurée ou non — jamais affichée —, modèle de `.env`, choix d'un
+    clé configurée ou non, jamais affichée, modèle de `.env`, choix d'un
     autre modèle dans la liste renvoyée par l'API du fournisseur ; décision du
     11/11), déclencheurs (§3.1), état du planificateur.
   - **`/admin/prompts` Prompts** (décision du 11/11) : prompt des thèses et des
@@ -659,7 +659,7 @@ défaut sur la version générée.
       après (+) ou une sous-branche (⤷), on monte, descend, supprime ; les
       valeurs proposées sont les codes de l'API de l'étape ; **les étapes
       elles-mêmes se déplacent** (↑ ↓, décision du 11/11) à l'intérieur de
-      leur groupe — vérifications (provenance, Alma, Sudoc), puis
+      leur groupe : vérifications (provenance, Alma, Sudoc), puis
       enrichissements (IdRef, Dewey), création toujours à la fin. L'ordre du
       fichier est l'ordre d'exécution du workflow (noté dans le dossier,
       champ `ordre`). Le vérificateur refuse une étape qui teste `ephe` avant
@@ -718,10 +718,10 @@ défaut sur la version générée.
     haut à droite, notice produite par la conversion en bas à droite, éditable.
 
   **Organisation du panneau droit** (décision du 11/11, après les premiers
-  essais) — l'information utile d'abord, le reste à titre informatif :
+  essais) : l'information utile d'abord, le reste à titre informatif :
   - **carte « Bilan »**, toujours en haut : issue, étape et motif écrit dans le
     pipeline, branche suivie ; puis les pièces selon le cas (arrêt Alma : les
-    notices candidates — PPN, MMS id, titre, auteurs, année, type, score ;
+    notices candidates avec PPN, MMS id, titre, auteurs, année, type, score ;
     arrêt Sudoc : les candidats retenus avec `thesis_state` ; provenance :
     établissement lu et règle ; conversion : PPN source et notice cible ;
     notice produite : profil, alertes, **points à valider** ; incident :
@@ -868,7 +868,7 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 | ING-T-005 | §6 | déjà couverte |
 | VLM-T-003, VLM-T-004 | §5 | intégrée |
 | VLM-T-005, VLM-T-006 | §5 | intégrée |
-| VLM-T-007 | — | étude, hors v1 |
+| VLM-T-007 | - | étude, hors v1 |
 | VLM-T-008 | §5, §10 | question ouverte : fournisseur configurable |
 | VLM-T-009 | §5 | question ouverte : stratégie configurable, défaut `requete_unique` |
 | ALM-SUD-F-001 | §6 | intégrée |
@@ -877,5 +877,5 @@ Chaque étape se termine par `uv run pytest` vert. Services mockés avec `respx`
 | ALM-SUD-F-002, conversions Sudoc | §7, §9 | intégrée (conversion = copie de la source en v1 ; décision du 03/11) |
 | Alma : au moins une notice trouvée → arrêt | §6 | intégrée (décision du 03/11) |
 | Provenance déduite de `granting_institution` | §6, §7 | intégrée, modèle de décision optionnel (décision du 03/11) |
-| Conversion « reproduction via 105 $bm, EPHE » | — | coquille du wiki : la branche Sudoc `printed_reproduction` ET `ephe = oui` de `pipeline.yaml` fait foi |
+| Conversion « reproduction via 105 $bm, EPHE » | - | coquille du wiki : la branche Sudoc `printed_reproduction` ET `ephe = oui` de `pipeline.yaml` fait foi |
 | Mémoire trouvé au Sudoc | §7 | la spec fait foi : conversion si notice électronique (« Mémoire, notice électronique au Sudoc ») |

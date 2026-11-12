@@ -85,7 +85,7 @@ def test_s08_sans_civilite_dans_200g(workflow):
 @respx.mock
 @pytest.mark.parametrize("statut, situation, routage", [
     ("academic_record_found", "Alma › status = academic_record_found", "terminé"),  # STOP sans alerte
-    ("ambiguous_academic_candidate", ALMA_INCERTAIN, "à reprendre"),               # STOP – à reprendre
+    ("ambiguous_academic_candidate", ALMA_INCERTAIN, "à reprendre"),               # STOP, à reprendre
     ("off_profile_match_only", ALMA_INCERTAIN, "à reprendre"),
 ])
 def test_s01_s14_arret_avec_ppn_alma(workflow, statut, situation, routage):  # ALM-SUD (décision du 05/11)
@@ -123,7 +123,7 @@ def test_s06_conversion_copie_puis_arret(workflow):
 def test_provenance_ambigue_arret_puis_reprise(workflow):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     d = workflow.executer(dossier())
-    # Provenance ambiguë (étape placée après Alma) : STOP – à reprendre avant Sudoc
+    # Provenance ambiguë (étape placée après Alma) : STOP, à reprendre avant Sudoc
     assert (d.routage, d.etape_arret) == ("à reprendre", "provenance")
     assert d.decision.situation == "Provenance › type = these ET ephe = absent OU ambigu"
     assert routes["alma"].call_count == 1 and not routes["sudoc"].called

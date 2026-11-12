@@ -217,7 +217,7 @@ def test_provenance_puis_relance(app, image):
     routes = simuler(extraction=EXTRACTION | {"granting_institution": "École des hautes études"})
     lot = app.creer_lot(EntreeLot(documents=[[image]]))
     (ligne,) = app.store.lignes_du_lot(lot.id)
-    d = app.vue_dossier(ligne.id).dossier  # provenance ambiguë (après Alma) : STOP – à reprendre avant Sudoc
+    d = app.vue_dossier(ligne.id).dossier  # provenance ambiguë (après Alma) : STOP, à reprendre avant Sudoc
     assert (d.etape_arret, d.routage) == ("provenance", "à reprendre") and routes["alma"].call_count == 1
     assert not routes["sudoc"].called
     with pytest.raises(ActionImpossible):

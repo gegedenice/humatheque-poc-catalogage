@@ -72,7 +72,7 @@
           <td><span class="block font-mono text-[13px]">{{ r.lot.id }}</span>
             <span class="text-xs text-sourdine">créé le {{ r.lot.cree_le | date("%d/%m/%Y %H:%M") }}</span></td>
           <td class="whitespace-nowrap">{{ ind.documents }} {{ "thèse(s)" if r.lot.parametres.type_document == "these" else "mémoire(s)" }}</td>
-          <td class="font-mono text-xs">{{ r.lot.parametres.fournisseur or "—" }}</td>
+          <td class="font-mono text-xs">{{ r.lot.parametres.fournisseur or "-" }}</td>
           <td><span class="puce-contour h-6 text-xs">{{ r.lot.declencheur }}</span></td>
           <td>
             {% if r.en_cours %}

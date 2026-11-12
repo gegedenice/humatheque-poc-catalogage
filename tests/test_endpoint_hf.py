@@ -106,5 +106,5 @@ def test_page_et_admin(tmp_path):
         respx.get("https://lift.test/health").respond(503)
         assert "scaledToZero" in c.get("/admin/endpoint-hf").text
         r = c.post("/admin/endpoint-hf/reveiller").text
-        assert "initializing" in r and "redémarrage demandé" in r
+        assert "initializing" in r and "Redémarrage demandé" in r
     assert c.get("/admin/endpoint-hf", params={"fournisseur": "albert"}).text == ""

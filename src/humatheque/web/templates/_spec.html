@@ -28,7 +28,7 @@
     <ul class="mt-2 space-y-1.5 text-xs">
       {% for c in spec.constats %}
       <li><span class="puce {{ 'bg-sortie-clair text-sortie-fonce' if c.gravite == 'erreur' else 'bg-decision-clair text-decision-fonce' }}">{{ c.gravite }}</span>
-        <span class="font-mono">{{ c.table }} {{ c.ligne }}</span> — {{ c.message }}</li>
+        <span class="font-mono">{{ c.table }} {{ c.ligne }}</span> : {{ c.message }}</li>
       {% endfor %}
     </ul>
   </details>

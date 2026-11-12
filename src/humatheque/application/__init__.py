@@ -41,7 +41,7 @@ from humatheque.workflow import resolution as res
 LIBELLES_ETAPES = {
     "extraction": "Extraction VLM", "provenance": "Provenance", "alma": "Vérification Alma",
     "sudoc": "Vérification Sudoc", "situation": "Notice à produire", "conversion": "Conversion",
-    "idref_personnes": "IdRef — personnes", "idref_organisations": "IdRef — organismes",
+    "idref_personnes": "IdRef personnes", "idref_organisations": "IdRef organismes",
     "dewey": "Classification Dewey", "generation": "Générateur UNIMARC",
 }
 FILTRES = {"tous": None, "a_reprendre": issues.A_REPRENDRE, "incidents": issues.INCIDENT}
@@ -70,7 +70,7 @@ class ExecuteurSynchrone(Executor):
         f: Future = Future()
         try:
             f.set_result(fn(*args, **kwargs))
-        except BaseException as e:  # noqa: BLE001 — remonté par le Future
+        except BaseException as e:  # noqa: BLE001 (remonté par le Future)
             f.set_exception(e)
         return f
 
@@ -371,7 +371,7 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
                 continue
             ouvertes = [e for e in d.exceptions if not e.resolue]
             etape = d.etape_arret or (ouvertes[0].etape if ouvertes else None)
-            motif = d.motif_arret or ("; ".join(e.objet + " — " + e.motif for e in ouvertes[:2]) if ouvertes else None)
+            motif = d.motif_arret or ("; ".join(e.objet + " : " + e.motif for e in ouvertes[:2]) if ouvertes else None)
             file.append(LigneException(
                 dossier_id=d.id, document_id=d.document.id, titre=(d.metadonnees or {}).get("title"),
                 etape=etape, etape_libelle=LIBELLES_ETAPES.get(etape or "", etape), motif=motif,

@@ -12,8 +12,8 @@
       <p class="text-[13px] text-sourdine break-words">
         <span class="font-mono">{{ d.document.id }}</span> · {{ "thèse" if d.document.type_document == "these" else "mémoire" }}
         · traité le {{ d.cree_le | date("%d/%m/%Y %H:%M") }}
-        · <span class="font-mono">{{ d.fournisseur_vlm or "—" }}</span>
-        · spec <span class="font-mono">{{ d.version_spec or "—" }}</span>
+        · <span class="font-mono">{{ d.fournisseur_vlm or "-" }}</span>
+        · spec <span class="font-mono">{{ d.version_spec or "-" }}</span>
         {% if d.extraction %}· prompt <span class="font-mono">{{ d.extraction.prompt.nom }} · {{ d.extraction.prompt.empreinte }} · {{ d.extraction.strategie }}</span>{% endif %}
       </p>
     </div>
@@ -50,7 +50,7 @@
           title="{{ e.statut }}{% if e.motif %} · {{ e.motif }}{% endif %}{% if e.tentatives > 1 %} · {{ e.tentatives }} tentatives{% endif %}">
         {{ statut_etape(e.statut) }}
         <span class="text-xs font-medium leading-tight">{{ e.libelle }}</span>
-        <span class="font-mono text-[11px] text-sourdine">{% if e.duree is not none %}{{ "%.1f" | format(e.duree) | replace(".", ",") }} s{% elif e.statut == "ignoree" %}ignorée{% else %}—{% endif %}{% if e.tentatives > 1 %} · ×{{ e.tentatives }}{% endif %}</span>
+        <span class="font-mono text-[11px] text-sourdine">{% if e.duree is not none %}{{ "%.1f" | format(e.duree) | replace(".", ",") }} s{% elif e.statut == "ignoree" %}ignorée{% else %}-{% endif %}{% if e.tentatives > 1 %} · ×{{ e.tentatives }}{% endif %}</span>
       </button></li>
       {% endfor %}
     </ol>

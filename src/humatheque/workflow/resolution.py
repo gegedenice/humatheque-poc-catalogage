@@ -138,7 +138,7 @@ def confirmer_notice_existante(d: Dossier, commentaire: str, auteur: str) -> Dos
     if etape in d.etapes:
         d.etapes[etape].routage = issues.TERMINE
     d.routage = issues.TERMINE
-    d.motif_arret = f"{d.motif_arret or etape} — notice déjà présente (confirmé par {auteur})"
+    d.motif_arret = f"{d.motif_arret or etape}, notice déjà présente (confirmé par {auteur})"
     d.noter(etape, "resolution", {"notice_existante": True, "commentaire": commentaire}, auteur)
     return d
 
