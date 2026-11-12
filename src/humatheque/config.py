@@ -64,8 +64,16 @@ class Reglages(BaseSettings):
     hf_model: str = "google/gemma-4-26B-A4B-it"
     hf_token: SecretStr = SecretStr("")
     albert_api_url: str = "https://albert.api.etalab.gouv.fr/v1/chat/completions"
-    albert_model: str = "mistralai/Ministral-3-8B-Instruct-2512"
+    albert_model: str = "google/gemma-4-31B-it"
     albert_api_key: SecretStr = SecretStr("")
+    # Endpoint HF dédié en scale-to-zero (fournisseur custom-hf-endpoint, décision du 12/11) :
+    # inférence OpenAI-compatible (jeton HF_TOKEN) et API de gestion (état, réveil)
+    hf_endpoint_api_url: str = ""
+    hf_endpoint_api_model: str = ""
+    hf_endpoint_name: str = ""
+    hf_endpoint_namespace: str = ""
+    hf_endpoints_api_base: str = "https://api.endpoints.huggingface.cloud/v2/endpoint"
+    hf_endpoint_attente: float = 420.0  # attente maximale du réveil (s)
 
     # Exécution
     code_etab: str = "EPHE"

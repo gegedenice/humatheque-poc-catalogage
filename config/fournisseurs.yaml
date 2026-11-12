@@ -1,0 +1,27 @@
+# Fournisseurs VLM proposés (décision du 12/11, d'après l'évaluation des VLM).
+# Modèles ouverts uniquement. URL, modèle par défaut et clés : .env.
+#
+#   libelle   affiché dans l'administration
+#   modeles   liste déroulante « Modèle utilisé » de l'administration ;
+#             absente : la liste vient de l'API du fournisseur (GET …/models) ;
+#             vide ([]) : seulement le modèle de .env.
+#             Le modèle de .env reste toujours proposé (et retenu par défaut).
+#   veille    endpoint en scale-to-zero : état affiché, réveil avant l'inférence
+fournisseurs:
+  albert:
+    libelle: Albert API (Etalab)
+    modeles:
+      - google/gemma-4-31B-it
+      - mistral-small-3-2-24b-instruct-2506
+  vlm-local:
+    libelle: VLM local (llama.cpp, réseau de la stack)
+  hf:
+    libelle: Hugging Face Inference Providers
+    modeles:
+      - google/gemma-4-26B-A4B-it
+      - Qwen/Qwen3.5-9B
+      - Qwen/Qwen3.8-27B
+  custom-hf-endpoint:
+    libelle: Endpoint Hugging Face dédié (lift)
+    modeles: []
+    veille: true

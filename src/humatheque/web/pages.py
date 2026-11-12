@@ -396,6 +396,22 @@ def modeles(request: Request, fournisseur: str):
     return HTMLResponse("".join(f'<option value="{escape(m)}">{escape(m)}</option>' for m in noms))
 
 
+@routeur.get("/admin/endpoint-hf")
+def endpoint_hf_etat(request: Request, fournisseur: str = ""):
+    """État de l'endpoint HF dédié (fragment chargé à l'affichage, sans le réveiller) ;
+    `fournisseur` (formulaire de traitement) : rien si un autre fournisseur est choisi."""
+    if fournisseur and fournisseur != "custom-hf-endpoint":
+        return HTMLResponse("")
+    return gabarits.TemplateResponse(request, "_endpoint_hf.html", {"e": _app(request).etat_endpoint_hf()})
+
+
+@routeur.post("/admin/endpoint-hf/reveiller")
+def endpoint_hf_reveiller(request: Request):
+    """Réveil explicite de l'endpoint HF dédié (resume ou requête de santé)."""
+    return gabarits.TemplateResponse(request, "_endpoint_hf.html",
+                                     {"e": _app(request).etat_endpoint_hf(reveiller=True), "reveil": True})
+
+
 @routeur.get("/admin/sante")
 def sante(request: Request):
     return _rendre(request, "_sante.html", sante=_app(request).sante())

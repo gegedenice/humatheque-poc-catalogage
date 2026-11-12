@@ -35,14 +35,15 @@
       </select></label>
     <div class="sous-carte">
       <p class="text-sm font-semibold mb-1">Modèles par fournisseur</p>
-      <p class="text-xs text-sourdine mb-3">Lus dans <span class="font-mono">.env</span> ; la liste déroulante interroge l'API du fournisseur (<span class="font-mono">/models</span>) pour proposer un autre modèle. Le choix s'applique à tous les lots qui utilisent ce fournisseur.</p>
+      <p class="text-xs text-sourdine mb-3">Lus dans <span class="font-mono">.env</span> ; la liste déroulante propose les modèles retenus par l'évaluation (<span class="font-mono">config/fournisseurs.yaml</span>), à défaut ceux de l'API du fournisseur (<span class="font-mono">/models</span>). Le choix s'applique à tous les lots qui utilisent ce fournisseur.</p>
       <ul class="flex flex-col gap-2">
         {% for v in vlm %}
         <li class="bg-white rounded-xl p-3 flex flex-col gap-2">
           <div class="flex flex-wrap items-baseline gap-2">
             <span class="font-mono font-semibold">{{ v.nom }}</span>
+            <span class="text-xs text-sourdine">{{ v.libelle }}</span>
             {% if v.nom == reglages.fournisseur %}<span class="puce bg-primaire-clair text-primaire-fonce">défaut</span>{% endif %}
-            {% if v.cle %}<span class="puce bg-auto-clair text-auto-fonce">clé configurée</span>{% elif v.nom != "vlm" %}<span class="puce bg-decision-clair text-decision-fonce">clé absente</span>{% endif %}
+            {% if v.cle %}<span class="puce bg-auto-clair text-auto-fonce">clé configurée</span>{% elif not v.sans_cle %}<span class="puce bg-decision-clair text-decision-fonce">clé absente</span>{% endif %}
             <span class="font-mono text-xs text-sourdine truncate min-w-0 flex-1" title="{{ v.url }}">{{ v.url or "URL non configurée" }}</span>
           </div>
           <label class="flex flex-wrap items-center gap-2"><span class="text-xs text-sourdine w-28">Modèle utilisé</span>
@@ -51,6 +52,9 @@
               <option value="" {% if v.modele == v.modele_env %}selected{% endif %}>{{ v.modele_env }} (.env)</option>
               {% if v.modele != v.modele_env %}<option value="{{ v.modele }}" selected>{{ v.modele }}</option>{% endif %}
             </select></label>
+          {% if v.veille %}
+          <div hx-get="/admin/endpoint-hf" hx-trigger="load" hx-swap="innerHTML" class="text-xs text-sourdine">État de l'endpoint…</div>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>

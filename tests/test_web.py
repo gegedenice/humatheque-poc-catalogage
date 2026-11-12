@@ -337,15 +337,25 @@ def test_modele_choisi_remplace_celui_de_env():
 def test_admin_modeles_par_fournisseur(client, app):
     page = html.unescape(client.get("/admin").text)
     assert "Modèles par fournisseur" in page and app.reglages.hf_model in page and "(.env)" in page
-    base = app.reglages.hf_api_url.rsplit("/chat/completions", 1)[0]
-    respx.get(f"{base}/models").respond(json={"data": [{"id": "Qwen/Qwen2.5-VL-7B-Instruct"}, {"id": app.reglages.hf_model}]})
+    # hf, albert : modèles retenus par l'évaluation (config/fournisseurs.yaml), sans appel à l'API (12/11)
     options = client.get("/admin/modeles", params={"fournisseur": "hf"}).text
-    assert 'value="Qwen/Qwen2.5-VL-7B-Instruct"' in options and app.reglages.hf_model not in options  # déjà proposé
-    r = client.post("/admin/reglages", data={"fournisseur": "hf", "modele.hf": "Qwen/Qwen2.5-VL-7B-Instruct",
+    assert 'value="Qwen/Qwen3.5-9B"' in options and 'value="Qwen/Qwen3.8-27B"' in options
+    assert app.reglages.hf_model not in options  # déjà proposé (.env)
+    options = client.get("/admin/modeles", params={"fournisseur": "albert"}).text
+    assert options.count("<option") == 1 and "mistral-small-3-2-24b-instruct-2506" in options
+    # vlm-local : liste de l'API du point d'accès
+    app.reglages = app.reglages.model_copy(update={"vlm_api_url": "https://vlm.test/v1/chat/completions"})
+    respx.get("https://vlm.test/v1/models").respond(json={"data": [{"id": "Qwen3-VL-8B"}]})
+    assert 'value="Qwen3-VL-8B"' in client.get("/admin/modeles", params={"fournisseur": "vlm-local"}).text
+    r = client.post("/admin/reglages", data={"fournisseur": "hf", "modele.hf": "Qwen/Qwen3.5-9B",
                                             "auteur": "Camille"})
-    assert r.status_code == 303 and app.reglages_admin().modeles == {"hf": "Qwen/Qwen2.5-VL-7B-Instruct"}
-    assert app.fournisseur_effectif("hf") == ("hf", "Qwen/Qwen2.5-VL-7B-Instruct")
+    assert r.status_code == 303 and app.reglages_admin().modeles == {"hf": "Qwen/Qwen3.5-9B"}
+    assert app.fournisseur_effectif("hf") == ("hf", "Qwen/Qwen3.5-9B")
     assert app.fournisseur_effectif("albert")[1] == app.reglages.albert_model
+    # ancien nom « vlm » : alias de « vlm-local »
+    assert app.fournisseur_effectif("vlm")[0] == "vlm-local"
+    page = html.unescape(client.get("/admin").text)
+    assert "custom-hf-endpoint" in page and 'hx-get="/admin/endpoint-hf"' in page
 
 
 @respx.mock

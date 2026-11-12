@@ -39,10 +39,18 @@ uv run humatheque serve   # http://127.0.0.1:8000
 
 `.env.example` liste toutes les variables (valeurs factices). L'essentiel :
 
-- **VLM** : `VLM_FOURNISSEUR` (`albert` par défaut, `vlm`, `hf` : modèles
-  ouverts uniquement) et l'URL, le modèle et la clé du fournisseur choisi
-  (`ALBERT_API_URL`, `ALBERT_MODEL`, `ALBERT_API_KEY`… ; `VLM_MODEL` pour le
-  point d'accès `vlm`) ;
+- **VLM** : `VLM_FOURNISSEUR` (`albert` par défaut, `vlm-local`, `hf`,
+  `custom-hf-endpoint` : modèles ouverts uniquement) et l'URL, le modèle et
+  la clé du fournisseur choisi (`ALBERT_API_URL`, `ALBERT_MODEL`,
+  `ALBERT_API_KEY`… ; `VLM_API_URL` et `VLM_MODEL` pour `vlm-local`) ;
+  modèles proposés dans l'administration : `config/fournisseurs.yaml`
+  (résultats de l'évaluation des VLM) ;
+- **Endpoint HF dédié** (`custom-hf-endpoint`) : `HF_ENDPOINT_API_URL`,
+  `HF_ENDPOINT_API_MODEL` (jeton `HF_TOKEN`) ; endpoint en scale-to-zero,
+  dont l'API de gestion (`HF_ENDPOINT_NAME`, `HF_ENDPOINT_NAMESPACE`,
+  `HF_ENDPOINTS_API_BASE`) donne l'état et permet le réveil (administration,
+  formulaire de traitement). Avant une extraction, l'application le réveille
+  si besoin et attend qu'il soit prêt (`HF_ENDPOINT_ATTENTE`, 420 s) ;
   `VLM_STRATEGIE` (`requete_unique` ou `par_image`).
 - **Services** : `ALMA_CHECKER_API_URL`, `SUDOC_CHECKER_API_URL`,
   `IDREF_QUALINKA_API_URL`, `DEWEY_CLASSIFICATION_API_URL` (clés facultatives) ;

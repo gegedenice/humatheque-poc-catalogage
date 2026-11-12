@@ -159,10 +159,26 @@ Restent en Python, fonctions pures, listes dans `config/texte_unimarc.yaml` :
     le fournisseur se changent par configuration, sans toucher à la logique
     métier (VLM-T-006) : une interface `FournisseurVLM` unique, une classe par
     fournisseur OpenAI-compatible (reprises du POC).
-  - **Fournisseurs** (décision du 11/11) : modèles ouverts uniquement —
-    `albert` (**par défaut**, modèle `ALBERT_MODEL` de `.env`), `vlm` (point
-    d'accès on-premise, ex. llama.cpp) et `hf`. OpenAI est retiré ; un réglage
-    d'administration qui le désignait revient au fournisseur par défaut.
+  - **Fournisseurs** (décisions du 11/11 et du 12/11) : modèles ouverts
+    uniquement — `albert` (**par défaut**, `ALBERT_MODEL`), `vlm-local`
+    (point d'accès on-premise, ex. llama.cpp ; ancien nom `vlm`, accepté comme
+    alias), `hf` (Inference Providers) et `custom-hf-endpoint` (endpoint HF
+    dédié). OpenAI est retiré. Les modèles proposés dans l'administration
+    sont ceux retenus par l'évaluation des VLM, dans `config/fournisseurs.yaml`
+    (albert : `google/gemma-4-31B-it`, `mistral-small-3-2-24b-instruct-2506` ;
+    hf : `google/gemma-4-26B-A4B-it`, `Qwen/Qwen3.5-9B`, `Qwen/Qwen3.8-27B`) ;
+    sans liste, celle de l'API (`/models`). Le modèle de `.env` reste le défaut.
+  - **Endpoint HF dédié** (`custom-hf-endpoint`, repris du POC) : inférence
+    OpenAI-compatible (`HF_ENDPOINT_API_URL`, `HF_ENDPOINT_API_MODEL`,
+    `HF_TOKEN`) ; l'endpoint est en scale-to-zero (arrêt après 30 min
+    d'inactivité, réveil en 2 à 5 min). L'API de gestion
+    (`HF_ENDPOINTS_API_BASE/{HF_ENDPOINT_NAMESPACE}/{HF_ENDPOINT_NAME}`) donne
+    son état, affiché dans l'administration et le formulaire de traitement
+    avec un bouton « Réveiller » (`POST …/resume` en pause, requête sur la
+    route de santé en veille). Avant une extraction, l'application le
+    réveille si besoin et attend qu'il soit prêt (`HF_ENDPOINT_ATTENTE`,
+    420 s) ; un 503 en cours de lot déclenche la même attente puis un second
+    essai. Les appels à l'API de gestion sont journalisés dans le dossier.
   - **Multi-images** (VLM-T-001, ING-T-001) : toutes les images du document sont
     envoyées. La stratégie est un paramètre (`VLM_STRATEGIE`) :
     `requete_unique` (toutes les images dans une requête, valeur par défaut en
