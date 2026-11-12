@@ -609,7 +609,7 @@ défaut sur la version générée.
 - **Gabarit commun** (décision du 11/11) : bandeau supérieur « Humathèque POC
   catalogage » et rail latéral (badge H, Accueil, Traiter, Lots, Historique,
   Admin).
-- **`/` Accueil** (décision du 11/11) : un widget par page (Lots traités —
+- **`/` Accueil** (décisions du 11/11 et du 12/11) : une entrée de menu par page, présentée comme un lien (icône, libellé, flèche) et non comme un indicateur (Lots traités —
   lots, documents, à reprendre ; Historique ; Chargement manuel ;
   Administration — état des règles), les derniers traitements et le
   raccourci « Balayer le bucket » (liste des dossiers du bucket MinIO avec

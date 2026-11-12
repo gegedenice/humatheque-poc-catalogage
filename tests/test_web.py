@@ -39,7 +39,7 @@ def _televerser(client, n=1, un_seul=False):
 
 # ---------------------------------------------------------------- pages
 def test_accueil(client):
-    """Accueil : bandeau, widgets (lots, historique, chargement manuel, admin),
+    """Accueil : bandeau, entrées de menu (chargement manuel, lots, historique, admin),
     derniers traitements, balayage du bucket ; le formulaire est sur /traiter."""
     r = client.get("/")
     texte = html.unescape(r.text)
