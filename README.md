@@ -136,25 +136,53 @@ docker compose up -d      # application : http://localhost:8000
 
 ### Sur un VPS, dans une stack Traefik
 
-`deploy/vps/` contient un service prêt à ajouter à une stack existante
-(Traefik + Let's Encrypt, réseau Docker `web`, services humathèque, MinIO et
-VLM llama.cpp dans le même compose) :
+Pour une stack existante (Traefik + Let's Encrypt, réseau Docker `web`,
+services humathèque, MinIO et VLM llama.cpp dans le même compose), cloner le
+dépôt à côté du compose et ajouter ce service (domaine à adapter) :
 
-- `compose.catalogage.yml` : le service `catalogage` (build depuis le clone,
-  labels Traefik, volumes `data/`, `regles/`, `config/prompts/`) ; domaine
-  à adapter ;
-- `catalogage.env.example` : variables de l'application avec les **adresses
-  internes** du réseau `web` (`http://sudoc-checker:8000`,
-  `http://minio:9000`, `http://llama-server-qwen:8080/v1/chat/completions`…) :
-  les appels ne repassent ni par Traefik ni par Internet. Fichier distinct
-  du `.env` de la stack ; valeurs factices, à renseigner.
+```yaml
+  catalogage:
+    build:
+      context: ./humatheque-poc-catalogage
+    container_name: humatheque-catalogage
+    restart: unless-stopped
+    env_file:
+      - ./.catalogage.env          # propre à l'application, distinct du .env de la stack
+    environment:
+      - FORWARDED_ALLOW_IPS=*      # Traefik transmet X-Forwarded-*
+    volumes:
+      - ./humatheque-poc-catalogage/data:/app/data                       # base SQLite, dossiers
+      - ./humatheque-poc-catalogage/regles:/app/regles                   # règles du studio
+      - ./humatheque-poc-catalogage/config/prompts:/app/config/prompts   # prompts
+    networks:
+      - web
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=web
+      - traefik.http.routers.catalogage.rule=Host(`catalogage.example.org`)
+      - traefik.http.routers.catalogage.entrypoints=websecure
+      - traefik.http.routers.catalogage.tls.certresolver=le
+      - traefik.http.services.catalogage.loadbalancer.server.port=8000
+```
+
+`.catalogage.env` part de `.env.example` (valeurs factices, à renseigner),
+avec les **adresses internes** du réseau `web` (nom du service compose et
+port interne) : les appels ne repassent ni par Traefik ni par Internet.
+
+```bash
+ALMA_CHECKER_API_URL=http://alma-checker:8000
+SUDOC_CHECKER_API_URL=http://sudoc-checker:8000
+IDREF_QUALINKA_API_URL=http://idref-linker:8000
+DEWEY_CLASSIFICATION_API_URL=http://dewey-classifier:8002
+MINIO_ENDPOINT=http://minio:9000
+VLM_API_URL=http://llama-server-qwen:8080/v1/chat/completions   # fournisseur « vlm »
+```
 
 ```bash
 # dans le dossier du compose de la stack
 git clone -b <branche> <url-du-depot> humatheque-poc-catalogage
-cp humatheque-poc-catalogage/deploy/vps/catalogage.env.example .catalogage.env   # puis renseigner
-# coller le service de deploy/vps/compose.catalogage.yml dans compose.yml, ou :
-docker compose -f compose.yml -f humatheque-poc-catalogage/deploy/vps/compose.catalogage.yml up -d --build catalogage
+cp humatheque-poc-catalogage/.env.example .catalogage.env   # puis renseigner (adresses ci-dessus)
+docker compose up -d --build catalogage
 ```
 
 - Exposée sur Internet : renseigner `MOT_DE_PASSE` (sinon l'application est ouverte).

@@ -791,11 +791,11 @@ défaut sur la version générée.
     modifiées depuis l'interface restent dans le dépôt), `env_file: .env`.
     Grist est retiré (décision du 06/11) ;
   - en local : `uv run humatheque serve`, ou `docker compose up -d`.
-  - VPS (décision du 11/11) : `deploy/vps/compose.catalogage.yml`, service à
-    ajouter à la stack Traefik existante (réseau `web`, Let's Encrypt,
-    `FORWARDED_ALLOW_IPS=*`), et `deploy/vps/catalogage.env.example` avec les
-    adresses internes des services (`http://sudoc-checker:8000`,
-    `http://minio:9000`, VLM llama.cpp…), dans un `.catalogage.env` distinct
+  - VPS (décisions du 11/11 et du 12/11) : service à ajouter à la stack
+    Traefik existante, décrit dans le README (réseau `web`, Let's Encrypt,
+    `FORWARDED_ALLOW_IPS=*`, volumes `data/`, `regles/`, `config/prompts/`),
+    avec les adresses internes des services (`http://sudoc-checker:8000`,
+    `http://minio:9000`, VLM llama.cpp…) dans un `.catalogage.env` distinct
     du `.env` de la stack ;
   - sauvegarde des règles modifiées sur le VPS (décision du 12/11) :
     `scripts/sauvegarde-regles.sh`, lancé chaque nuit par cron sur l'hôte,
