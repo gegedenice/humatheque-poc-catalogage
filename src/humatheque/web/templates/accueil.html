@@ -2,7 +2,7 @@
 {% from "_composants.html" import badge, vide, repartition %}
 {% block titre %}Accueil{% endblock %}
 {% block fil %}Accueil{% endblock %}
-{% block entete %}<h1>Catalogage assisté des thèses et mémoires</h1>{% endblock %}
+{% block entete %}<h1>Catalogage assisté par IA (thèses et mémoires)</h1>{% endblock %}
 {% block contenu %}
 {% if nouveaux_lots %}
 <div role="status" class="avis bg-incident-clair text-incident-fonce flex flex-wrap items-center gap-x-3 gap-y-1 mb-6">
@@ -28,9 +28,9 @@
   </a></li>
 {%- endmacro %}
 <nav aria-label="Pages de l'application" class="mb-6">
-  <ul class="grid gap-3 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
-  {{ entree("/traiter", "Chargement manuel", "téléverser des images ou coller des URL", '<path d="M12 5v14M5 12h14"/>') }}
+  <ul class="grid gap-3 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">  
   {{ entree("/lots", "Lots traités", synthese.lots ~ " lot(s) · " ~ synthese.documents ~ " document(s)" ~ (" · " ~ synthese.a_reprendre ~ " à reprendre" if synthese.a_reprendre else ""), '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>') }}
+  {{ entree("/traiter", "Chargement manuel", "téléverser des images ou coller des URL", '<path d="M12 5v14M5 12h14"/>') }}
   {{ entree("/historique", "Historique", synthese.ingestions ~ " balayage(s) et traitement(s)", '<path d="M4 7a8 8 0 1 1-1 5"/><path d="M4 3v4h4M12 8v4l3 2"/>') }}
   {{ entree("/admin", "Administration", (vue.spec.nb_erreurs ~ " erreur(s) dans les règles") if vue.spec.nb_erreurs else "services, prompts, règles", '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>', alerte=vue.spec.nb_erreurs) }}
   </ul>
