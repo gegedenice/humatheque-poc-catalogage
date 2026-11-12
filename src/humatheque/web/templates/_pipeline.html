@@ -62,7 +62,7 @@
 {%- endmacro %}
 
 <div class="flex flex-wrap items-center gap-3 mb-4">
-  <p class="text-sm text-sourdine flex-1 min-w-[280px]">Le pipeline, étape par étape. Chaque étape lit des valeurs — <span class="font-mono">type</span>, <span class="font-mono">ephe</span> et les codes renvoyés par son API — et suit la première branche qui correspond, de haut en bas. Une branche indentée ajoute une condition (<strong>ET</strong>) ; plusieurs valeurs : <strong>OU</strong> ; <strong class="text-sortie">SAUF</strong> : valeurs exclues. Les étapes se déplacent (↑ ↓) dans leur groupe : vérifications (provenance, Alma, Sudoc), puis IdRef et Dewey ; l'ordre affiché est l'ordre d'exécution.</p>
+  <p class="text-sm text-sourdine flex-1 min-w-[280px]">Le pipeline, étape par étape. Chaque étape lit des valeurs (<span class="font-mono">type</span>, <span class="font-mono">ephe</span> et les codes renvoyés par son API) et suit la première branche qui correspond, de haut en bas. Une branche indentée ajoute une condition (<strong>ET</strong>) ; plusieurs valeurs : <strong>OU</strong> ; <strong class="text-sortie">SAUF</strong> : valeurs exclues. Les étapes se déplacent (↑ ↓) dans leur groupe : vérifications (provenance, Alma, Sudoc), puis IdRef et Dewey ; l'ordre affiché est l'ordre d'exécution.</p>
   <details class="text-xs text-sourdine"><summary class="cursor-pointer">Résultats possibles</summary>
     <ul class="mt-2 flex flex-col gap-1">{% for r, d in vue.resultats.items() %}<li><span class="puce {{ couleurs.get(r) }}">{{ r }}</span> {{ d }}</li>{% endfor %}</ul></details>
 </div>

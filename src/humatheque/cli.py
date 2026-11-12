@@ -57,7 +57,7 @@ def _tailwind() -> Path:
         chemin.parent.mkdir(parents=True, exist_ok=True)
         url = TAILWIND_URL.format(version=TAILWIND_VERSION, plateforme=plateforme)
         print(f"Téléchargement de {url}")
-        urllib.request.urlretrieve(url, chemin)  # noqa: S310 — URL figée
+        urllib.request.urlretrieve(url, chemin)  # noqa: S310 (URL figée)
         chemin.chmod(chemin.stat().st_mode | stat.S_IEXEC)
     return chemin
 

@@ -26,15 +26,15 @@
 {%- endmacro %}
 
 {% macro ligne_provenance(p, m) -%}
-  <p class="text-sm">Établissement lu : « {{ (m or {}).get("granting_institution") or "—" }} »
-    → <span class="font-semibold">{{ p.valeur if p else "—" }}</span>
-    {% if p %}<span class="text-xs text-sourdine">— règle {{ p.regle }}{% if p.forme_comparee %}, forme comparée « {{ p.forme_comparee }} »{% endif %}{% if p.forme_reconnue %}, forme reconnue « {{ p.forme_reconnue }} »{% endif %}</span>{% endif %}</p>
+  <p class="text-sm">Établissement lu : « {{ (m or {}).get("granting_institution") or "-" }} »
+    → <span class="font-semibold">{{ p.valeur if p else "-" }}</span>
+    {% if p %}<span class="text-xs text-sourdine">(règle {{ p.regle }}{% if p.forme_comparee %}, forme comparée « {{ p.forme_comparee }} »{% endif %}{% if p.forme_reconnue %}, forme reconnue « {{ p.forme_reconnue }} »{% endif %})</span>{% endif %}</p>
 {%- endmacro %}
 
 {% macro appels(liste) -%}
   {% for a in liste %}
   <details class="mt-1 bg-white rounded-xl px-3 py-2">
-    <summary class="cursor-pointer text-xs font-mono break-all">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "—" }} · {{ a.duree }} s{% if a.erreur %} · <span class="text-sortie">{{ a.erreur }}</span>{% endif %}</summary>
+    <summary class="cursor-pointer text-xs font-mono break-all">{{ a.methode }} {{ a.url }} · HTTP {{ a.statut_http or "-" }} · {{ a.duree }} s{% if a.erreur %} · <span class="text-sortie">{{ a.erreur }}</span>{% endif %}</summary>
     <p class="etiquette mt-2 mb-0">Requête</p>{{ json(a.requete) }}
     <p class="etiquette mt-2 mb-0">Réponse</p>{{ json(a.reponse) }}
   </details>

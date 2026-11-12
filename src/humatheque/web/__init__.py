@@ -54,7 +54,7 @@ def _survol_variables(html: Markup, infos: dict[str, dict]) -> Markup:
         info = infos.get(nom)
         if not info:
             return m.group(0)
-        titre = f"{nom} — source : {info.get('source') or '—'}"
+        titre = f"{nom} : source {info.get('source') or 'non renseignée'}"
         titre += f"\nexemple : {info['exemple']}" if info.get("exemple") else "\nexemple : (vide)"
         if not info.get("disponible", True):
             titre += "\nindisponible : jamais renseignée"
@@ -78,7 +78,7 @@ def _libelle_routage(routage: str | None) -> str:
     from humatheque.issues import normaliser
 
     r = normaliser(routage)
-    return LIBELLES_ROUTAGE.get(r or "", r or "—")
+    return LIBELLES_ROUTAGE.get(r or "", r or "-")
 
 
 def _version_statique(chemin: str) -> str:

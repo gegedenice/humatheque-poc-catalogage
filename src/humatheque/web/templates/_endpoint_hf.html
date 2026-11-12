@@ -4,7 +4,7 @@
 <div class="flex flex-wrap items-center gap-2" id="endpoint-hf">
   <span class="text-xs text-sourdine">Endpoint</span>
   <span class="puce {{ tons.get(e.ton, 'bg-rail text-encre') }} font-mono">{{ e.etat }}</span>
-  <span class="text-xs text-sourdine flex-1 min-w-[10rem]">{{ e.libelle }}{% if e.replicas %} · réplicas prêts {{ e.replicas }}{% endif %}{% if reveil and not e.pret %} — redémarrage demandé, comptez 2 à 5 min{% endif %}</span>
+  <span class="text-xs text-sourdine flex-1 min-w-[10rem]">{{ e.libelle }}{% if e.replicas %} · réplicas prêts {{ e.replicas }}{% endif %}{% if reveil and not e.pret %}. Redémarrage demandé, comptez 2 à 5 min{% endif %}</span>
   {% if e.etat not in ("non_configure",) %}
   <button type="button" class="btn-discret btn-sm" hx-get="/admin/endpoint-hf" hx-target="#endpoint-hf" hx-swap="outerHTML">Actualiser</button>
   {% if not e.pret %}<button type="button" class="btn-tonal btn-sm" hx-post="/admin/endpoint-hf/reveiller" hx-target="#endpoint-hf" hx-swap="outerHTML">Réveiller</button>{% endif %}

@@ -96,7 +96,7 @@ class FournisseurEndpointHF(FournisseurOpenAICompatible):
             appel = Appel(service=f"vlm:{self.nom}", methode="POST", url=self.url,
                           erreur=f"endpoint HF non prêt : {e.etat} ({e.libelle})")
             raise InferenceIndisponible(f"endpoint HF dédié non prêt après {self._reglages.hf_endpoint_attente:.0f} s : "
-                                        f"{e.etat} — {e.libelle}", appel)
+                                        f"{e.etat} ({e.libelle})", appel)
         self._pret = True
 
     def appeler(self, prompt: str, images: list[str]) -> tuple[str, Appel]:

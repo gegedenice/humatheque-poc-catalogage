@@ -222,7 +222,7 @@ def cas_sinon(regles: Regles, etape: str) -> list[str]:
 
 
 def rapport_invalide(e: ReglesInvalides, emplacement: str) -> Rapport:
-    return Rapport(emplacement=emplacement, version="—", constats=[
+    return Rapport(emplacement=emplacement, version="-", constats=[
         Constat(gravite="erreur", code="yaml_invalide", table=f, ligne=l, message=m) for f, l, m in e.problemes])
 
 

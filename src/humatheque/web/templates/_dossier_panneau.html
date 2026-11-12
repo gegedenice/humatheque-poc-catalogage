@@ -34,7 +34,7 @@
       {# Îlot éditeur (Monaco) : présent seulement une fois le traitement terminé (aucun rafraîchissement). #}
       <div class="flex flex-col gap-3" aria-label="Édition de la notice">
         <div class="flex flex-wrap items-center gap-2">
-          <span class="text-sm text-sourdine">profil {{ notice.profil or "—" }} · <strong id="editeur-statut" class="text-encre">version {{ notice.version }} · {{ notice.statut }}</strong></span>
+          <span class="text-sm text-sourdine">profil {{ notice.profil or "-" }} · <strong id="editeur-statut" class="text-encre">version {{ notice.version }} · {{ notice.statut }}</strong></span>
           <span class="flex-1"></span>
           <label class="text-xs text-sourdine flex items-center gap-2">Catalogueur <input id="editeur-auteur" class="champ champ-sm w-36" value="{{ auteur }}"></label>
           <button id="editeur-enregistrer" type="button" class="btn btn-sm" title="Ctrl+S">Enregistrer</button>
@@ -88,7 +88,7 @@
     {# ------------------------------------------------------------ extraction #}
     <div role="tabpanel" id="volet-extraction" aria-labelledby="onglet-extraction" class="p-5 flex flex-col gap-4" {% if defaut != "extraction" %}hidden{% endif %}>
       {% if d.extraction %}
-      <details class="sous-carte"><summary class="cursor-pointer text-sm font-semibold">Sortie brute du modèle <span class="font-normal text-xs text-sourdine">· {{ d.fournisseur_vlm or "—" }} · prompt {{ d.extraction.prompt.nom }}</span></summary>
+      <details class="sous-carte"><summary class="cursor-pointer text-sm font-semibold">Sortie brute du modèle <span class="font-normal text-xs text-sourdine">· {{ d.fournisseur_vlm or "-" }} · prompt {{ d.extraction.prompt.nom }}</span></summary>
         {% for b in d.extraction.bruts %}<pre class="code mt-2 max-h-96 bg-white">{{ b }}</pre>{% endfor %}</details>
       {% endif %}
       {% if vue.champs %}
@@ -145,7 +145,7 @@
       {% endif %}
       {% for e in d.journal %}
         <div class="ligne-journal"><span class="text-encre">{{ e.horodatage | date("%H:%M:%S") }}</span>
-          <span><span class="text-encre">{{ e.etape }} · {{ e.type }}</span>{% if e.auteur != "système" %} · {{ e.auteur }}{% endif %} — {{ e.detail if e.detail is string else (e.detail | tojson) }}</span></div>
+          <span><span class="text-encre">{{ e.etape }} · {{ e.type }}</span>{% if e.auteur != "système" %} · {{ e.auteur }}{% endif %} : {{ e.detail if e.detail is string else (e.detail | tojson) }}</span></div>
       {% else %}{{ vide("Journal vide.") }}{% endfor %}
     </div>
   </section>
