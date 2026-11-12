@@ -45,7 +45,8 @@ LIBELLES_ETAPES = {
     "dewey": "Classification Dewey", "generation": "Générateur UNIMARC",
 }
 FILTRES = {"tous": None, "a_reprendre": issues.A_REPRENDRE, "incidents": issues.INCIDENT}
-FOURNISSEURS = ["albert", "vlm", "hf"]  # modèles ouverts ; Albert par défaut
+# Modèles ouverts ; Albert par défaut ; « vlm » devenu « vlm-local » (12/11, alias conservé)
+FOURNISSEURS = ["albert", "vlm-local", "hf", "custom-hf-endpoint"]
 
 
 class Introuvable(Exception):
@@ -213,6 +214,9 @@ class Application(Administration, AdministrationRegles, Studio, Prompts):
             raise ActionImpossible("aucun document à traiter")
         if entree.types and len(entree.types) != len(docs):
             raise ActionImpossible("un type par document attendu")
+        from humatheque.extraction.fournisseurs import nom_fournisseur
+
+        entree.fournisseur = nom_fournisseur(entree.fournisseur) or None
         if entree.fournisseur and entree.fournisseur not in FOURNISSEURS:
             raise ActionImpossible(f"fournisseur inconnu : {entree.fournisseur}")
         ids = entree.identifiants or [self._identifiant_document(d) for d in docs]

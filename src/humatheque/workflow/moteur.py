@@ -198,7 +198,8 @@ class Workflow:
             raise _Incident("image_inaccessible", str(e), relancable=True) from e
         except InferenceIndisponible as e:
             statut = "inference_timeout" if e.timeout else "inference_indisponible"
-            raise _Incident(statut, str(e), [e.appel], relancable=True) from e
+            prealables = getattr(self.services.vlm, "appels_prealables", list)()
+            raise _Incident(statut, str(e), [*prealables, e.appel], relancable=True) from e
         except ExtractionInvalide as e:
             d.etapes["extraction"].appels += e.appels
             d.etapes["extraction"].reponse = {"bruts": e.bruts}

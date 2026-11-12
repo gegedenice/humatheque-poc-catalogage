@@ -70,6 +70,8 @@
           <option value="{{ f }}" {% if f == vue.fournisseur_defaut %}selected{% endif %}>{{ f }}{% if f == vue.fournisseur_defaut %} (défaut){% endif %}</option>
           {% endfor %}
         </select>
+        {# Endpoint HF dédié en veille : état et réveil, seulement s'il est choisi #}
+        <div class="mt-2" hx-get="/admin/endpoint-hf" hx-include="#fournisseur" hx-trigger="load, change from:#fournisseur" hx-swap="innerHTML"></div>
       </div>
     </div>
     {{ parametres_avances(vue.reglables) }}

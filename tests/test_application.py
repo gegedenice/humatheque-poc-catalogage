@@ -42,7 +42,7 @@ def test_documents_depuis_liste():
 def test_accueil_etat_de_la_spec(app):
     a = app.accueil()
     assert a.spec.nb_erreurs == 0 and a.spec.nb_avertissements == 0  # cas « sinon » : informations
-    assert "vlm" in a.fournisseurs and a.lots == []
+    assert "vlm-local" in a.fournisseurs and "custom-hf-endpoint" in a.fournisseurs and a.lots == []
 
 
 def test_recharger_spec(app):

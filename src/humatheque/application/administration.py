@@ -64,6 +64,9 @@ class FournisseurVue(BaseModel):
     modele_env: str
     modele: str = Field(description="modèle utilisé : choix de l'administration, sinon .env")
     cle: bool = Field(description="clé configurée (jamais affichée)")
+    libelle: str = ""
+    veille: bool = Field(False, description="endpoint en scale-to-zero : état et réveil affichés")
+    sans_cle: bool = Field(False, description="fournisseur sans clé (point d'accès local)")
 
 
 class Sante(BaseModel):
@@ -83,13 +86,20 @@ class Administration:
         if enregistre:
             from humatheque.application import FOURNISSEURS
 
+            from humatheque.extraction.fournisseurs import nom_fournisseur
+
             valeur, maj_le, auteur = enregistre
-            if valeur.get("fournisseur") not in FOURNISSEURS:  # ex. « openai », retiré
-                valeur = {**valeur, "fournisseur": self.reglages.vlm_fournisseur}
+            # anciens noms (« vlm » → « vlm-local ») ; fournisseur retiré (« openai ») : défaut
+            valeur = {**valeur, "fournisseur": nom_fournisseur(valeur.get("fournisseur")),
+                      "modeles": {nom_fournisseur(k): v for k, v in (valeur.get("modeles") or {}).items()}}
+            if valeur["fournisseur"] not in FOURNISSEURS:
+                valeur["fournisseur"] = nom_fournisseur(self.reglages.vlm_fournisseur)
             return ReglagesAdmin(**valeur, maj_le=maj_le, auteur=auteur)
+        from humatheque.extraction.fournisseurs import nom_fournisseur
+
         r = self.reglages
         return ReglagesAdmin(
-            fournisseur=r.vlm_fournisseur,
+            fournisseur=nom_fournisseur(r.vlm_fournisseur),
             declencheurs=Declencheurs(
                 balayage=Balayage(actif=r.ingestion_auto, intervalle_minutes=r.balayage_intervalle),
                 planification=Planification(actif=bool(r.planification_cron.strip()), cron=r.planification_cron.strip()),
@@ -99,8 +109,11 @@ class Administration:
     def modifier_reglages_admin(self: "Application", nouveaux: ReglagesAdmin, auteur: str) -> ReglagesAdmin:
         from humatheque.application import FOURNISSEURS, ActionImpossible
 
+        from humatheque.extraction.fournisseurs import nom_fournisseur
+
         if not auteur.strip():
             raise ActionImpossible("Indiquez votre nom pour journaliser la modification.")
+        nouveaux.fournisseur = nom_fournisseur(nouveaux.fournisseur)
         if nouveaux.fournisseur not in FOURNISSEURS:
             raise ActionImpossible(f"fournisseur inconnu : {nouveaux.fournisseur}")
         services = self.valider_reglages(nouveaux.reglages_services)
@@ -121,14 +134,25 @@ class Administration:
 
     # -------------------------------------------------------------- modèles VLM
     def fournisseurs_vlm(self: "Application") -> list[FournisseurVue]:
+        from humatheque.config import charger_yaml
         from humatheque.extraction.fournisseurs import table_fournisseurs
 
         choix = self.reglages_admin().modeles
-        return [FournisseurVue(nom=n, url=u, modele_env=m, modele=choix.get(n) or m, cle=bool(c))
+        cfg = charger_yaml("fournisseurs").get("fournisseurs") or {}
+        return [FournisseurVue(nom=n, url=u, modele_env=m, modele=choix.get(n) or m, cle=bool(c),
+                               libelle=(cfg.get(n) or {}).get("libelle") or n,
+                               veille=bool((cfg.get(n) or {}).get("veille")), sans_cle=n == "vlm-local")
                 for n, (u, m, c) in table_fournisseurs(self.reglages).items()]
 
+    def etat_endpoint_hf(self: "Application", reveiller: bool = False):
+        """État de l'endpoint HF dédié (API de gestion) ; `reveiller` : le relance s'il dort."""
+        from humatheque.extraction import endpoint_hf
+
+        return (endpoint_hf.reveiller if reveiller else endpoint_hf.etat)(self.reglages)
+
     def modeles_accessibles(self: "Application", fournisseur: str) -> list[str]:
-        """Modèles proposés par l'API du fournisseur (liste vide si injoignable)."""
+        """Modèles proposés : liste de config/fournisseurs.yaml, sinon l'API du fournisseur
+        (liste vide si injoignable)."""
         from humatheque.extraction.fournisseurs import lister_modeles
 
         try:
@@ -140,7 +164,9 @@ class Administration:
         """(fournisseur, modèle) utilisés pour un lot : modèle choisi en administration, sinon .env."""
         from humatheque.extraction.fournisseurs import table_fournisseurs
 
-        nom = (fournisseur or self.reglages_admin().fournisseur or self.reglages.vlm_fournisseur).lower()
+        from humatheque.extraction.fournisseurs import nom_fournisseur
+
+        nom = nom_fournisseur(fournisseur or self.reglages_admin().fournisseur or self.reglages.vlm_fournisseur)
         table = table_fournisseurs(self.reglages)
         modele = self.reglages_admin().modeles.get(nom) or (table[nom][1] if nom in table else "")
         return nom, modele
@@ -192,6 +218,13 @@ class Administration:
         except ValueError as e:
             return Sante(composant=nom, ok=False, detail=str(e))
         base = prov.url.rsplit("/chat/completions", 1)[0]
+        if f == "custom-hf-endpoint":  # état par l'API de gestion : ne réveille pas l'endpoint
+            from humatheque.extraction import endpoint_hf
+
+            def appel():
+                e = endpoint_hf.etat(self.reglages)
+                return e.pret, f"endpoint {e.etat} · {e.libelle} · modèle {prov.modele}"
+            return self._mesurer(nom, prov.url, appel)
 
         def appel():
             r = httpx.get(f"{base}/models", headers=prov._entetes, timeout=10)

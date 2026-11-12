@@ -72,33 +72,100 @@ class FournisseurOpenAICompatible:
             appel.duree = round(time.monotonic() - debut, 3)
 
 
-SEPARATEUR_MODELE = "#"  # « hf#Qwen/Qwen2.5-VL-7B-Instruct » : fournisseur et modèle choisi
+class FournisseurEndpointHF(FournisseurOpenAICompatible):
+    """Endpoint HF dédié en scale-to-zero (`custom-hf-endpoint`) : avant l'inférence,
+    vérifie son état, le réveille et attend qu'il soit prêt ; un 503 (endpoint qui
+    s'est endormi entre-temps) déclenche la même attente puis un second essai.
+    Les appels à l'API de gestion sont rendus par `appels_prealables()` (journal)."""
+
+    def __init__(self, *args: Any, reglages: Reglages, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._reglages = reglages
+        self._gestion: list[Appel] = []
+        self._pret = False
+
+    def appels_prealables(self) -> list[Appel]:
+        appels, self._gestion = self._gestion, []
+        return appels
+
+    def _assurer_pret(self) -> None:
+        from humatheque.extraction import endpoint_hf
+
+        e = endpoint_hf.attendre_pret(self._reglages, journal=self._gestion)
+        if not e.pret and e.etat != "non_configure":
+            appel = Appel(service=f"vlm:{self.nom}", methode="POST", url=self.url,
+                          erreur=f"endpoint HF non prêt : {e.etat} ({e.libelle})")
+            raise InferenceIndisponible(f"endpoint HF dédié non prêt après {self._reglages.hf_endpoint_attente:.0f} s : "
+                                        f"{e.etat} — {e.libelle}", appel)
+        self._pret = True
+
+    def appeler(self, prompt: str, images: list[str]) -> tuple[str, Appel]:
+        if not self._pret:
+            self._assurer_pret()
+        try:
+            return super().appeler(prompt, images)
+        except InferenceIndisponible as e:
+            if e.appel.statut_http != 503:
+                raise
+            self._gestion.append(e.appel)  # 503 : endpoint endormi entre-temps
+            self._pret = False
+            self._assurer_pret()
+            return super().appeler(prompt, images)
+
+
+SEPARATEUR_MODELE = "#"  # « hf#Qwen/Qwen3.5-9B » : fournisseur et modèle choisi
+# Anciens noms (lots et réglages enregistrés) → nom actuel (décision du 12/11)
+ALIAS = {"vlm": "vlm-local"}
+
+
+def nom_fournisseur(nom: str | None) -> str:
+    nom = (nom or "").strip().lower()
+    return ALIAS.get(nom, nom)
 
 
 def table_fournisseurs(r: Reglages) -> dict[str, tuple[str, str, str]]:
-    """Fournisseur → (URL, modèle de .env, clé) ; la clé n'est jamais affichée."""
+    """Fournisseur → (URL, modèle de .env, clé) ; la clé n'est jamais affichée.
+    Modèles ouverts uniquement ; l'ordre est celui des listes de l'interface."""
     return {
         "albert": (r.albert_api_url, r.albert_model, r.albert_api_key.get_secret_value()),
-        "vlm": (r.vlm_api_url, r.vlm_model, ""),
+        "vlm-local": (r.vlm_api_url, r.vlm_model, ""),
         "hf": (r.hf_api_url, r.hf_model, r.hf_token.get_secret_value()),
+        "custom-hf-endpoint": (r.hf_endpoint_api_url, r.hf_endpoint_api_model, r.hf_token.get_secret_value()),
     }
 
 
+def modeles_proposes(nom: str) -> list[str] | None:
+    """Modèles proposés par config/fournisseurs.yaml (résultats de l'évaluation des VLM) ;
+    None : la liste vient de l'API du fournisseur (`/models`)."""
+    from humatheque.config import charger_yaml
+
+    f = (charger_yaml("fournisseurs").get("fournisseurs") or {}).get(nom_fournisseur(nom)) or {}
+    modeles = f.get("modeles")
+    return [str(m) for m in modeles] if isinstance(modeles, list) else None
+
+
 def fournisseur(nom: str, r: Reglages, client: httpx.Client | None = None) -> FournisseurOpenAICompatible:
-    """Fournisseur par nom : albert (défaut), vlm (endpoint on-premise), hf ; « nom#modèle »
-    remplace le modèle de .env (choix de l'administration)."""
+    """Fournisseur par nom : albert (défaut), vlm-local (point d'accès on-premise), hf,
+    custom-hf-endpoint ; « nom#modèle » remplace le modèle de .env (choix de l'administration)."""
     nom, _, modele_choisi = (nom or r.vlm_fournisseur).partition(SEPARATEUR_MODELE)
-    nom = nom.strip().lower()
+    nom = nom_fournisseur(nom)
     table = table_fournisseurs(r)
     if nom not in table:
         raise ValueError(f"fournisseur VLM inconnu : {nom} (admis : {', '.join(table)})")
     url, modele, cle = table[nom]
+    if nom == "custom-hf-endpoint":
+        return FournisseurEndpointHF(nom, url, modele_choisi.strip() or modele, cle, r.vlm_timeout, client=client,
+                                     reglages=r)
     return FournisseurOpenAICompatible(nom, url, modele_choisi.strip() or modele, cle, r.vlm_timeout, client=client)
 
 
 def lister_modeles(nom: str, r: Reglages, timeout: float = 10) -> list[str]:
-    """Modèles accessibles chez un fournisseur (`GET …/models` des API OpenAI-compatibles)."""
-    url, _, cle = table_fournisseurs(r)[nom]
+    """Modèles proposés : liste de config/fournisseurs.yaml si elle existe, sinon
+    `GET …/models` de l'API OpenAI-compatible du fournisseur."""
+    proposes = modeles_proposes(nom)
+    if proposes is not None:
+        return proposes
+    url, _, cle = table_fournisseurs(r)[nom_fournisseur(nom)]
     if not url:
         raise ValueError("URL non configurée")
     base = url.rsplit("/chat/completions", 1)[0]

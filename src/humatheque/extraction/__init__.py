@@ -110,6 +110,8 @@ def extraire(fournisseur: FournisseurVLM, images: list[str | bytes], type_docume
     for lot in lots:
         contenu, appel = fournisseur.appeler(prompt.texte, lot)
         bruts.append(contenu)
+        # Endpoint HF dédié : vérification d'état et réveil, journalisés avant l'inférence
+        appels += getattr(fournisseur, "appels_prealables", list)()
         appels.append(appel)
         try:
             extraits.append(analyser_json(contenu))
