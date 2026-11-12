@@ -1,4 +1,4 @@
-# humatheque-catalogage — démonstrateur du workflow de catalogage assisté
+# humatheque-catalogage : démonstrateur du workflow de catalogage assisté
 
 Application web qui prend un document de thèse ou de mémoire (une ou plusieurs
 images, téléversées, par URL ou depuis le bucket MinIO) et produit une notice
@@ -8,7 +8,7 @@ Les règles de catalogage ne sont PAS dans le code : elles sont dans `regles/`
 les étapes Alma → provenance → Sudoc → IdRef → Dewey → création (ordre réglable dans
 chaque groupe, c'est l'ordre d'exécution), chacune avec
 son arbre de décision sur les codes renvoyés par l'API, sans traduction, et des
-résultats simples — stop, stop à reprendre, conversion, poursuite, poursuite
+résultats simples : stop, stop à reprendre, conversion, poursuite, poursuite
 avec alerte, poursuite à reprendre, création ; `notice/`, socle et variantes
 de la notice en zones et sous-zones structurées). Mot d'ordre : SIMPLE. Spécification fonctionnelle
 complète : `docs/SPEC.md`. La lire avant toute modification. Les exigences du

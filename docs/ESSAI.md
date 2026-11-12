@@ -1,4 +1,4 @@
-# Essai réel — 04/11/2026 (SPEC §11, étape 7)
+# Essai réel du 04/11/2026 (SPEC §11, étape 7)
 
 Conditions : VLM `google/gemma-4-26B-A4B-it:fastest` par Hugging Face Inference
 Providers (`VLM_FOURNISSEUR=hf`, stratégie `requete_unique`) ; services
@@ -94,7 +94,7 @@ restitué quand le dictionnaire n'en connaît qu'une forme.
    - (b) relever `IDREF_TIMEOUT` (300 à 600 s) ;
    - (c) traiter un délai dépassé sur **une** personne comme une exception non
      bloquante (repli `$a$b`, « IdRef indisponible pour X ») au lieu d'un
-     incident du dossier — écart au §6 (« API indisponible → incident ») ;
+     incident du dossier, écart au §6 (« API indisponible → incident ») ;
    - (d) ne relancer que les personnes en échec. Proposition : (a) + (d), puis
      (c) si cela ne suffit pas.
 2. **Titre non extrait** : le dossier part en incident sur une erreur 400

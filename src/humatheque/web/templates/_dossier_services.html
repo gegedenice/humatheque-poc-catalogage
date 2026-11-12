@@ -27,7 +27,7 @@
     <span class="puce {{ couleurs.get(r.resultat, 'bg-rail') }}" title="{{ r.chemin | join(' › ') }}">{% if r.objet %}{{ r.objet }} : {% endif %}{{ r.resultat }}{% if r.notice %} · {{ r.notice }}{% endif %}</span>
     {% endfor %}
   </div>
-  {% for r in resultats if r.motif %}<p class="text-xs text-sourdine">{% if r.objet %}{{ r.objet }} — {% endif %}{{ r.motif }}</p>{% endfor %}
+  {% for r in resultats if r.motif %}<p class="text-xs text-sourdine">{% if r.objet %}{{ r.objet }} : {% endif %}{{ r.motif }}</p>{% endfor %}
 
   {% if not executees %}
     <p class="text-sm text-sourdine">Non exécutée{% if d.etape_arret %} : arrêt à l'étape {{ vue.bilan.etape_libelle if vue.bilan else d.etape_arret }}{% endif %}.</p>
@@ -39,7 +39,7 @@
   {% elif c == "provenance" %}
     {{ ligne_provenance(d.provenance, d.metadonnees) }}
   {% elif c == "sudoc" and d.sudoc %}
-    <p class="text-xs text-sourdine">code <span class="font-mono">{{ d.sudoc.statut_service }}</span> · état agrégé <span class="font-mono">{{ d.etat_sudoc or "—" }}</span> · seuil {{ d.sudoc.seuil }} — {{ d.sudoc.justification }}</p>
+    <p class="text-xs text-sourdine">code <span class="font-mono">{{ d.sudoc.statut_service }}</span> · état agrégé <span class="font-mono">{{ d.etat_sudoc or "-" }}</span> · seuil {{ d.sudoc.seuil }} · {{ d.sudoc.justification }}</p>
     {{ table_sudoc(d.sudoc) }}
   {% elif c == "idref" and (d.idref_personnes or d.idref_organisations) %}
   <div class="defilant"><table class="tableau bg-white rounded-xl"><thead><tr><th>Personne / organisme</th><th>Code</th><th>PPN retenu</th><th>Meilleurs candidats</th></tr></thead><tbody>

@@ -14,7 +14,7 @@ def vers_winibw(notice: Notice, annoter: bool = False) -> str:
         ligne = z.texte()
         if annoter:
             regles = ", ".join(f"{r.id} [{r.statut}]" for r in z.regles)
-            ligne += f"    ← {regles}" + (f" — {z.libelle}" if z.libelle else "")
+            ligne += f"    ← {regles}" + (f" ({z.libelle})" if z.libelle else "")
         lignes.append(ligne)
     return "\n".join(lignes)
 

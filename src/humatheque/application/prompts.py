@@ -149,7 +149,7 @@ class Prompts:
         def ligne(champ: str, consigne: str, nom: str | None, v: Any, present: bool) -> Correspondance:
             return Correspondance(
                 champ=champ, consigne=consigne, variable=nom, present=present,
-                transformation=(v.transformation if v else "") or ("—" if v is None else "aucune"),
+                transformation=(v.transformation if v else "") or ("-" if v is None else "aucune"),
                 disponible=v.disponible if v else False, type=fixes.get(champ, v.type if v else "texte"),
                 liste=v.liste if v else champ in ctx["multivalues"], description=v.description if v else "",
                 type_fixe=champ in fixes)

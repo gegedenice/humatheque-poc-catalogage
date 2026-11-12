@@ -157,7 +157,7 @@ class Administration:
 
         try:
             return lister_modeles(fournisseur, self.reglages)
-        except Exception:  # noqa: BLE001 — affichage : le modèle de .env reste proposé
+        except Exception:  # noqa: BLE001 (affichage : le modèle de .env reste proposé)
             return []
 
     def fournisseur_effectif(self: "Application", fournisseur: str | None) -> tuple[str, str]:

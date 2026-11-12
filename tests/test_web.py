@@ -115,7 +115,7 @@ def test_notice_alma_certaine_sans_a_trancher(client):
     simuler(alma=sim.alma("academic_record_found", ppn="229969437"))
     page = client.get(_televerser(client).headers["location"])
     texte = html.unescape(page.text)
-    assert 'id="bilan"' in texte and "Alma — notice déjà dans Alma" in texte and "229969437" in texte
+    assert 'id="bilan"' in texte and "Alma : notice déjà dans Alma" in texte and "229969437" in texte
     assert "Faux positif" not in texte and "traité hors outil" not in texte and "Pas de notice" not in texte
     assert 'id="onglet-notice"' not in texte and 'id="onglet-extraction"' in texte
 
@@ -127,7 +127,7 @@ def test_resolution_par_formulaire(client, app):
     page = html.unescape(client.get(dossier).text)
     # Bilan (11/11) : étape et motif du pipeline, notice(s) candidate(s), actions sur place
     bilan = page[page.index('id="bilan"'):page.index('id="onglets-dossier"')]
-    assert "Alma — candidat Alma à vérifier" in bilan and "Notice(s) Alma candidate(s)" in bilan
+    assert "Alma : candidat Alma à vérifier" in bilan and "Notice(s) Alma candidate(s)" in bilan
     assert "Faux positif : poursuivre" in bilan and "Confirmer : notice déjà présente" in bilan \
         and "traité hors outil" in bilan
     assert 'id="service-alma"' in page and "Parcours du pipeline" in page \

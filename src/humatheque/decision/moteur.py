@@ -1,6 +1,6 @@
 """Décision (SPEC §7) : le pipeline de `regles/pipeline.yaml` appliqué au dossier.
 
-- `valeurs_etape` : ce que lit une étape — type, ephe, et les codes renvoyés
+- `valeurs_etape` : ce que lit une étape : type, ephe et les codes renvoyés
   par l'API de l'étape (status, thesis_state), sans traduction ;
 - `evaluer` (regles.moteur) donne le résultat : stop, stop à reprendre,
   conversion, poursuite (avec alerte, à reprendre), création ;

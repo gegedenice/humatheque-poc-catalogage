@@ -5,7 +5,7 @@
   <input type="hidden" name="etape" value="{{ etape.id }}"><input type="hidden" name="chemin" value="{{ chemin }}">
   <input type="hidden" name="operation" value="{{ operation }}">
   <div class="flex items-center gap-2">
-    <h4 class="font-semibold flex-1">{{ {"modifier": "Modifier la branche", "ajouter": "Nouvelle branche", "sous_branche": "Nouvelle sous-branche (ET)"}[operation] }}{% if sinon %} « sinon »{% endif %} — {{ etape.libelle }}</h4>
+    <h4 class="font-semibold flex-1">{{ {"modifier": "Modifier la branche", "ajouter": "Nouvelle branche", "sous_branche": "Nouvelle sous-branche (ET)"}[operation] }}{% if sinon %} « sinon »{% endif %} ({{ etape.libelle }})</h4>
     <button type="button" class="btn-icone w-8 h-8" aria-label="Fermer" onclick="this.closest('form').remove()">✕</button>
   </div>
   {% if not sinon %}
@@ -34,7 +34,7 @@
       </select></label>
     <label class="block"><span class="etiquette">Notice (conversion, création)</span>
       <select class="champ champ-sm" name="notice">
-        <option value="">—</option>
+        <option value="">-</option>
         {% for p in vue.profils %}<option value="{{ p.profil }}" {% if n.notice == p.profil %}selected{% endif %}>{{ p.profil }}</option>{% endfor %}
       </select></label>
     <label class="block"><span class="etiquette">Motif (affiché au dossier)</span>

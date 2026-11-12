@@ -1,5 +1,5 @@
 # Dictionnaire des variables utilisables dans la notice (studio › Notice UNIMARC).
-#   source         : d'où vient la valeur — extraction.<champ du prompt>, calcul,
+#   source         : d'où vient la valeur : extraction.<champ du prompt>, calcul,
 #                    service.<service>, constante ; hors extraction, la valeur porte
 #                    le nom de la variable dans le contexte
 #   transformation : ce que fait le démonstrateur entre le prompt et la notice

@@ -17,7 +17,7 @@
       <tbody>
       {% for v in banc.donnees %}
         <tr class="{% if not v.disponible %}text-sourdine{% endif %}"><td class="font-mono">{{ v.nom }}</td><td class="font-mono text-xs">{{ v.source }}</td>
-          <td class="break-words max-w-[28rem]">{% if v.valeur in (none, "", []) %}<span class="text-contour">{{ "indisponible" if not v.disponible else "—" }}</span>{% else %}{{ v.valeur | apercu_valeur }}{% endif %}</td></tr>
+          <td class="break-words max-w-[28rem]">{% if v.valeur in (none, "", []) %}<span class="text-contour">{{ "indisponible" if not v.disponible else "-" }}</span>{% else %}{{ v.valeur | apercu_valeur }}{% endif %}</td></tr>
       {% endfor %}
       </tbody>
     </table></div>
